@@ -1,8 +1,16 @@
+import { Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { cancelAppointment, logout } from "./actions";
-import { SHOP_NAME, todayISO } from "@/lib/constants";
+import { SHOP_NAME, todayISO, dayLabel } from "@/lib/constants";
 import ManualBookingForm from "./manual-booking-form";
 import NotificationsPanel from "./notifications-panel";
+
+function waitlistCountLabel(n: number) {
+  if (n === 1) return "1 stranka čaka na termin";
+  if (n === 2) return "2 stranki čakata na termin";
+  if (n === 3 || n === 4) return `${n} stranke čakajo na termin`;
+  return `${n} strank čaka na termin`;
+}
 
 export default async function OwnerDashboard() {
   const supabase = await createClient();
@@ -25,6 +33,12 @@ export default async function OwnerDashboard() {
     .eq("status", "pending")
     .order("created_at", { ascending: true });
 
+  const { data: waitlist, error: waitlistError } = await supabase
+    .from("waitlist")
+    .select("*")
+    .order("preferred_date", { ascending: true })
+    .order("created_at", { ascending: true });
+
   return (
     <div className="min-h-screen bg-ink text-cream font-sans px-6 py-10">
       <div className="max-w-2xl mx-auto">
@@ -43,6 +57,56 @@ export default async function OwnerDashboard() {
             </button>
           </form>
         </div>
+
+        {waitlistError ? (
+          <p className="text-sm text-rose mb-10">
+            Napaka pri branju čakajočih: {waitlistError.message}
+          </p>
+        ) : (
+          <div className="mb-10 rounded-lg border border-gold/40 bg-gradient-to-br from-[#2E2620] to-[#1B1815] p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <Users size={18} className="text-gold" />
+              <span className="font-display text-lg text-cream">
+                {waitlist && waitlist.length > 0
+                  ? waitlistCountLabel(waitlist.length)
+                  : "Čakajo na termin"}
+              </span>
+            </div>
+
+            {!waitlist || waitlist.length === 0 ? (
+              <p className="text-sm text-cream-muted">
+                Trenutno ni čakajočih - ko bo salon poln, se bodo stranke lahko
+                prijavile tukaj.
+              </p>
+            ) : (
+              <div className="mt-3 divide-y divide-border-soft">
+                {waitlist.map((w) => (
+                  <div
+                    key={w.id}
+                    className="flex items-center justify-between gap-3 py-2.5 text-sm"
+                  >
+                    <div>
+                      <span className="text-cream">{w.customer_name}</span>
+                      <span className="text-cream-faint ml-2">
+                        {w.customer_phone}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-gold text-xs">
+                        {w.service_preference === "vseeno"
+                          ? "Vseeno katera storitev"
+                          : w.service_preference}
+                      </div>
+                      <div className="text-cream-faint text-xs">
+                        {dayLabel(w.preferred_date)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-medium">Termini za danes</h2>

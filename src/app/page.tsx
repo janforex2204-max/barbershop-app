@@ -3,20 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { Scissors } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import {
-  SHOP_NAME,
-  HOURS,
-  todayISO,
-  dayLabel,
-  nextBusinessDayOffsets,
-} from "@/lib/constants";
+import { SHOP_NAME, HOURS, todayISO, dayLabel, upcomingBusinessWeeks } from "@/lib/constants";
+import DatePicker from "./date-picker";
 
 type Service = { id: string; name: string };
 type BookingForm = { name: string; phone: string; service: string; time: string };
 type WaitForm = { name: string; phone: string; service: string };
 
-// Salon dela torek-sobota - pokaži naslednje 3 delovne dni (preskoči nedeljo/ponedeljek).
-const DATE_OPTIONS = nextBusinessDayOffsets(3).map((o) => todayISO(o));
+// Prvi razpoložljivi delovni dan (torek-sobota) - privzeto izbrani datum.
+const INITIAL_DATE = upcomingBusinessWeeks()[0]?.dates[0] ?? todayISO();
 
 export default function Home() {
   const supabase = createClient();
@@ -24,7 +19,7 @@ export default function Home() {
   const [services, setServices] = useState<Service[]>([]);
   const [servicesLoading, setServicesLoading] = useState(true);
 
-  const [selectedDate, setSelectedDate] = useState(DATE_OPTIONS[0]);
+  const [selectedDate, setSelectedDate] = useState(INITIAL_DATE);
   const [takenTimes, setTakenTimes] = useState<Set<string>>(new Set());
   const [slotsLoading, setSlotsLoading] = useState(true);
 
@@ -180,21 +175,7 @@ export default function Home() {
         <h2 className="font-display text-xl font-semibold mb-1 text-cream">
           Izberi dan
         </h2>
-        <div className="flex gap-2 mb-7">
-          {DATE_OPTIONS.map((d) => (
-            <button
-              key={d}
-              onClick={() => selectDate(d)}
-              className={`flex-1 py-2.5 px-2 text-[13px] rounded-md capitalize cursor-pointer border transition-colors ${
-                selectedDate === d
-                  ? "border-gold bg-ink-elevated text-cream"
-                  : "border-border text-cream bg-transparent"
-              }`}
-            >
-              {dayLabel(d).split(",")[0]}
-            </button>
-          ))}
-        </div>
+        <DatePicker selectedDate={selectedDate} onSelect={selectDate} />
 
         {slotsLoading || servicesLoading ? (
           <p className="text-sm text-cream-dim">Nalagam proste termine...</p>
