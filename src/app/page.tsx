@@ -3,14 +3,21 @@
 import { useCallback, useEffect, useState } from "react";
 import { Scissors } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { SHOP_NAME, HOURS, todayISO, dayLabel } from "@/lib/constants";
+import {
+  SHOP_NAME,
+  HOURS,
+  todayISO,
+  dayLabel,
+  nextBusinessDayOffsets,
+} from "@/lib/constants";
 import type { TimePreference } from "@/types/database.types";
 
 type Service = { id: string; name: string };
 type BookingForm = { name: string; phone: string; service: string; time: string };
 type WaitForm = { name: string; phone: string; pref: TimePreference };
 
-const DATE_OPTIONS = [0, 1, 2].map((o) => todayISO(o));
+// Salon dela torek-sobota - pokaži naslednje 3 delovne dni (preskoči nedeljo/ponedeljek).
+const DATE_OPTIONS = nextBusinessDayOffsets(3).map((o) => todayISO(o));
 
 export default function Home() {
   const supabase = createClient();

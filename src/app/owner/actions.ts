@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { SHOP_NAME, HOURS, dayLabel, todayISO, weekdayOf, timeBucket } from "@/lib/constants";
+import { SHOP_NAME, dayLabel, weekdayOf, timeBucket, isBusinessDay } from "@/lib/constants";
 
 export async function login(formData: FormData) {
   const supabase = await createClient();
@@ -98,50 +98,59 @@ export async function cancelAppointment(appointmentId: string) {
   revalidatePath("/owner");
 }
 
-// Ko stranka iz SMS obvestila potrdi termin: zapolni sproščeni slot z novim
-// terminom (status "filled") in obvestilo označi kot prevzeto.
-export async function claimFromLog(logId: string) {
+// Ko lastnik pošlje pripravljeno WhatsApp sporočilo stranki, obvestilo
+// označimo kot obravnavano (izgine s seznama čakajočih). Če stranka termin
+// dejansko potrdi, ga lastnik doda ročno prek "Dodaj termin" obrazca.
+export async function markSmsSent(logId: string) {
   const supabase = await createClient();
-
-  const { data: log } = await supabase
-    .from("sms_notifications")
-    .select("*")
-    .eq("id", logId)
-    .single();
-
-  if (!log) return;
-
-  let date = todayISO();
-  let time = HOURS[0];
-  let service = "Strizenje";
-
-  if (log.appointment_id) {
-    const { data: cancelledAppt } = await supabase
-      .from("appointments")
-      .select("*")
-      .eq("id", log.appointment_id)
-      .single();
-
-    if (cancelledAppt) {
-      date = cancelledAppt.appointment_date;
-      time = cancelledAppt.appointment_time;
-      service = cancelledAppt.service;
-    }
-  }
-
-  await supabase.from("appointments").insert({
-    customer_name: log.recipient_name,
-    customer_phone: log.recipient_phone,
-    service,
-    appointment_date: date,
-    appointment_time: time,
-    status: "filled",
-  });
 
   await supabase
     .from("sms_notifications")
-    .update({ status: "claimed" })
+    .update({ status: "sent" })
     .eq("id", logId);
 
   revalidatePath("/owner");
+}
+
+export type ManualBookingState = { error?: string; success?: boolean };
+
+// Lastnik ročno doda termin (npr. telefonska rezervacija mimo spletnega obrazca).
+export async function addManualAppointment(
+  _prevState: ManualBookingState,
+  formData: FormData
+): Promise<ManualBookingState> {
+  const supabase = await createClient();
+
+  const customer_name = String(formData.get("customer_name") ?? "").trim();
+  const customer_phone = String(formData.get("customer_phone") ?? "").trim();
+  const service = String(formData.get("service") ?? "").trim();
+  const appointment_date = String(formData.get("appointment_date") ?? "");
+  const appointment_time = String(formData.get("appointment_time") ?? "");
+
+  if (!customer_name || !customer_phone || !service || !appointment_date || !appointment_time) {
+    return { error: "Izpolni vsa polja." };
+  }
+
+  if (!isBusinessDay(appointment_date)) {
+    return { error: "Salon ta dan ne dela (odprto torek-sobota)." };
+  }
+
+  const { error } = await supabase.from("appointments").insert({
+    customer_name,
+    customer_phone,
+    service,
+    appointment_date,
+    appointment_time,
+    status: "booked",
+  });
+
+  if (error) {
+    if (error.code === "23505") {
+      return { error: "Ta termin je bil pravkar zaseden. Izberi drugega." };
+    }
+    return { error: error.message };
+  }
+
+  revalidatePath("/owner");
+  return { success: true };
 }

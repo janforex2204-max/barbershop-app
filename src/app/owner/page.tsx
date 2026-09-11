@@ -1,7 +1,8 @@
-import { Bell } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { cancelAppointment, claimFromLog, logout } from "./actions";
+import { cancelAppointment, logout } from "./actions";
 import { SHOP_NAME, todayISO } from "@/lib/constants";
+import ManualBookingForm from "./manual-booking-form";
+import NotificationsPanel from "./notifications-panel";
 
 export default async function OwnerDashboard() {
   const supabase = await createClient();
@@ -43,7 +44,10 @@ export default async function OwnerDashboard() {
           </form>
         </div>
 
-        <h2 className="text-lg font-medium mb-3">Termini za danes</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-medium">Termini za danes</h2>
+          <ManualBookingForm />
+        </div>
         <div className="border border-border rounded-lg divide-y divide-border-soft mb-10">
           {error && (
             <p className="p-4 text-sm text-rose">
@@ -90,54 +94,13 @@ export default async function OwnerDashboard() {
           ))}
         </div>
 
-        <h2 className="text-lg font-medium mb-1 flex items-center gap-2">
-          <Bell size={18} className="text-gold" /> Poslana SMS obvestila
-        </h2>
-        <p className="text-xs text-cream-faint mb-3">
-          Simulacija — v resnični postavitvi gredo prek SMS ponudnika (npr.
-          Twilio).
-        </p>
-        <div className="border border-border rounded-lg divide-y divide-border-soft">
-          {smsError && (
-            <p className="p-4 text-sm text-rose">
-              Napaka pri branju obvestil: {smsError.message}
-            </p>
-          )}
-          {!smsError && smsLog?.length === 0 && (
-            <p className="p-4 text-sm text-cream-dim">
-              Ni aktivnih obvestil. Odpovej termin, da vidiš, kako sistem
-              reagira.
-            </p>
-          )}
-          {smsLog?.map((log) => (
-            <div
-              key={log.id}
-              className="flex items-center justify-between gap-3 px-4 py-3"
-            >
-              <div>
-                <div className="text-sm font-medium">
-                  {log.recipient_name}{" "}
-                  <span className="text-xs text-gold ml-1.5">
-                    {log.reason === "pattern_match"
-                      ? "AI zazna vzorec"
-                      : "čakalna vrsta"}
-                  </span>
-                </div>
-                <div className="text-xs text-cream-faint mt-0.5">
-                  {log.message}
-                </div>
-              </div>
-              <form action={claimFromLog.bind(null, log.id)}>
-                <button
-                  type="submit"
-                  className="whitespace-nowrap text-xs px-3 py-1.5 rounded border border-sage text-sage hover:bg-sage/10 cursor-pointer"
-                >
-                  Potrdi
-                </button>
-              </form>
-            </div>
-          ))}
-        </div>
+        {smsError ? (
+          <p className="text-sm text-rose">
+            Napaka pri branju obvestil: {smsError.message}
+          </p>
+        ) : (
+          <NotificationsPanel smsLog={smsLog ?? []} />
+        )}
       </div>
     </div>
   );
