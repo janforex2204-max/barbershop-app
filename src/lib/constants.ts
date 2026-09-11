@@ -97,6 +97,57 @@ export function upcomingBusinessWeeks(weekCount = 3): BusinessWeek[] {
   return weeks;
 }
 
+// ---------------------------------------------------------------------------
+// Mesečni koledar (lastnikova nadzorna plošča) - vse spodaj dela z "YYYY-MM".
+// ---------------------------------------------------------------------------
+
+export function monthOf(iso: string) {
+  return iso.slice(0, 7);
+}
+
+export function monthLabel(monthStr: string) {
+  const [y, m] = monthStr.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString("sl-SI", {
+    month: "long",
+    year: "numeric",
+  });
+}
+
+export function shiftMonth(monthStr: string, delta: number) {
+  const [y, m] = monthStr.split("-").map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+export function monthRange(monthStr: string): { start: string; end: string } {
+  const [y, m] = monthStr.split("-").map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+  return {
+    start: `${monthStr}-01`,
+    end: `${monthStr}-${String(lastDay).padStart(2, "0")}`,
+  };
+}
+
+// Mreža dni za mesečni koledar, teden se začne s ponedeljkom. `null` = prazna
+// celica za poravnavo (dan izven prikazanega meseca).
+export function monthGrid(monthStr: string): (string | null)[][] {
+  const [y, m] = monthStr.split("-").map(Number);
+  const month0 = m - 1;
+  const jsFirstWeekday = new Date(y, month0, 1).getDay(); // 0=ned..6=sob
+  const leadingBlanks = (jsFirstWeekday + 6) % 7; // pretvori v ponedeljek=0
+  const daysInMonth = new Date(y, month0 + 1, 0).getDate();
+
+  const cells: (string | null)[] = new Array(leadingBlanks).fill(null);
+  for (let day = 1; day <= daysInMonth; day++) {
+    cells.push(toISODate(new Date(y, month0, day)));
+  }
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const weeks: (string | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return weeks;
+}
+
 // Pretvori lokalno slovensko številko (npr. "040 123 456") v mednarodni
 // format brez "+", ki ga zahteva wa.me (npr. "386401234456").
 export function toWhatsAppPhone(phone: string): string {

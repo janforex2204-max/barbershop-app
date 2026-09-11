@@ -7,15 +7,19 @@ import { addManualAppointment, type ManualBookingState } from "./actions";
 
 type Service = { id: string; name: string };
 
-const DEFAULT_DATE = todayISO(nextBusinessDayOffsets(1)[0] ?? 0);
+const FALLBACK_DATE = todayISO(nextBusinessDayOffsets(1)[0] ?? 0);
 const initialState: ManualBookingState = {};
 
-export default function ManualBookingForm() {
+export default function ManualBookingForm({
+  initialDate,
+}: {
+  initialDate?: string;
+}) {
   const supabase = createClient();
 
   const [open, setOpen] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
-  const [date, setDate] = useState(DEFAULT_DATE);
+  const [date, setDate] = useState(initialDate ?? FALLBACK_DATE);
   const [time, setTime] = useState("");
   const [takenTimes, setTakenTimes] = useState<Set<string>>(new Set());
   const [slotsLoading, setSlotsLoading] = useState(true);

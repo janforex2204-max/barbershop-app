@@ -1,9 +1,10 @@
 import { Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { cancelAppointment, logout } from "./actions";
-import { SHOP_NAME, todayISO, dayLabel } from "@/lib/constants";
+import { SHOP_NAME, todayISO, dayLabel, monthOf, monthRange } from "@/lib/constants";
 import ManualBookingForm from "./manual-booking-form";
 import NotificationsPanel from "./notifications-panel";
+import MonthCalendar from "./month-calendar";
 
 function waitlistCountLabel(n: number) {
   if (n === 1) return "1 stranka čaka na termin";
@@ -12,7 +13,14 @@ function waitlistCountLabel(n: number) {
   return `${n} strank čaka na termin`;
 }
 
-export default async function OwnerDashboard() {
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const MONTH_RE = /^\d{4}-\d{2}$/;
+
+export default async function OwnerDashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ date?: string; month?: string }>;
+}) {
   const supabase = await createClient();
 
   const {
@@ -20,23 +28,50 @@ export default async function OwnerDashboard() {
   } = await supabase.auth.getUser();
 
   const today = todayISO();
+  const params = await searchParams;
+  const selectedDate = params.date && DATE_RE.test(params.date) ? params.date : today;
+  const monthStr =
+    params.month && MONTH_RE.test(params.month) ? params.month : monthOf(selectedDate);
+
+  const isToday = selectedDate === today;
+  const { start: monthStart, end: monthEnd } = monthRange(monthStr);
+
+  const { data: monthAppointments } = await supabase
+    .from("appointments")
+    .select("appointment_date")
+    .gte("appointment_date", monthStart)
+    .lte("appointment_date", monthEnd)
+    .neq("status", "cancelled");
+
+  const countsByDate: Record<string, number> = {};
+  for (const a of monthAppointments ?? []) {
+    countsByDate[a.appointment_date] = (countsByDate[a.appointment_date] ?? 0) + 1;
+  }
+
+  const { data: monthWaitlist } = await supabase
+    .from("waitlist")
+    .select("preferred_date")
+    .gte("preferred_date", monthStart)
+    .lte("preferred_date", monthEnd);
+
+  const waitingDates = new Set((monthWaitlist ?? []).map((w) => w.preferred_date));
 
   const { data: appointments, error } = await supabase
     .from("appointments")
     .select("*")
-    .eq("appointment_date", today)
+    .eq("appointment_date", selectedDate)
     .order("appointment_time", { ascending: true });
+
+  const { data: waitlist, error: waitlistError } = await supabase
+    .from("waitlist")
+    .select("*")
+    .eq("preferred_date", selectedDate)
+    .order("created_at", { ascending: true });
 
   const { data: smsLog, error: smsError } = await supabase
     .from("sms_notifications")
     .select("*")
     .eq("status", "pending")
-    .order("created_at", { ascending: true });
-
-  const { data: waitlist, error: waitlistError } = await supabase
-    .from("waitlist")
-    .select("*")
-    .order("preferred_date", { ascending: true })
     .order("created_at", { ascending: true });
 
   return (
@@ -58,6 +93,14 @@ export default async function OwnerDashboard() {
           </form>
         </div>
 
+        <MonthCalendar
+          monthStr={monthStr}
+          selectedDate={selectedDate}
+          today={today}
+          countsByDate={countsByDate}
+          waitingDates={waitingDates}
+        />
+
         {waitlistError ? (
           <p className="text-sm text-rose mb-10">
             Napaka pri branju čakajočih: {waitlistError.message}
@@ -72,6 +115,10 @@ export default async function OwnerDashboard() {
                   : "Čakajo na termin"}
               </span>
             </div>
+            <p className="text-xs text-cream-faint mb-2 capitalize">
+              {dayLabel(selectedDate)}
+              {isToday && " · danes"}
+            </p>
 
             {!waitlist || waitlist.length === 0 ? (
               <p className="text-sm text-cream-muted">
@@ -91,15 +138,10 @@ export default async function OwnerDashboard() {
                         {w.customer_phone}
                       </span>
                     </div>
-                    <div className="text-right">
-                      <div className="text-gold text-xs">
-                        {w.service_preference === "vseeno"
-                          ? "Vseeno katera storitev"
-                          : w.service_preference}
-                      </div>
-                      <div className="text-cream-faint text-xs">
-                        {dayLabel(w.preferred_date)}
-                      </div>
+                    <div className="text-gold text-xs">
+                      {w.service_preference === "vseeno"
+                        ? "Vseeno katera storitev"
+                        : w.service_preference}
                     </div>
                   </div>
                 ))}
@@ -109,8 +151,10 @@ export default async function OwnerDashboard() {
         )}
 
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-medium">Termini za danes</h2>
-          <ManualBookingForm />
+          <h2 className="text-lg font-medium capitalize">
+            Termini za {isToday ? "danes" : dayLabel(selectedDate)}
+          </h2>
+          <ManualBookingForm initialDate={selectedDate} />
         </div>
         <div className="border border-border rounded-lg divide-y divide-border-soft mb-10">
           {error && (
@@ -119,7 +163,7 @@ export default async function OwnerDashboard() {
             </p>
           )}
           {!error && appointments?.length === 0 && (
-            <p className="p-4 text-sm text-cream-dim">Ni terminov za danes.</p>
+            <p className="p-4 text-sm text-cream-dim">Ni terminov za ta dan.</p>
           )}
           {appointments?.map((a) => (
             <div
