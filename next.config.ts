@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Privzeta Next.js nastavitev zadošča za Vercel - build/output zazna samodejno.
 };
 
 export default nextConfig;
