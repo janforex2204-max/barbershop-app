@@ -1,26 +1,31 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
+/*
+  Barvna paleta in tipografija povzeta iz reference/barbershop-mvp.jsx —
+  fiksna temna "brand" tema (ne sledi sistemskemu light/dark).
+*/
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --font-display: var(--font-fraunces);
+  --font-sans: var(--font-inter);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-ink: #1b1815;
+  --color-ink-soft: #25201a;
+  --color-ink-elevated: #2e2620;
+  --color-ink-field: #151210;
+  --color-border: #3a342c;
+  --color-border-soft: #2a2520;
+  --color-cream: #efe6d8;
+  --color-cream-muted: #c9c2b4;
+  --color-cream-dim: #a39d91;
+  --color-cream-faint: #8a8377;
+  --color-cream-ghost: #7a756a;
+  --color-gold: #a67c3d;
+  --color-burgundy: #8c2f2f;
+  --color-rose: #c97d7d;
+  --color-sage: #7fa06b;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-ink);
+  color: var(--color-cream);
 }
