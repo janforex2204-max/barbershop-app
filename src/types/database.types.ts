@@ -3,8 +3,7 @@
 //   npx supabase gen types typescript --project-id <tvoj-project-id> > src/types/database.types.ts
 
 export type AppointmentStatus = "booked" | "cancelled" | "filled";
-export type TimePreference = "vseeno" | "dopoldan" | "popoldan";
-export type SmsReason = "waitlist" | "pattern_match";
+export type SmsReason = "waitlist" | "earlier_slot";
 export type SmsStatus = "pending" | "sent" | "claimed" | "failed";
 
 export type Database = {
@@ -37,6 +36,7 @@ export type Database = {
           appointment_date: string;
           appointment_time: string;
           status: AppointmentStatus;
+          barber_name: string;
           created_at: string;
         };
         Insert: {
@@ -47,6 +47,7 @@ export type Database = {
           appointment_date: string;
           appointment_time: string;
           status?: AppointmentStatus;
+          barber_name?: string;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["appointments"]["Insert"]>;
@@ -58,7 +59,8 @@ export type Database = {
           customer_name: string;
           customer_phone: string;
           preferred_date: string;
-          time_preference: TimePreference;
+          service_preference: string;
+          barber_name: string;
           created_at: string;
         };
         Insert: {
@@ -66,7 +68,8 @@ export type Database = {
           customer_name: string;
           customer_phone: string;
           preferred_date: string;
-          time_preference?: TimePreference;
+          service_preference?: string;
+          barber_name?: string;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["waitlist"]["Insert"]>;

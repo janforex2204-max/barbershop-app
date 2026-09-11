@@ -10,7 +10,7 @@ type SmsLog = {
   recipient_name: string;
   recipient_phone: string;
   message: string;
-  reason: "waitlist" | "pattern_match";
+  reason: "waitlist" | "earlier_slot";
 };
 
 export default function NotificationsPanel({ smsLog }: { smsLog: SmsLog[] }) {
@@ -73,9 +73,9 @@ export default function NotificationsPanel({ smsLog }: { smsLog: SmsLog[] }) {
                   <div className="text-sm font-medium">
                     {log.recipient_name}{" "}
                     <span className="text-xs text-gold ml-1.5">
-                      {log.reason === "pattern_match"
-                        ? "AI zazna vzorec"
-                        : "čakalna vrsta"}
+                      {log.reason === "earlier_slot"
+                        ? "zgodnejši termin"
+                        : "želi termin"}
                     </span>
                   </div>
                   <div className="text-xs text-cream-faint mt-0.5">

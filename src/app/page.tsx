@@ -10,11 +10,10 @@ import {
   dayLabel,
   nextBusinessDayOffsets,
 } from "@/lib/constants";
-import type { TimePreference } from "@/types/database.types";
 
 type Service = { id: string; name: string };
 type BookingForm = { name: string; phone: string; service: string; time: string };
-type WaitForm = { name: string; phone: string; pref: TimePreference };
+type WaitForm = { name: string; phone: string; service: string };
 
 // Salon dela torek-sobota - pokaži naslednje 3 delovne dni (preskoči nedeljo/ponedeljek).
 const DATE_OPTIONS = nextBusinessDayOffsets(3).map((o) => todayISO(o));
@@ -38,7 +37,7 @@ export default function Home() {
   const [waitForm, setWaitForm] = useState<WaitForm>({
     name: "",
     phone: "",
-    pref: "vseeno",
+    service: "vseeno",
   });
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -132,7 +131,7 @@ export default function Home() {
 
   async function joinWaitlist() {
     if (!waitForm.name || !waitForm.phone) {
-      showToast("Izpolni ime in telefon za čakalno vrsto.");
+      showToast("Izpolni ime in telefon.");
       return;
     }
     setSubmitting(true);
@@ -140,7 +139,7 @@ export default function Home() {
       customer_name: waitForm.name,
       customer_phone: waitForm.phone,
       preferred_date: selectedDate,
-      time_preference: waitForm.pref,
+      service_preference: waitForm.service,
     });
     setSubmitting(false);
 
@@ -149,8 +148,8 @@ export default function Home() {
       return;
     }
 
-    setWaitForm({ name: "", phone: "", pref: "vseeno" });
-    showToast("Dodan/a na čakalno vrsto. Obvestimo te, če se sprosti termin.");
+    setWaitForm({ name: "", phone: "", service: "vseeno" });
+    showToast("Obvestili te bomo, ko se kaj sprosti.");
   }
 
   return (
@@ -256,8 +255,8 @@ export default function Home() {
         ) : (
           <div className="border border-border rounded-lg p-5">
             <p className="text-sm text-cream-muted mb-4">
-              Ta dan je popolnoma zaseden. Pridruži se čakalni vrsti — obvestimo
-              te takoj, ko se kaj sprosti.
+              Ta dan je popolnoma zaseden. Povej nam, katero storitev želiš, in
+              te obvestimo, ko se kaj sprosti.
             </p>
             <input
               placeholder="Ime in priimek"
@@ -272,22 +271,23 @@ export default function Home() {
               className={inputClass}
             />
             <select
-              value={waitForm.pref}
-              onChange={(e) =>
-                setWaitForm((f) => ({ ...f, pref: e.target.value as TimePreference }))
-              }
+              value={waitForm.service}
+              onChange={(e) => setWaitForm((f) => ({ ...f, service: e.target.value }))}
               className={inputClass}
             >
-              <option value="vseeno">Kadarkoli</option>
-              <option value="dopoldan">Dopoldan</option>
-              <option value="popoldan">Popoldan</option>
+              <option value="vseeno">Vseeno katera storitev</option>
+              {services.map((s) => (
+                <option key={s.id} value={s.name}>
+                  {s.name}
+                </option>
+              ))}
             </select>
             <button
               onClick={joinWaitlist}
               disabled={submitting}
               className="w-full py-3 rounded-md border-none bg-burgundy text-cream text-sm font-semibold cursor-pointer mt-1 disabled:opacity-60"
             >
-              Pridruži se čakalni vrsti
+              Obvesti me, ko se kaj sprosti
             </button>
           </div>
         )}

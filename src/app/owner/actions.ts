@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { SHOP_NAME, dayLabel, weekdayOf, timeBucket, isBusinessDay } from "@/lib/constants";
+import { isBusinessDay } from "@/lib/constants";
 
 export async function login(formData: FormData) {
   const supabase = await createClient();
@@ -25,10 +25,11 @@ export async function logout() {
   redirect("/owner/login");
 }
 
-// Odpove termin in poišče stranke, ki jih je smiselno obvestiti o sprostitvi:
-// 1. čakalna vrsta za ta dan (ki ustreza dopoldan/popoldan preferenci),
-// 2. pretekle stranke, ki so na ta isti dan v tednu + uro že rezervirale
-//    (ujemanje vzorca), brez podvajanja telefonskih številk iz #1.
+// Odpove termin in poišče stranke, ki jih je smiselno obvestiti o sprostitvi,
+// v dveh ločenih skupinah (vsaka s svojim sporočilom):
+// 1. stranke, ki imajo isti dan že rezerviran kasnejši termin za ISTO
+//    storitev - lahko bi prišle prej;
+// 2. ljudje na seznamu "Obvesti me", ki so izbrali to storitev (ali "vseeno").
 export async function cancelAppointment(appointmentId: string) {
   const supabase = await createClient();
 
@@ -45,48 +46,48 @@ export async function cancelAppointment(appointmentId: string) {
     .update({ status: "cancelled" })
     .eq("id", appointmentId);
 
-  const bucket = timeBucket(appt.appointment_time);
+  const { data: laterSameService } = await supabase
+    .from("appointments")
+    .select("customer_name, customer_phone")
+    .eq("appointment_date", appt.appointment_date)
+    .eq("service", appt.service)
+    .neq("id", appointmentId)
+    .neq("status", "cancelled")
+    .gt("appointment_time", appt.appointment_time);
+
+  const earlierSlotSeen = new Set<string>();
+  const earlierSlotMatches = (laterSameService ?? []).filter((a) => {
+    if (earlierSlotSeen.has(a.customer_phone)) return false;
+    earlierSlotSeen.add(a.customer_phone);
+    return true;
+  });
+
   const { data: waitMatches } = await supabase
     .from("waitlist")
     .select("*")
     .eq("preferred_date", appt.appointment_date)
-    .in("time_preference", ["vseeno", bucket]);
+    .in("service_preference", ["vseeno", appt.service]);
 
-  const wd = weekdayOf(appt.appointment_date);
-  const { data: sameTimeAppts } = await supabase
-    .from("appointments")
-    .select("customer_name, customer_phone, appointment_date")
-    .eq("appointment_time", appt.appointment_time)
-    .neq("id", appointmentId)
-    .neq("status", "cancelled");
-
-  const seenPhones = new Set((waitMatches ?? []).map((w) => w.customer_phone));
-  const patternMatches: { customer_name: string; customer_phone: string }[] = [];
-  const patternSeen = new Set<string>();
-  for (const a of sameTimeAppts ?? []) {
-    if (weekdayOf(a.appointment_date) !== wd) continue;
-    if (seenPhones.has(a.customer_phone) || patternSeen.has(a.customer_phone)) continue;
-    patternSeen.add(a.customer_phone);
-    patternMatches.push(a);
-  }
+  const waitlistSeen = new Set<string>();
+  const waitlistMatches = (waitMatches ?? []).filter((w) => {
+    if (waitlistSeen.has(w.customer_phone)) return false;
+    waitlistSeen.add(w.customer_phone);
+    return true;
+  });
 
   const newLogs = [
-    ...(waitMatches ?? []).map((w) => ({
-      recipient_name: w.customer_name,
-      recipient_phone: w.customer_phone,
-      message: `Sprostil se je termin ob ${appt.appointment_time} (${dayLabel(
-        appt.appointment_date
-      )}) pri ${SHOP_NAME}. Odgovori DA za rezervacijo.`,
-      reason: "waitlist" as const,
+    ...earlierSlotMatches.map((a) => ({
+      recipient_name: a.customer_name,
+      recipient_phone: a.customer_phone,
+      message: `Sprostil se je zgodnejši termin ob ${appt.appointment_time} - bi rad prišel prej?`,
+      reason: "earlier_slot" as const,
       appointment_id: appointmentId,
     })),
-    ...patternMatches.map((p) => ({
-      recipient_name: p.customer_name,
-      recipient_phone: p.customer_phone,
-      message: `Prost termin ob ${appt.appointment_time} (${dayLabel(
-        appt.appointment_date
-      )}) — tvoj običajni čas pri ${SHOP_NAME}. Odgovori DA za rezervacijo.`,
-      reason: "pattern_match" as const,
+    ...waitlistMatches.map((w) => ({
+      recipient_name: w.customer_name,
+      recipient_phone: w.customer_phone,
+      message: `Sprostil se je termin za ${appt.service} ob ${appt.appointment_time} - se želiš rezervirati?`,
+      reason: "waitlist" as const,
       appointment_id: appointmentId,
     })),
   ];

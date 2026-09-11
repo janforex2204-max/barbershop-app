@@ -1,4 +1,6 @@
 export const SHOP_NAME = "Barbershop pr' Kljuni";
+// Priprava na več frizerjev (funkcionalnost še ne obstaja) - privzeto ime lastnika.
+export const OWNER_NAME = "Žiga Kljun";
 
 export const HOURS = [
   "09:00",
@@ -47,11 +49,6 @@ export function nextBusinessDayOffsets(count: number, maxLookahead = 21) {
     if (isBusinessDay(todayISO(o))) offsets.push(o);
   }
   return offsets;
-}
-
-export function timeBucket(hhmm: string): "dopoldan" | "popoldan" {
-  const h = parseInt(hhmm.split(":")[0], 10);
-  return h < 13 ? "dopoldan" : "popoldan";
 }
 
 // Pretvori lokalno slovensko številko (npr. "040 123 456") v mednarodni

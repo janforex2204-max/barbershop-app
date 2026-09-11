@@ -30,6 +30,8 @@ create table if not exists appointments (
   appointment_date date not null,
   appointment_time text not null check (appointment_time ~ '^[0-2][0-9]:[0-5][0-9]$'),
   status text not null default 'booked' check (status in ('booked', 'cancelled', 'filled')),
+  -- Priprava na več frizerjev (funkcionalnost še ne obstaja v UI) - privzeto lastnik.
+  barber_name text not null default 'Žiga Kljun',
   created_at timestamptz not null default now()
 );
 
@@ -48,7 +50,10 @@ create table if not exists waitlist (
   customer_name text not null,
   customer_phone text not null,
   preferred_date date not null,
-  time_preference text not null default 'vseeno' check (time_preference in ('vseeno', 'dopoldan', 'popoldan')),
+  -- Katero storitev stranka čaka, ali 'vseeno' za katerokoli.
+  service_preference text not null default 'vseeno',
+  -- Priprava na več frizerjev (funkcionalnost še ne obstaja v UI) - privzeto lastnik.
+  barber_name text not null default 'Žiga Kljun',
   created_at timestamptz not null default now()
 );
 
@@ -62,7 +67,7 @@ create table if not exists sms_notifications (
   recipient_name text not null,
   recipient_phone text not null,
   message text not null,
-  reason text not null check (reason in ('waitlist', 'pattern_match')),
+  reason text not null check (reason in ('waitlist', 'earlier_slot')),
   appointment_id uuid references appointments(id) on delete set null,
   status text not null default 'pending' check (status in ('pending', 'sent', 'claimed', 'failed')),
   created_at timestamptz not null default now()
