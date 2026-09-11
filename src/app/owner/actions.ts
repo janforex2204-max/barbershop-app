@@ -82,6 +82,7 @@ export async function cancelAppointment(appointmentId: string) {
       message: `Sprostil se je zgodnejši termin ob ${appt.appointment_time} - bi rad prišel prej?`,
       reason: "earlier_slot" as const,
       appointment_id: appointmentId,
+      appointment_date: appt.appointment_date,
     })),
     ...waitlistMatches.map((w) => ({
       recipient_name: w.customer_name,
@@ -89,6 +90,7 @@ export async function cancelAppointment(appointmentId: string) {
       message: `Sprostil se je termin za ${appt.service} ob ${appt.appointment_time} - se želiš rezervirati?`,
       reason: "waitlist" as const,
       appointment_id: appointmentId,
+      appointment_date: appt.appointment_date,
     })),
   ];
 

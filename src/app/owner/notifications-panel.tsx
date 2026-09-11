@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Bell, MessageCircle, Sparkles, Zap } from "lucide-react";
-import { whatsAppLink } from "@/lib/constants";
+import { whatsAppLink, dayLabel } from "@/lib/constants";
 import { markSmsSent } from "./actions";
 
 type SmsLog = {
@@ -13,7 +13,15 @@ type SmsLog = {
   reason: "waitlist" | "earlier_slot";
 };
 
-export default function NotificationsPanel({ smsLog }: { smsLog: SmsLog[] }) {
+export default function NotificationsPanel({
+  smsLog,
+  selectedDate,
+  isToday,
+}: {
+  smsLog: SmsLog[];
+  selectedDate: string;
+  isToday: boolean;
+}) {
   const [mode, setMode] = useState<"manual" | "auto">("manual");
 
   async function handleSend(log: SmsLog) {
@@ -23,9 +31,13 @@ export default function NotificationsPanel({ smsLog }: { smsLog: SmsLog[] }) {
 
   return (
     <div>
-      <h2 className="text-lg font-medium mb-3 flex items-center gap-2">
+      <h2 className="text-lg font-medium mb-1 flex items-center gap-2">
         <Bell size={18} className="text-gold" /> Obveščanje strank
       </h2>
+      <p className="text-xs text-cream-faint mb-3 capitalize">
+        {dayLabel(selectedDate)}
+        {isToday && " · danes"}
+      </p>
 
       <div className="inline-flex gap-1 bg-ink-soft p-1 rounded-md mb-4">
         <button
@@ -60,8 +72,7 @@ export default function NotificationsPanel({ smsLog }: { smsLog: SmsLog[] }) {
           <div className="border border-border rounded-lg divide-y divide-border-soft">
             {smsLog.length === 0 && (
               <p className="p-4 text-sm text-cream-dim">
-                Ni aktivnih obvestil. Odpovej termin, da vidiš, kako sistem
-                reagira.
+                Ni aktivnih obvestil za ta dan.
               </p>
             )}
             {smsLog.map((log) => (

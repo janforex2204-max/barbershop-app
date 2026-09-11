@@ -72,6 +72,7 @@ export default async function OwnerDashboard({
     .from("sms_notifications")
     .select("*")
     .eq("status", "pending")
+    .eq("appointment_date", selectedDate)
     .order("created_at", { ascending: true });
 
   return (
@@ -207,7 +208,11 @@ export default async function OwnerDashboard({
             Napaka pri branju obvestil: {smsError.message}
           </p>
         ) : (
-          <NotificationsPanel smsLog={smsLog ?? []} />
+          <NotificationsPanel
+            smsLog={smsLog ?? []}
+            selectedDate={selectedDate}
+            isToday={isToday}
+          />
         )}
       </div>
     </div>

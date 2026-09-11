@@ -83,6 +83,7 @@ export type Database = {
           message: string;
           reason: SmsReason;
           appointment_id: string | null;
+          appointment_date: string | null;
           status: SmsStatus;
           created_at: string;
         };
@@ -93,6 +94,7 @@ export type Database = {
           message: string;
           reason: SmsReason;
           appointment_id?: string | null;
+          appointment_date?: string | null;
           status?: SmsStatus;
           created_at?: string;
         };

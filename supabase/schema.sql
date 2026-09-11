@@ -69,9 +69,14 @@ create table if not exists sms_notifications (
   message text not null,
   reason text not null check (reason in ('waitlist', 'earlier_slot')),
   appointment_id uuid references appointments(id) on delete set null,
+  -- Kateri dan se obvestilo tiče (da ga nadzorna plošča lahko filtrira po
+  -- izbranem dnevu v koledarju, enako kot termine in čakalno vrsto).
+  appointment_date date,
   status text not null default 'pending' check (status in ('pending', 'sent', 'claimed', 'failed')),
   created_at timestamptz not null default now()
 );
+
+create index if not exists sms_notifications_date_idx on sms_notifications (appointment_date);
 
 -- ---------------------------------------------------------------------------
 -- VARNOST (Row Level Security)
