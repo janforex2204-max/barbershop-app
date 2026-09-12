@@ -99,8 +99,8 @@ export default async function OwnerDashboard({
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <p className="font-display text-lg text-gold mb-1">{SHOP_NAME}</p>
-            <h1 className="text-2xl font-semibold">Nadzorna plošča</h1>
+            <p className="font-display text-3xl text-gold mb-1">{SHOP_NAME}</p>
+            <h1 className="text-sm font-medium text-cream-dim">Nadzorna plošča</h1>
             <p className="text-sm text-cream-faint">{user?.email}</p>
           </div>
           <form action={logout}>
