@@ -1,7 +1,15 @@
-import { Users } from "lucide-react";
+import { Clock, MessageCircle, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { cancelAppointment, logout } from "./actions";
-import { SHOP_NAME, todayISO, dayLabel, monthOf, monthRange } from "@/lib/constants";
+import {
+  SHOP_NAME,
+  todayISO,
+  dayLabel,
+  monthOf,
+  monthRange,
+  nextBusinessDayAfterToday,
+  whatsAppLink,
+} from "@/lib/constants";
 import ManualBookingForm from "./manual-booking-form";
 import NotificationsPanel from "./notifications-panel";
 import MonthCalendar from "./month-calendar";
@@ -67,6 +75,17 @@ export default async function OwnerDashboard({
     .select("*")
     .eq("preferred_date", selectedDate)
     .order("created_at", { ascending: true });
+
+  const tomorrow = todayISO(1);
+  const nextBizDay = nextBusinessDayAfterToday();
+  const isLiterallyTomorrow = nextBizDay === tomorrow;
+
+  const { data: tomorrowAppointments, error: tomorrowError } = await supabase
+    .from("appointments")
+    .select("*")
+    .eq("appointment_date", nextBizDay)
+    .neq("status", "cancelled")
+    .order("appointment_time", { ascending: true });
 
   const { data: smsLog, error: smsError } = await supabase
     .from("sms_notifications")
@@ -201,6 +220,48 @@ export default async function OwnerDashboard({
               )}
             </div>
           ))}
+        </div>
+
+        <h2 className="text-lg font-medium mb-1 flex items-center gap-2">
+          <Clock size={18} className="text-gold" />
+          {isLiterallyTomorrow ? "Termini za jutri" : `Termini za ${dayLabel(nextBizDay)}`}
+        </h2>
+        <p className="text-xs text-cream-faint mb-3 capitalize">{dayLabel(nextBizDay)}</p>
+        <div className="border border-border rounded-lg divide-y divide-border-soft mb-10">
+          {tomorrowError && (
+            <p className="p-4 text-sm text-rose">
+              Napaka pri branju terminov: {tomorrowError.message}
+            </p>
+          )}
+          {!tomorrowError && tomorrowAppointments?.length === 0 && (
+            <p className="p-4 text-sm text-cream-dim">Ni terminov za ta dan.</p>
+          )}
+          {tomorrowAppointments?.map((a) => {
+            const intro = isLiterallyTomorrow ? "jutri" : dayLabel(nextBizDay);
+            const reminderMessage = `Opomnik: ${intro} ob ${a.appointment_time} imaš rezervacijo za ${a.service} - ${SHOP_NAME}. Se vidimo!`;
+            return (
+              <div
+                key={a.id}
+                className="flex items-center justify-between gap-3 px-4 py-3 text-sm"
+              >
+                <div>
+                  <span className="text-gold font-medium mr-3">
+                    {a.appointment_time}
+                  </span>
+                  <span className="text-cream">{a.customer_name}</span>
+                  <span className="text-cream-faint"> — {a.service}</span>
+                </div>
+                <a
+                  href={whatsAppLink(a.customer_phone, reminderMessage)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="whitespace-nowrap flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-sage text-sage hover:bg-sage/10"
+                >
+                  <MessageCircle size={13} /> Pošlji opomnik
+                </a>
+              </div>
+            );
+          })}
         </div>
 
         {smsError ? (

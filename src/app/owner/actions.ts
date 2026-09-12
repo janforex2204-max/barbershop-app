@@ -115,7 +115,17 @@ export async function markSmsSent(logId: string) {
   revalidatePath("/owner");
 }
 
-export type ManualBookingState = { error?: string; success?: boolean };
+export type ManualBookingState = {
+  error?: string;
+  success?: boolean;
+  booked?: {
+    name: string;
+    phone: string;
+    date: string;
+    time: string;
+    service: string;
+  };
+};
 
 // Lastnik ročno doda termin (npr. telefonska rezervacija mimo spletnega obrazca).
 export async function addManualAppointment(
@@ -155,5 +165,14 @@ export async function addManualAppointment(
   }
 
   revalidatePath("/owner");
-  return { success: true };
+  return {
+    success: true,
+    booked: {
+      name: customer_name,
+      phone: customer_phone,
+      date: appointment_date,
+      time: appointment_time,
+      service,
+    },
+  };
 }

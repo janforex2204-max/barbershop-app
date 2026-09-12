@@ -59,6 +59,15 @@ export function nextBusinessDayOffsets(count: number, maxLookahead = 21) {
   return offsets;
 }
 
+// Prvi delovni dan po danes (preskoči nedeljo/ponedeljek) - za "Termini za
+// jutri" na nadzorni plošči.
+export function nextBusinessDayAfterToday(maxLookahead = 14) {
+  for (let o = 1; o <= maxLookahead; o++) {
+    if (isBusinessDay(todayISO(o))) return todayISO(o);
+  }
+  return todayISO(1);
+}
+
 // Ponedeljek tega tedna za dani datum (uporabljeno za grupiranje po tednih).
 function mondayOf(iso: string): Date {
   const d = new Date(iso + "T00:00:00");

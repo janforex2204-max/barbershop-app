@@ -1,8 +1,17 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import { MessageCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { HOURS, dayLabel, isBusinessDay, nextBusinessDayOffsets, todayISO } from "@/lib/constants";
+import {
+  HOURS,
+  SHOP_NAME,
+  dayLabel,
+  isBusinessDay,
+  nextBusinessDayOffsets,
+  todayISO,
+  whatsAppLink,
+} from "@/lib/constants";
 import { addManualAppointment, type ManualBookingState } from "./actions";
 
 type Service = { id: string; name: string };
@@ -115,10 +124,25 @@ export default function ManualBookingForm({
         </button>
       </div>
 
-      {state.success && (
-        <p className="text-xs text-sage bg-[#16241a] border border-[#2a4a34] rounded-md px-3 py-2 mb-3">
-          Termin je bil dodan.
-        </p>
+      {state.success && state.booked && (
+        <div className="mb-3 space-y-2">
+          <p className="text-xs text-sage bg-[#16241a] border border-[#2a4a34] rounded-md px-3 py-2">
+            Termin je bil dodan.
+          </p>
+          <a
+            href={whatsAppLink(
+              state.booked.phone,
+              `Pozdravljen/a ${state.booked.name}, tvoja rezervacija je potrjena: ${dayLabel(
+                state.booked.date
+              )} ob ${state.booked.time}, ${state.booked.service} - ${SHOP_NAME}`
+            )}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-1.5 w-full py-2 rounded-md border border-sage text-sage text-xs font-medium hover:bg-sage/10"
+          >
+            <MessageCircle size={13} /> Pošlji potrditev
+          </a>
+        </div>
       )}
       {state.error && (
         <p className="text-xs text-rose bg-[#2A1616] border border-[#4A2626] rounded-md px-3 py-2 mb-3">
