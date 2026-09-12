@@ -36,6 +36,43 @@ export default async function OwnerDashboard({
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Odobritev lastnika: manjkajoča vrstica (star/ročno ustvarjen račun) se
+  // šteje kot odobrena, da se z uvedbo te tabele ne zaklene obstoječi dostop -
+  // zavrnjen je samo, če vrstica OBSTAJA in status ni "approved".
+  if (user) {
+    const { data: ownerRow } = await supabase
+      .from("salon_owners")
+      .select("status, salon_name")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (ownerRow && ownerRow.status !== "approved") {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-ink font-sans px-4">
+          <div className="w-full max-w-sm border border-border rounded-lg p-6 space-y-4 text-center">
+            <p className="font-display text-lg text-gold">{SHOP_NAME}</p>
+            <p className="text-sm text-cream">
+              {ownerRow.status === "rejected"
+                ? "Tvoja registracija ni bila odobrena."
+                : "Tvoj račun čaka na odobritev."}
+            </p>
+            <p className="text-xs text-cream-faint">
+              {ownerRow.salon_name} · {user.email}
+            </p>
+            <form action={logout}>
+              <button
+                type="submit"
+                className="w-full rounded-md border border-border text-cream text-sm font-medium py-2 hover:bg-ink-soft cursor-pointer"
+              >
+                Odjava
+              </button>
+            </form>
+          </div>
+        </div>
+      );
+    }
+  }
+
   const today = todayISO();
   const params = await searchParams;
   const selectedDate = params.date && DATE_RE.test(params.date) ? params.date : today;

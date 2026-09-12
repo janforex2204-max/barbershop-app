@@ -5,6 +5,7 @@
 export type AppointmentStatus = "booked" | "cancelled" | "filled";
 export type SmsReason = "waitlist" | "earlier_slot";
 export type SmsStatus = "pending" | "sent" | "claimed" | "failed";
+export type OwnerStatus = "pending" | "approved" | "rejected";
 
 export type Database = {
   public: {
@@ -99,6 +100,24 @@ export type Database = {
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["sms_notifications"]["Insert"]>;
+        Relationships: [];
+      };
+      salon_owners: {
+        Row: {
+          id: string;
+          user_id: string;
+          salon_name: string;
+          status: OwnerStatus;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          salon_name: string;
+          status?: OwnerStatus;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["salon_owners"]["Insert"]>;
         Relationships: [];
       };
     };

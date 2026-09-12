@@ -79,6 +79,17 @@ create table if not exists sms_notifications (
 create index if not exists sms_notifications_date_idx on sms_notifications (appointment_date);
 
 -- ---------------------------------------------------------------------------
+-- LASTNIKI SALONA (registracija + ročna odobritev)
+-- ---------------------------------------------------------------------------
+create table if not exists salon_owners (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null unique references auth.users(id) on delete cascade,
+  salon_name text not null,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  created_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------------
 -- VARNOST (Row Level Security)
 --
 -- Lastnik salona se prijavi prek Supabase Auth (email + geslo) in ima poln
@@ -91,6 +102,7 @@ alter table services enable row level security;
 alter table appointments enable row level security;
 alter table waitlist enable row level security;
 alter table sms_notifications enable row level security;
+alter table salon_owners enable row level security;
 
 -- Vsak "create policy" ima pred sabo "drop policy if exists", da je celoten
 -- skript varno ponovno zagnati (npr. če se popravi samo en del sheme).
@@ -128,6 +140,19 @@ create policy "waitlist_anon_insert" on waitlist
 drop policy if exists "sms_notifications_owner_full_access" on sms_notifications;
 create policy "sms_notifications_owner_full_access" on sms_notifications
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+
+-- salon_owners: vsak uporabnik lahko bere in vstavi SAMO svojo vrstico
+-- (registracija + preverjanje lastnega statusa po prijavi). Odobritev
+-- (sprememba status -> 'approved') se dela ročno prek Table Editorja s
+-- postgres/service_role dostopom, ki RLS itak obide - zato tu ni potrebna
+-- posebna "owner manage" politika.
+drop policy if exists "salon_owners_self_select" on salon_owners;
+create policy "salon_owners_self_select" on salon_owners
+  for select using (auth.uid() = user_id);
+
+drop policy if exists "salon_owners_self_insert" on salon_owners;
+create policy "salon_owners_self_insert" on salon_owners
+  for insert to authenticated with check (auth.uid() = user_id);
 
 -- ---------------------------------------------------------------------------
 -- JAVNA ZASEDENOST - view brez osebnih podatkov, ki ga smejo brati stranke.

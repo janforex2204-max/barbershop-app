@@ -1,8 +1,7 @@
-import { login } from "../actions";
+import { registerOwner } from "./actions";
 import { SHOP_NAME } from "@/lib/constants";
-import ForgotPassword from "./forgot-password";
 
-export default async function LoginPage({
+export default async function RegisterPage({
   searchParams,
 }: {
   searchParams: Promise<{ error?: string }>;
@@ -15,8 +14,11 @@ export default async function LoginPage({
         <div>
           <p className="font-display text-lg text-gold mb-1">{SHOP_NAME}</p>
           <h1 className="text-xl font-semibold text-cream">
-            Prijava za lastnika
+            Registracija lastnika salona
           </h1>
+          <p className="text-xs text-cream-faint mt-1">
+            Po registraciji tvoj račun čaka na ročno odobritev.
+          </p>
         </div>
 
         {error && (
@@ -25,7 +27,20 @@ export default async function LoginPage({
           </p>
         )}
 
-        <form action={login} className="space-y-4">
+        <form action={registerOwner} className="space-y-4">
+          <div className="space-y-1">
+            <label htmlFor="salon_name" className="text-sm text-cream-dim">
+              Ime salona
+            </label>
+            <input
+              id="salon_name"
+              name="salon_name"
+              type="text"
+              required
+              className="w-full rounded-md border border-border bg-ink-field px-3 py-2 text-cream text-sm"
+            />
+          </div>
+
           <div className="space-y-1">
             <label htmlFor="email" className="text-sm text-cream-dim">
               E-pošta
@@ -48,6 +63,7 @@ export default async function LoginPage({
               name="password"
               type="password"
               required
+              minLength={6}
               className="w-full rounded-md border border-border bg-ink-field px-3 py-2 text-cream text-sm"
             />
           </div>
@@ -56,17 +72,15 @@ export default async function LoginPage({
             type="submit"
             className="w-full rounded-md bg-burgundy hover:opacity-90 text-cream text-sm font-medium py-2 transition-opacity cursor-pointer"
           >
-            Prijava
+            Registriraj se
           </button>
         </form>
 
-        <ForgotPassword />
-
         <a
-          href="/register"
+          href="/owner/login"
           className="block text-center text-xs text-cream-dim hover:text-cream underline"
         >
-          Nimaš računa? Registracija
+          Že imaš račun? Prijava
         </a>
       </div>
     </div>
