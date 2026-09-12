@@ -79,12 +79,35 @@ function mondayOf(iso: string): Date {
 
 export type BusinessWeek = { label: string; dates: string[] };
 
-// Delovni dnevi (torek-sobota), grupirani po tednih - ta teden + naslednja dva.
-// Pretekli dnevi v tekočem tednu so izpuščeni.
-export function upcomingBusinessWeeks(weekCount = 3): BusinessWeek[] {
+function capitalize(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// "15. - 19. september" (isti mesec) ali "29. september - 3. oktober" (prehod
+// čez mesec).
+function formatDayRange(startIso: string, endIso: string): string {
+  const start = new Date(startIso + "T00:00:00");
+  const end = new Date(endIso + "T00:00:00");
+  const startMonth = start.toLocaleDateString("sl-SI", { month: "long" });
+  const endMonth = end.toLocaleDateString("sl-SI", { month: "long" });
+
+  if (startIso === endIso) {
+    return `${start.getDate()}. ${capitalize(startMonth)}`;
+  }
+
+  if (startMonth === endMonth) {
+    return `${start.getDate()}. - ${end.getDate()}. ${capitalize(endMonth)}`;
+  }
+  return `${start.getDate()}. ${capitalize(startMonth)} - ${end.getDate()}. ${capitalize(endMonth)}`;
+}
+
+// Delovni dnevi (torek-sobota), grupirani po tednih - privzeto ta teden +
+// naslednji trije (cca. 4 tedne vnaprej). Pretekli dnevi v tekočem tednu so
+// izpuščeni. Oznaka vsake skupine je dejanski datumski razpon tistega bloka
+// dni ("Ta teden" ima dodano predpono, ostali imajo samo datume).
+export function upcomingBusinessWeeks(weekCount = 4): BusinessWeek[] {
   const today = todayISO();
   const monday = mondayOf(today);
-  const labels = ["Ta teden", "Naslednji teden", "Čez 2 tedna", "Čez 3 tedne"];
 
   const weeks: BusinessWeek[] = [];
   for (let w = 0; w < weekCount; w++) {
@@ -100,7 +123,8 @@ export function upcomingBusinessWeeks(weekCount = 3): BusinessWeek[] {
     }
 
     if (dates.length > 0) {
-      weeks.push({ label: labels[w] ?? `Čez ${w} tedne`, dates });
+      const range = formatDayRange(dates[0], dates[dates.length - 1]);
+      weeks.push({ label: w === 0 ? `Ta teden, ${range}` : range, dates });
     }
   }
   return weeks;

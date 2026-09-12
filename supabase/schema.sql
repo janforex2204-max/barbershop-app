@@ -13,9 +13,9 @@ create table if not exists services (
 );
 
 insert into services (name, sort_order) values
-  ('Strizenje', 1),
+  ('Striženje', 1),
   ('Brada', 2),
-  ('Strizenje + Brada', 3),
+  ('Striženje + Brada', 3),
   ('Otroško striženje', 4)
 on conflict do nothing;
 

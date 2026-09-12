@@ -4,7 +4,7 @@ import { Scissors, Bell, Calendar, TrendingUp, X, Check, Clock, Users } from "lu
 const SHOP_NAME = "Pri Marku";
 const STORAGE_KEY = "barbershop-data-v1";
 const HOURS = ["09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00"];
-const SERVICES = ["Strizenje", "Brada", "Strizenje + Brada", "Otroško striženje"];
+const SERVICES = ["Striženje", "Brada", "Striženje + Brada", "Otroško striženje"];
 
 function todayISO(offset = 0) {
   const d = new Date();
@@ -35,8 +35,8 @@ function seedData() {
     { id: "h4", name: "Ana Zupan", phone: "051 333 444", weekday: weekdayOf(t0), time: "09:00" },
   ];
   const appointments = [
-    { id: "a1", name: "Rok Potočnik", phone: "040 444 555", service: "Strizenje + Brada", date: t0, time: "10:00", status: "booked" },
-    { id: "a2", name: "Anže Kos", phone: "030 555 666", service: "Strizenje", date: t0, time: "12:00", status: "booked" },
+    { id: "a1", name: "Rok Potočnik", phone: "040 444 555", service: "Striženje + Brada", date: t0, time: "10:00", status: "booked" },
+    { id: "a2", name: "Anže Kos", phone: "030 555 666", service: "Striženje", date: t0, time: "12:00", status: "booked" },
     { id: "a3", name: "Blaž Vidmar", phone: "070 666 777", service: "Brada", date: t0, time: "17:00", status: "booked" },
   ];
   return { appointments, waitlist: [], smsLog: [], history };
