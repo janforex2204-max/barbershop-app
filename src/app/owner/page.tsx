@@ -22,6 +22,7 @@ function waitlistCountLabel(n: number) {
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const WAITLIST_LIMIT = 50;
 const MONTH_RE = /^\d{4}-\d{2}$/;
 
 export default async function OwnerDashboard({
@@ -70,11 +71,18 @@ export default async function OwnerDashboard({
     .eq("appointment_date", selectedDate)
     .order("appointment_time", { ascending: true });
 
-  const { data: waitlist, error: waitlistError } = await supabase
+  const {
+    data: waitlist,
+    error: waitlistError,
+    count: waitlistTotal,
+  } = await supabase
     .from("waitlist")
-    .select("*")
+    .select("*", { count: "exact" })
     .eq("preferred_date", selectedDate)
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: true })
+    .limit(WAITLIST_LIMIT);
+
+  const waitlistExtra = Math.max((waitlistTotal ?? 0) - (waitlist?.length ?? 0), 0);
 
   const tomorrow = todayISO(1);
   const nextBizDay = nextBusinessDayAfterToday();
@@ -130,8 +138,8 @@ export default async function OwnerDashboard({
             <div className="flex items-center gap-2 mb-1">
               <Users size={18} className="text-gold" />
               <span className="font-display text-lg text-cream">
-                {waitlist && waitlist.length > 0
-                  ? waitlistCountLabel(waitlist.length)
+                {waitlistTotal && waitlistTotal > 0
+                  ? waitlistCountLabel(waitlistTotal)
                   : "Čakajo na termin"}
               </span>
             </div>
@@ -166,6 +174,11 @@ export default async function OwnerDashboard({
                   </div>
                 ))}
               </div>
+            )}
+            {waitlistExtra > 0 && (
+              <p className="mt-2 text-xs text-cream-faint">
+                +{waitlistExtra} dodatnih čaka
+              </p>
             )}
           </div>
         )}
