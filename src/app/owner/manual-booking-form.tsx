@@ -8,7 +8,6 @@ import {
   SHOP_NAME,
   dayLabel,
   isBusinessDay,
-  nextBusinessDayOffsets,
   todayISO,
   whatsAppLink,
 } from "@/lib/constants";
@@ -16,19 +15,19 @@ import { addManualAppointment, type ManualBookingState } from "./actions";
 
 type Service = { id: string; name: string };
 
-const FALLBACK_DATE = todayISO(nextBusinessDayOffsets(1)[0] ?? 0);
 const initialState: ManualBookingState = {};
 
 export default function ManualBookingForm({
   initialDate,
+  onClose,
 }: {
-  initialDate?: string;
+  initialDate: string;
+  onClose: () => void;
 }) {
   const supabase = createClient();
 
-  const [open, setOpen] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
-  const [date, setDate] = useState(initialDate ?? FALLBACK_DATE);
+  const [date, setDate] = useState(initialDate);
   const [time, setTime] = useState("");
   const [takenTimes, setTakenTimes] = useState<Set<string>>(new Set());
   const [slotsLoading, setSlotsLoading] = useState(true);
@@ -38,9 +37,8 @@ export default function ManualBookingForm({
     initialState
   );
 
-  // Storitve naloži enkrat, ko se obrazec prvič odpre.
+  // Storitve naloži enkrat, ko se panel odpre (komponenta se namesti).
   useEffect(() => {
-    if (!open) return;
     supabase
       .from("services")
       .select("id, name")
@@ -49,12 +47,11 @@ export default function ManualBookingForm({
         if (!error && data) setServices(data);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, []);
 
-  // Zasedenost izbranega dne - "loading"/reset se sproži v event handlerjih
-  // (openForm/handleDateChange), efekt samo naredi poizvedbo.
+  // Zasedenost izbranega dne - "loading"/reset se sproži v handleDateChange,
+  // efekt samo naredi poizvedbo.
   useEffect(() => {
-    if (!open) return;
     supabase
       .from("public_availability")
       .select("appointment_time")
@@ -65,7 +62,7 @@ export default function ManualBookingForm({
         }
         setSlotsLoading(false);
       });
-  }, [open, date, supabase]);
+  }, [date, supabase]);
 
   // Po uspešni oddaji znova naloži zasedenost za isti dan (termin je zdaj zaseden).
   useEffect(() => {
@@ -83,11 +80,6 @@ export default function ManualBookingForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
-  function openForm() {
-    setOpen(true);
-    setSlotsLoading(true);
-  }
-
   function handleDateChange(next: string) {
     setDate(next);
     setTime("");
@@ -97,18 +89,6 @@ export default function ManualBookingForm({
   const freeTimes = HOURS.filter((h) => !takenTimes.has(h));
   const validDay = isBusinessDay(date);
 
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={openForm}
-        className="text-sm border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft cursor-pointer"
-      >
-        + Dodaj termin ročno
-      </button>
-    );
-  }
-
   return (
     <div className="border border-border rounded-lg p-5 mb-4">
       <div className="flex items-center justify-between mb-4">
@@ -117,7 +97,7 @@ export default function ManualBookingForm({
         </h3>
         <button
           type="button"
-          onClick={() => setOpen(false)}
+          onClick={onClose}
           className="text-xs text-cream-faint hover:text-cream cursor-pointer"
         >
           Zapri

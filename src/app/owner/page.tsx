@@ -10,7 +10,7 @@ import {
   nextBusinessDayAfterToday,
   whatsAppLink,
 } from "@/lib/constants";
-import ManualBookingForm from "./manual-booking-form";
+import AppointmentsHeader from "./appointments-header";
 import NotificationsPanel from "./notifications-panel";
 import MonthCalendar from "./month-calendar";
 
@@ -170,12 +170,10 @@ export default async function OwnerDashboard({
           </div>
         )}
 
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-medium capitalize">
-            Termini za {isToday ? "danes" : dayLabel(selectedDate)}
-          </h2>
-          <ManualBookingForm initialDate={selectedDate} />
-        </div>
+        <AppointmentsHeader
+          title={`Termini za ${isToday ? "danes" : dayLabel(selectedDate)}`}
+          initialDate={selectedDate}
+        />
         <div className="border border-border rounded-lg divide-y divide-border-soft mb-10">
           {error && (
             <p className="p-4 text-sm text-rose">
