@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { PLATFORM_NAME } from "@/lib/constants";
+import { PLATFORM_NAME, APPROVAL_TOKEN_EXPIRY_DAYS } from "@/lib/constants";
 
 // Odobritev lastnika z enim klikom iz admin email obvestila - namenoma BREZ
 // zahteve po prijavi (klika se iz emaila, ne iz brskalnika, kjer je lastnik
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   const admin = createAdminClient();
   const { data: row, error } = await admin
     .from("salon_owners")
-    .select("id, salon_name, approved_at")
+    .select("id, salon_name, approved_at, created_at")
     .eq("approval_token", token)
     .maybeSingle();
 
@@ -30,6 +30,16 @@ export async function GET(request: NextRequest) {
     return page(
       "Napaka",
       `Ta povezava je bila že uporabljena - salon "${row.salon_name}" je bil že odobren.`,
+      false
+    );
+  }
+
+  const ageMs = Date.now() - new Date(row.created_at).getTime();
+  const expiryMs = APPROVAL_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+  if (ageMs > expiryMs) {
+    return page(
+      "Napaka",
+      `Ta povezava je potekla (veljavna je bila ${APPROVAL_TOKEN_EXPIRY_DAYS} dni). Prosi salon "${row.salon_name}", naj se registrira znova.`,
       false
     );
   }

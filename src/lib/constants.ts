@@ -6,6 +6,9 @@ export const PLATFORM_NAME = "Fillio";
 // odobritev), kjer mora povezava vedno kazati na pravo domeno, ne na
 // localhost, ne glede na okolje, iz katerega je bila sprožena.
 export const PLATFORM_URL = "https://fillio.si";
+// Po kolikšnem času preneha veljati povezava za odobritev novega lastnika
+// (glej src/app/admin/approve/route.ts).
+export const APPROVAL_TOKEN_EXPIRY_DAYS = 5;
 // Priprava na več frizerjev (funkcionalnost še ne obstaja) - privzeto ime lastnika.
 export const OWNER_NAME = "Žiga Kljun";
 
