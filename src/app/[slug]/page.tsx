@@ -24,5 +24,5 @@ export default async function SalonBookingPage({
     notFound();
   }
 
-  return <BookingPage salonId={salon.id} salonName={salon.salon_name} />;
+  return <BookingPage slug={slug} salonId={salon.id} salonName={salon.salon_name} />;
 }

@@ -193,7 +193,7 @@ create policy "sms_notifications_owner_full_access" on sms_notifications
 -- ---------------------------------------------------------------------------
 create or replace view public_availability
   with (security_invoker = false) as
-  select salon_id, appointment_date, appointment_time, status
+  select appointment_date, appointment_time, status, salon_id
   from appointments
   where status <> 'cancelled';
 

@@ -6,6 +6,7 @@ import { Scissors } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { HOURS, todayISO, dayLabel, upcomingBusinessWeeks } from "@/lib/constants";
 import DatePicker from "./date-picker";
+import { bookAppointment as bookAppointmentAction, joinWaitlist as joinWaitlistAction } from "./actions";
 
 type Service = { id: string; name: string };
 type BookingForm = { name: string; phone: string; service: string; time: string };
@@ -15,9 +16,11 @@ type WaitForm = { name: string; phone: string; service: string };
 const INITIAL_DATE = upcomingBusinessWeeks()[0]?.dates[0] ?? todayISO();
 
 export default function BookingPage({
+  slug,
   salonId,
   salonName,
 }: {
+  slug: string;
   salonId: string;
   salonName: string;
 }) {
@@ -104,29 +107,29 @@ export default function BookingPage({
 
   const freeTimes = HOURS.filter((h) => !takenTimes.has(h));
 
+  // Vpis gre prek server action-a (./actions.ts), ki salon_id VEDNO sam
+  // izpelje iz `slug` na strežniku - `salonId` tu v komponenti se uporablja
+  // samo za BRANJE (storitve/zasedenost), nikoli se ne pošlje kot vrednost,
+  // ki bi jo strežnik za vpis "verjel" klientu.
   async function bookAppointment() {
     if (!form.name || !form.phone || !form.time) {
       showToast("Izpolni ime, telefon in izberi uro.");
       return;
     }
     setSubmitting(true);
-    const { error } = await supabase.from("appointments").insert({
-      salon_id: salonId,
-      customer_name: form.name,
-      customer_phone: form.phone,
+    const { error } = await bookAppointmentAction(slug, {
+      name: form.name,
+      phone: form.phone,
       service: form.service,
-      appointment_date: selectedDate,
-      appointment_time: form.time,
-      status: "booked",
+      date: selectedDate,
+      time: form.time,
     });
     setSubmitting(false);
 
     if (error) {
-      if (error.code === "23505") {
-        showToast("Ta termin je bil pravkar zaseden. Izberi drugega.");
-      } else {
-        showToast("Napaka pri rezervaciji: " + error.message);
-      }
+      showToast(
+        error.includes("zaseden") ? error : "Napaka pri rezervaciji: " + error
+      );
       loadAvailability(selectedDate);
       return;
     }
@@ -142,17 +145,16 @@ export default function BookingPage({
       return;
     }
     setSubmitting(true);
-    const { error } = await supabase.from("waitlist").insert({
-      salon_id: salonId,
-      customer_name: waitForm.name,
-      customer_phone: waitForm.phone,
-      preferred_date: selectedDate,
-      service_preference: waitForm.service,
+    const { error } = await joinWaitlistAction(slug, {
+      name: waitForm.name,
+      phone: waitForm.phone,
+      service: waitForm.service,
+      date: selectedDate,
     });
     setSubmitting(false);
 
     if (error) {
-      showToast("Napaka: " + error.message);
+      showToast("Napaka: " + error);
       return;
     }
 
