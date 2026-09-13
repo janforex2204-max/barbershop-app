@@ -78,7 +78,9 @@ export default function ResetPasswordPage() {
     <div className="min-h-screen flex items-center justify-center bg-ink font-sans px-4">
       <div className="w-full max-w-sm border border-border rounded-lg p-6 space-y-4">
         <div>
-          <p className="font-display text-lg text-gold mb-1">{PLATFORM_NAME}</p>
+          <p className="text-[11px] text-cream-ghost tracking-wide mb-2">
+            Powered by {PLATFORM_NAME}
+          </p>
           <h1 className="text-xl font-semibold text-cream">
             Nastavi novo geslo
           </h1>

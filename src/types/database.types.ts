@@ -109,6 +109,7 @@ export type Database = {
           salon_name: string;
           status: OwnerStatus;
           approval_token: string | null;
+          approval_token_created_at: string;
           approved_at: string | null;
           created_at: string;
         };
@@ -118,6 +119,7 @@ export type Database = {
           salon_name: string;
           status?: OwnerStatus;
           approval_token?: string | null;
+          approval_token_created_at?: string;
           approved_at?: string | null;
           created_at?: string;
         };
