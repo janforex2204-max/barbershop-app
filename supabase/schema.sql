@@ -13,6 +13,19 @@ create table if not exists salon_owners (
   -- URL-varen identifikator za javno rezervacijsko stran /[slug] - edinstven
   -- čez celo platformo (glej src/lib/slug.ts za generiranje ob registraciji).
   slug text not null unique,
+  -- Lastnikov telefon, zbran ob registraciji (glej /register) - trenutno se
+  -- NE uporablja za same WhatsApp linke (ti gredo na STRANKINO številko, glej
+  -- whatsAppLink() v src/lib/constants.ts), shranjen je za prihodnjo uporabo
+  -- (npr. Twilio pošiljateljska identiteta, ločevanje WhatsApp Business linij
+  -- med saloni, če to kdaj avtomatiziramo).
+  phone text,
+  -- Obvezno privoljenje ob registraciji, da se lastnikov telefon lahko
+  -- uporabi za WhatsApp obveščanje strank (glej /register - checkbox).
+  whatsapp_consent boolean not null default false,
+  -- Naročniški nivo - "pro" odklene avtomatsko SMS obveščanje (glej
+  -- src/app/owner/notifications-panel.tsx). Za zdaj se preklaplja ROČNO prek
+  -- Table Editorja - pravega plačilnega sistema (Stripe ipd.) še ni.
+  plan text not null default 'free' check (plan in ('free', 'pro')),
   status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
   -- Naključen token za odobritev z enim klikom iz admin emaila (glej
   -- src/app/admin/approve/route.ts) - ni namenjen prijavi, samo temu.
@@ -99,6 +112,12 @@ create table if not exists sms_notifications (
   -- izbranem dnevu v koledarju, enako kot termine in čakalno vrsto).
   appointment_date date,
   status text not null default 'pending' check (status in ('pending', 'sent', 'claimed', 'failed')),
+  -- Razloči "sistem je samodejno poskusil poslati SMS" (Fillio Pro, glej
+  -- cancelAppointment v src/app/owner/actions.ts) od "lastnik je ročno
+  -- kliknil Pošlji WhatsApp" (markSmsSent) - oba primera pustita status
+  -- 'sent'/'failed', ta stolpec pa nadzorni plošči pove, v kateri zavihek
+  -- ("Ročno" ali "Avtomatsko") vrstica spada.
+  auto_sent boolean not null default false,
   created_at timestamptz not null default now()
 );
 

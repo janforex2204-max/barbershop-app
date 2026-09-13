@@ -6,6 +6,7 @@ export type AppointmentStatus = "booked" | "cancelled" | "filled";
 export type SmsReason = "waitlist" | "earlier_slot";
 export type SmsStatus = "pending" | "sent" | "claimed" | "failed";
 export type OwnerStatus = "pending" | "approved" | "rejected";
+export type OwnerPlan = "free" | "pro";
 
 export type Database = {
   public: {
@@ -93,6 +94,7 @@ export type Database = {
           appointment_id: string | null;
           appointment_date: string | null;
           status: SmsStatus;
+          auto_sent: boolean;
           created_at: string;
         };
         Insert: {
@@ -105,6 +107,7 @@ export type Database = {
           appointment_id?: string | null;
           appointment_date?: string | null;
           status?: SmsStatus;
+          auto_sent?: boolean;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["sms_notifications"]["Insert"]>;
@@ -116,6 +119,9 @@ export type Database = {
           user_id: string;
           salon_name: string;
           slug: string;
+          phone: string | null;
+          whatsapp_consent: boolean;
+          plan: OwnerPlan;
           status: OwnerStatus;
           approval_token: string | null;
           approval_token_created_at: string;
@@ -127,6 +133,9 @@ export type Database = {
           user_id: string;
           salon_name: string;
           slug: string;
+          phone?: string | null;
+          whatsapp_consent?: boolean;
+          plan?: OwnerPlan;
           status?: OwnerStatus;
           approval_token?: string | null;
           approval_token_created_at?: string;

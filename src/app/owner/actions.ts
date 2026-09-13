@@ -3,7 +3,8 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { isBusinessDay } from "@/lib/constants";
+import { isBusinessDay, toWhatsAppPhone } from "@/lib/constants";
+import { isTwilioConfigured, sendSms } from "@/lib/sms";
 
 export async function login(formData: FormData) {
   const supabase = await createClient();
@@ -103,7 +104,38 @@ export async function cancelAppointment(appointmentId: string) {
   ];
 
   if (newLogs.length > 0) {
-    await supabase.from("sms_notifications").insert(newLogs);
+    // Fillio Pro: če je salon na 'pro' planu IN je Twilio dejansko
+    // konfiguriran (glej src/lib/sms.ts), poskusi vsako obvestilo poslati
+    // TAKOJ prek SMS in ga zapiši že kot 'sent'/'failed' - lastniku ni treba
+    // ničesar ročno klikati. Free plan (ali 'pro' brez povezanega Twilia)
+    // ostane pri obstoječem toku: vrstica ostane 'pending', lastnik jo
+    // ročno pošlje prek WhatsApp gumba v zavihku "Ročno".
+    let autoSend = false;
+    if (isTwilioConfigured()) {
+      const { data: owner } = await supabase
+        .from("salon_owners")
+        .select("plan")
+        .eq("id", appt.salon_id)
+        .maybeSingle();
+      autoSend = owner?.plan === "pro";
+    }
+
+    if (autoSend) {
+      for (const log of newLogs) {
+        const to = "+" + toWhatsAppPhone(log.recipient_phone);
+        const { ok, error } = await sendSms(to, log.message);
+        if (!ok) {
+          console.error(`Samodejni SMS ni uspel (${log.recipient_phone}):`, error);
+        }
+        await supabase.from("sms_notifications").insert({
+          ...log,
+          status: ok ? "sent" : "failed",
+          auto_sent: true,
+        });
+      }
+    } else {
+      await supabase.from("sms_notifications").insert(newLogs);
+    }
   }
 
   revalidatePath("/owner");

@@ -71,6 +71,34 @@ export default async function RegisterPage({
             />
           </div>
 
+          <div className="space-y-1">
+            <label htmlFor="phone" className="text-sm text-cream-dim">
+              Telefonska številka
+            </label>
+            <input
+              id="phone"
+              name="phone"
+              type="tel"
+              required
+              className="w-full rounded-md border border-border bg-ink-field px-3 py-2 text-cream text-sm"
+            />
+            <p className="text-xs text-cream-faint">
+              Uporabljeno za WhatsApp obveščanje strank o terminih.
+            </p>
+          </div>
+
+          <label className="flex items-start gap-2 text-xs text-cream-dim">
+            <input
+              type="checkbox"
+              name="whatsapp_consent"
+              value="true"
+              required
+              className="mt-0.5"
+            />
+            Strinjam se, da se moja telefonska številka uporabi za WhatsApp
+            obveščanje strank
+          </label>
+
           <button
             type="submit"
             className="w-full rounded-md bg-burgundy hover:opacity-90 text-cream text-sm font-medium py-2 transition-opacity cursor-pointer"

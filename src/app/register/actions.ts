@@ -18,13 +18,22 @@ export async function registerOwner(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const salonName = String(formData.get("salon_name") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim();
+  const whatsappConsent = formData.get("whatsapp_consent") === "true";
 
-  if (!email || !password || !salonName) {
+  if (!email || !password || !salonName || !phone) {
     redirect(`/register?error=${encodeURIComponent("Izpolni vsa polja.")}`);
   }
   if (password.length < 6) {
     redirect(
       `/register?error=${encodeURIComponent("Geslo mora imeti vsaj 6 znakov.")}`
+    );
+  }
+  if (!whatsappConsent) {
+    redirect(
+      `/register?error=${encodeURIComponent(
+        "Za dokončanje registracije se moraš strinjati z uporabo telefonske številke za WhatsApp obveščanje."
+      )}`
     );
   }
 
@@ -65,6 +74,8 @@ export async function registerOwner(formData: FormData) {
       user_id: data.user.id,
       salon_name: salonName,
       slug,
+      phone,
+      whatsapp_consent: whatsappConsent,
       status: "pending",
       approval_token: approvalToken,
     })

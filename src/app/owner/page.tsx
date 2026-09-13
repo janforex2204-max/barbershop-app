@@ -47,7 +47,7 @@ export default async function OwnerDashboard({
   // (my_salon_id() v shemi) je neodvisen, strežniški backstop za isto mejo.
   const { data: ownerRow } = await supabase
     .from("salon_owners")
-    .select("id, salon_name, status")
+    .select("id, salon_name, status, plan")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -154,6 +154,18 @@ export default async function OwnerDashboard({
     .select("*")
     .eq("salon_id", salonId)
     .eq("status", "pending")
+    .eq("appointment_date", selectedDate)
+    .order("created_at", { ascending: true });
+
+  // Samo za prikaz v zavihku "Avtomatsko" (Fillio Pro) - dnevnik SMS-ov, ki
+  // jih je sistem že sam poskusil poslati (glej cancelAppointment v
+  // ./actions.ts). Free plan tega nikoli ne ustvari (vedno ostane 'pending'),
+  // zato poizvedba plan-u ni treba dodatno pogojevati.
+  const { data: autoSmsLog } = await supabase
+    .from("sms_notifications")
+    .select("*")
+    .eq("salon_id", salonId)
+    .eq("auto_sent", true)
     .eq("appointment_date", selectedDate)
     .order("created_at", { ascending: true });
 
@@ -338,6 +350,8 @@ export default async function OwnerDashboard({
         ) : (
           <NotificationsPanel
             smsLog={smsLog ?? []}
+            autoSmsLog={autoSmsLog ?? []}
+            plan={ownerRow.plan}
             selectedDate={selectedDate}
             isToday={isToday}
           />
