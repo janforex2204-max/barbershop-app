@@ -15,6 +15,11 @@ type WaitForm = { name: string; phone: string; service: string };
 // Prvi razpoložljivi delovni dan (torek-sobota) - privzeto izbrani datum.
 const INITIAL_DATE = upcomingBusinessWeeks()[0]?.dates[0] ?? todayISO();
 
+// Vsi datumi, ki jih DatePicker ponuja (isti nabor, iz istega izvora) -
+// uporabljeno za ugotavljanje "sosednjih" datumov pri prednalaganju
+// zasedenosti v ozadju (glej prefetchNeighbors spodaj).
+const ALL_DATES = upcomingBusinessWeeks().flatMap((w) => w.dates);
+
 export default function BookingPage({
   slug,
   salonId,
@@ -43,6 +48,13 @@ export default function BookingPage({
   // "zastarelih" odgovorov, če stranka hitro preklaplja med dnevi in starejši
   // klic (za prej izbrani dan) pride nazaj PO novejšem.
   const latestDateRef = useRef(INITIAL_DATE);
+  // Predpomnilnik zasedenosti po datumu (v ref-u, ne state - branje/pisanje
+  // sem NE sme sprožiti rerenderja, saj se med drugim uporablja tudi za tihe
+  // prednalaganje SOSEDNJIH datumov, ki jih uporabnik še ne gleda). Ob izbiri
+  // že predpomnjenega datuma se termini prikažejo TAKOJ (brez "Nalagam..."),
+  // v ozadju pa se podatki vseeno osvežijo (stale-while-revalidate), ker se
+  // zasedenost lahko medtem spremeni (druga stranka je rezervirala termin).
+  const availabilityCacheRef = useRef<Map<string, Set<string>>>(new Map());
   // Poveča se ob kliku na "Poskusi znova" - v deps spodnjega useEffect-a, da
   // gumb lahko ponovno sproži nalaganje storitev (loadAvailability za
   // termine kliče uporabnik neposredno, ker je to že samostojna funkcija).
@@ -105,9 +117,13 @@ export default function BookingPage({
   }, [salonId, supabase, servicesRetryTick]);
 
   // Ista zaščita (Promise.resolve + .catch + "cancelled"/zastarel-odgovor
-  // preverba) uporabljena za nalaganje zasedenosti - glej loadAvailability.
+  // preverba) uporabljena za nalaganje zasedenosti. "background" (za tiho
+  // prednalaganje sosednjih dni) samo zapiše v cache, NIKOLI ne dotakne
+  // slotsLoading/slotsError/takenTimes - te se posodobijo le, če je `date`
+  // (še vedno) tisti, ki ga uporabnik trenutno gleda.
   const loadAvailability = useCallback(
-    async (date: string) => {
+    async (date: string, opts?: { background?: boolean }) => {
+      const background = opts?.background ?? false;
       const { data, error } = await Promise.resolve(
         supabase
           .from("public_availability")
@@ -116,38 +132,64 @@ export default function BookingPage({
           .eq("appointment_date", date)
       ).catch((err) => ({ data: null, error: err }));
 
-      // Stran je medtem preklopila na drug dan - ta odgovor je zastarel,
-      // zavrzi ga (prepreči, da bi starejši, pozneje-prispeli odgovor
-      // prepisal podatke za NOVEJŠI, že izbrani dan).
-      if (date !== latestDateRef.current) return;
-
       if (error || !data) {
         console.error(`Napaka pri nalaganju zasedenosti (${date}):`, error);
-        setSlotsError(true);
-      } else {
-        setSlotsError(false);
-        setTakenTimes(new Set(data.map((r) => r.appointment_time)));
+        if (!background && date === latestDateRef.current) {
+          setSlotsError(true);
+          setSlotsLoading(false);
+        }
+        return;
       }
+
+      const taken = new Set(data.map((r) => r.appointment_time));
+      availabilityCacheRef.current.set(date, taken);
+
+      // Stran je medtem preklopila na drug dan (ali gre za tiho prednalaganje
+      // sosednjega dne) - ne dotikaj se vidnega stanja za NEK DRUG dan.
+      if (date !== latestDateRef.current) return;
+
+      setSlotsError(false);
+      setTakenTimes(taken);
       setSlotsLoading(false);
     },
     [salonId, supabase]
   );
 
+  // Po uspešnem nalaganju trenutnega dne tiho (brez loading/error stanja)
+  // prednaloži sosednja datuma v koledarju - če jih stranka nato izbere, so
+  // termini že v cache-u in se prikažejo takoj, brez čakanja na omrežje.
+  const prefetchNeighbors = useCallback(
+    (date: string) => {
+      const idx = ALL_DATES.indexOf(date);
+      if (idx === -1) return;
+      for (const neighbor of [ALL_DATES[idx - 1], ALL_DATES[idx + 1]]) {
+        if (neighbor && !availabilityCacheRef.current.has(neighbor)) {
+          loadAvailability(neighbor, { background: true });
+        }
+      }
+    },
+    [loadAvailability]
+  );
+
   useEffect(() => {
     latestDateRef.current = selectedDate;
-    // loadAvailability ne kliče setState sinhrono - vsi setX() klici v njej
-    // so ŠELE po "await" (glej definicijo zgoraj), zato tu ni dejanskega
-    // "cascading render" tveganja, na katero opozarja spodnje pravilo -
-    // linter samo ne razlikuje med sinhronim in po-await delom funkcije.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadAvailability(selectedDate);
-  }, [selectedDate, loadAvailability]);
+    loadAvailability(selectedDate).then(() => prefetchNeighbors(selectedDate));
+  }, [selectedDate, loadAvailability, prefetchNeighbors]);
 
   function selectDate(date: string) {
     setSelectedDate(date);
     setForm((f) => ({ ...f, time: "" }));
-    setSlotsLoading(true);
-    setSlotsError(false);
+    const cached = availabilityCacheRef.current.get(date);
+    if (cached) {
+      // Že prednaloženo (ali prej obiskano) - prikaži TAKOJ, brez "Nalagam...".
+      // Zgornji useEffect bo podatke v ozadju vseeno osvežil.
+      setTakenTimes(cached);
+      setSlotsLoading(false);
+      setSlotsError(false);
+    } else {
+      setSlotsLoading(true);
+      setSlotsError(false);
+    }
   }
 
   function retryLoad() {
@@ -260,7 +302,19 @@ export default function BookingPage({
             </button>
           </div>
         ) : slotsLoading || servicesLoading ? (
-          <p className="text-sm text-cream-dim">Nalagam proste termine...</p>
+          <>
+            <h2 className="font-display text-xl font-semibold mb-3 text-cream">
+              Prosti termini
+            </h2>
+            <div className="grid grid-cols-5 gap-2 mb-7">
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-[42px] rounded-md border border-border bg-ink-soft animate-pulse"
+                />
+              ))}
+            </div>
+          </>
         ) : freeTimes.length > 0 ? (
           <>
             <h2 className="font-display text-xl font-semibold mb-3 text-cream">
