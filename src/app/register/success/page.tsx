@@ -1,6 +1,13 @@
 import { PLATFORM_NAME } from "@/lib/constants";
 
-export default function RegisterSuccessPage() {
+export default async function RegisterSuccessPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ salon?: string }>;
+}) {
+  const { salon } = await searchParams;
+  const salonName = salon?.trim() || PLATFORM_NAME;
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-ink font-sans px-4">
       <div className="w-full max-w-sm border border-border rounded-lg p-6 space-y-4 text-center">
@@ -9,8 +16,9 @@ export default function RegisterSuccessPage() {
           Registracija uspešna.
         </p>
         <p className="text-sm text-cream-muted">
-          Tvoj račun čaka na ročno odobritev. Ko bo odobren, se boš lahko
-          prijavil/a in videl/a nadzorno ploščo.
+          Salon <span className="text-cream font-medium">{salonName}</span> čaka
+          na ročno odobritev. Ko bo odobren, se boš lahko prijavil/a in videl/a
+          nadzorno ploščo.
         </p>
         <a
           href="/owner/login"

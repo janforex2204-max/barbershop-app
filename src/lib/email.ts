@@ -1,3 +1,5 @@
+import { PLATFORM_NAME } from "@/lib/constants";
+
 // Pošlje email obvestilo lastniku aplikacije ob novi registraciji.
 // Uporablja Resend (resend.com) - preprost REST API, brez dodatnega paketa.
 // Če RESEND_API_KEY ali OWNER_NOTIFICATION_EMAIL nista nastavljena, tiho
@@ -26,7 +28,7 @@ export async function notifyNewRegistration({
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "Barbershop pr' Kljuni <onboarding@resend.dev>",
+      from: `${PLATFORM_NAME} <onboarding@resend.dev>`,
       to,
       subject: "Nova registracija lastnika salona",
       text: `Nova registracija čaka na odobritev:\n\nSalon: ${salonName}\nE-pošta: ${email}\n\nOdobri v Supabase → Table Editor → salon_owners → nastavi status na "approved".`,

@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyNewRegistration } from "@/lib/email";
@@ -19,8 +20,18 @@ export async function registerOwner(formData: FormData) {
     );
   }
 
+  // Kam naj potrditveni email preusmeri - eksplicitno, da ne glede na
+  // Supabase projekta Site URL nastavitev pravilno pristane na route
+  // handlerju, ki sejo vzpostavi in pravilno shrani (glej src/app/auth/confirm).
+  const headersList = await headers();
+  const origin = headersList.get("origin") ?? "";
+
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { emailRedirectTo: `${origin}/auth/confirm` },
+  });
 
   if (error || !data.user) {
     redirect(
@@ -50,5 +61,5 @@ export async function registerOwner(formData: FormData) {
     console.error("Napaka pri pošiljanju email obvestila:", e);
   }
 
-  redirect("/register/success");
+  redirect(`/register/success?salon=${encodeURIComponent(salonName)}`);
 }

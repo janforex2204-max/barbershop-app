@@ -15,8 +15,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Barbershop pr' Kljuni — rezervacije",
-  description: "Rezervacijski sistem za frizerski salon",
+  title: "Fillio — rezervacije",
+  description: "Rezervacijski sistem za frizerske salone",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
