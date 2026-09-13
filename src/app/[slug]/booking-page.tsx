@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Scissors } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -24,14 +24,29 @@ export default function BookingPage({
   salonId: string;
   salonName: string;
 }) {
-  const supabase = createClient();
+  // createClient() vrne NOV objekt ob vsakem klicu - če bi ga klicali direktno
+  // v telesu komponente, bi bil "supabase" spodaj v deps useEffect-ov vsakič
+  // drugačen in bi se ti sprožali ob VSAKEM rerenderju (ne le ob dejanski
+  // spremembi datuma/salona), kar je odprlo pot do prekrivajočih se (race)
+  // klicev. useState(() => ...) ga ustvari samo enkrat.
+  const [supabase] = useState(() => createClient());
 
   const [services, setServices] = useState<Service[]>([]);
   const [servicesLoading, setServicesLoading] = useState(true);
+  const [servicesError, setServicesError] = useState(false);
 
   const [selectedDate, setSelectedDate] = useState(INITIAL_DATE);
   const [takenTimes, setTakenTimes] = useState<Set<string>>(new Set());
   const [slotsLoading, setSlotsLoading] = useState(true);
+  const [slotsError, setSlotsError] = useState(false);
+  // Vedno kaže na TRENUTNO izbrani datum - uporabljeno za zavrnitev
+  // "zastarelih" odgovorov, če stranka hitro preklaplja med dnevi in starejši
+  // klic (za prej izbrani dan) pride nazaj PO novejšem.
+  const latestDateRef = useRef(INITIAL_DATE);
+  // Poveča se ob kliku na "Poskusi znova" - v deps spodnjega useEffect-a, da
+  // gumb lahko ponovno sproži nalaganje storitev (loadAvailability za
+  // termine kliče uporabnik neposredno, ker je to že samostojna funkcija).
+  const [servicesRetryTick, setServicesRetryTick] = useState(0);
 
   const [form, setForm] = useState<BookingForm>({
     name: "",
@@ -53,56 +68,95 @@ export default function BookingPage({
   }, []);
 
   // Storitve TEGA salona iz baze - naloži enkrat.
+  // Promise.resolve(...).catch(...) je namenoma tu: supabase-js poizvedba
+  // sicer ob NAPAKAH API-ja (npr. RLS, napačen stolpec) vrne { error } in se
+  // ne "zavrne" (reject) - ampak ob pravi omrežni napaki (odjava, DNS,
+  // Supabase projekt, ki se ravno "prebuja" po neaktivnosti, PostgREST
+  // shema-cache napaka tik po migraciji - to smo dejansko že videli v
+  // dev logih za drugo tabelo) PA se obljuba lahko zavrne. Brez .catch tu bi
+  // takrat setServicesLoading(false) NIKOLI ne bil klican in "Nalagam proste
+  // termine..." bi obtičalo za vedno, tudi po osvežitvi strani.
   useEffect(() => {
-    supabase
-      .from("services")
-      .select("id, name")
-      .eq("salon_id", salonId)
-      .eq("active", true)
-      .order("sort_order", { ascending: true })
+    let cancelled = false;
+    Promise.resolve(
+      supabase
+        .from("services")
+        .select("id, name")
+        .eq("salon_id", salonId)
+        .eq("active", true)
+        .order("sort_order", { ascending: true })
+    )
+      .catch((err) => ({ data: null, error: err }))
       .then(({ data, error }) => {
-        if (!error && data) {
+        if (cancelled) return;
+        if (error || !data) {
+          console.error("Napaka pri nalaganju storitev:", error);
+          setServicesError(true);
+        } else {
+          setServicesError(false);
           setServices(data);
           setForm((f) => ({ ...f, service: f.service || data[0]?.name || "" }));
         }
         setServicesLoading(false);
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [salonId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [salonId, supabase, servicesRetryTick]);
 
-  // Zasedenost izbranega dne PRI TEM SALONU - naloži ob vsaki spremembi datuma.
+  // Ista zaščita (Promise.resolve + .catch + "cancelled"/zastarel-odgovor
+  // preverba) uporabljena za nalaganje zasedenosti - glej loadAvailability.
+  const loadAvailability = useCallback(
+    async (date: string) => {
+      const { data, error } = await Promise.resolve(
+        supabase
+          .from("public_availability")
+          .select("appointment_time")
+          .eq("salon_id", salonId)
+          .eq("appointment_date", date)
+      ).catch((err) => ({ data: null, error: err }));
+
+      // Stran je medtem preklopila na drug dan - ta odgovor je zastarel,
+      // zavrzi ga (prepreči, da bi starejši, pozneje-prispeli odgovor
+      // prepisal podatke za NOVEJŠI, že izbrani dan).
+      if (date !== latestDateRef.current) return;
+
+      if (error || !data) {
+        console.error(`Napaka pri nalaganju zasedenosti (${date}):`, error);
+        setSlotsError(true);
+      } else {
+        setSlotsError(false);
+        setTakenTimes(new Set(data.map((r) => r.appointment_time)));
+      }
+      setSlotsLoading(false);
+    },
+    [salonId, supabase]
+  );
+
   useEffect(() => {
-    supabase
-      .from("public_availability")
-      .select("appointment_time")
-      .eq("salon_id", salonId)
-      .eq("appointment_date", selectedDate)
-      .then(({ data, error }) => {
-        if (!error && data) {
-          setTakenTimes(new Set(data.map((r) => r.appointment_time)));
-        }
-        setSlotsLoading(false);
-      });
-  }, [selectedDate, salonId, supabase]);
-
-  async function loadAvailability(date: string) {
-    setSlotsLoading(true);
-    const { data, error } = await supabase
-      .from("public_availability")
-      .select("appointment_time")
-      .eq("salon_id", salonId)
-      .eq("appointment_date", date);
-
-    if (!error && data) {
-      setTakenTimes(new Set(data.map((r) => r.appointment_time)));
-    }
-    setSlotsLoading(false);
-  }
+    latestDateRef.current = selectedDate;
+    // loadAvailability ne kliče setState sinhrono - vsi setX() klici v njej
+    // so ŠELE po "await" (glej definicijo zgoraj), zato tu ni dejanskega
+    // "cascading render" tveganja, na katero opozarja spodnje pravilo -
+    // linter samo ne razlikuje med sinhronim in po-await delom funkcije.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadAvailability(selectedDate);
+  }, [selectedDate, loadAvailability]);
 
   function selectDate(date: string) {
     setSelectedDate(date);
     setForm((f) => ({ ...f, time: "" }));
     setSlotsLoading(true);
+    setSlotsError(false);
+  }
+
+  function retryLoad() {
+    setServicesLoading(true);
+    setServicesError(false);
+    setServicesRetryTick((n) => n + 1);
+    setSlotsLoading(true);
+    setSlotsError(false);
+    loadAvailability(selectedDate);
   }
 
   const freeTimes = HOURS.filter((h) => !takenTimes.has(h));
@@ -192,7 +246,20 @@ export default function BookingPage({
         </h2>
         <DatePicker selectedDate={selectedDate} onSelect={selectDate} />
 
-        {slotsLoading || servicesLoading ? (
+        {slotsError || servicesError ? (
+          <div className="border border-border rounded-lg p-5">
+            <p className="text-sm text-cream-muted mb-3">
+              Prišlo je do začasne napake pri nalaganju prostih terminov.
+              Poskusi znova.
+            </p>
+            <button
+              onClick={retryLoad}
+              className="px-4 py-2 rounded-md border border-border text-cream text-sm font-medium cursor-pointer hover:bg-ink-soft"
+            >
+              Poskusi znova
+            </button>
+          </div>
+        ) : slotsLoading || servicesLoading ? (
           <p className="text-sm text-cream-dim">Nalagam proste termine...</p>
         ) : freeTimes.length > 0 ? (
           <>
