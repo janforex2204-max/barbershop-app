@@ -1,8 +1,8 @@
+import { redirect } from "next/navigation";
 import { Clock, MessageCircle, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { cancelAppointment, logout } from "./actions";
 import {
-  SHOP_NAME,
   PLATFORM_NAME,
   todayISO,
   dayLabel,
@@ -37,44 +37,53 @@ export default async function OwnerDashboard({
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Odobritev lastnika: manjkajoča vrstica (star/ročno ustvarjen račun) se
-  // šteje kot odobrena, da se z uvedbo te tabele ne zaklene obstoječi dostop -
-  // zavrnjen je samo, če vrstica OBSTAJA in status ni "approved".
-  if (user) {
-    const { data: ownerRow } = await supabase
-      .from("salon_owners")
-      .select("status, salon_name")
-      .eq("user_id", user.id)
-      .maybeSingle();
+  if (!user) {
+    redirect("/");
+  }
 
-    if (ownerRow && ownerRow.status !== "approved") {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-ink font-sans px-4">
-          <div className="w-full max-w-sm border border-border rounded-lg p-6 space-y-4 text-center">
-            <p className="text-[11px] text-cream-ghost tracking-wide">
-              Powered by {PLATFORM_NAME}
-            </p>
-            <p className="text-sm text-cream">
-              {ownerRow.status === "rejected"
+  // Meja izolacije med saloni: id salona SAMO tega prijavljenega uporabnika.
+  // Vsaka poizvedba spodaj MORA filtrirati po salonId - to je edino, kar
+  // (na nivoju aplikacije) prepreči mešanje podatkov med saloni; RLS
+  // (my_salon_id() v shemi) je neodvisen, strežniški backstop za isto mejo.
+  const { data: ownerRow } = await supabase
+    .from("salon_owners")
+    .select("id, salon_name, status")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!ownerRow || ownerRow.status !== "approved") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-ink font-sans px-4">
+        <div className="w-full max-w-sm border border-border rounded-lg p-6 space-y-4 text-center">
+          <p className="text-[11px] text-cream-ghost tracking-wide">
+            Powered by {PLATFORM_NAME}
+          </p>
+          <p className="text-sm text-cream">
+            {!ownerRow
+              ? "Tvoj račun ni povezan z nobenim salonom."
+              : ownerRow.status === "rejected"
                 ? "Tvoja registracija ni bila odobrena."
                 : "Tvoj račun čaka na odobritev."}
-            </p>
-            <p className="text-xs text-cream-faint">
-              {ownerRow.salon_name} · {user.email}
-            </p>
-            <form action={logout}>
-              <button
-                type="submit"
-                className="w-full rounded-md border border-border text-cream text-sm font-medium py-2 hover:bg-ink-soft cursor-pointer"
-              >
-                Odjava
-              </button>
-            </form>
-          </div>
+          </p>
+          <p className="text-xs text-cream-faint">
+            {ownerRow ? `${ownerRow.salon_name} · ` : ""}
+            {user.email}
+          </p>
+          <form action={logout}>
+            <button
+              type="submit"
+              className="w-full rounded-md border border-border text-cream text-sm font-medium py-2 hover:bg-ink-soft cursor-pointer"
+            >
+              Odjava
+            </button>
+          </form>
         </div>
-      );
-    }
+      </div>
+    );
   }
+
+  const salonId = ownerRow.id;
+  const salonName = ownerRow.salon_name;
 
   const today = todayISO();
   const params = await searchParams;
@@ -88,6 +97,7 @@ export default async function OwnerDashboard({
   const { data: monthAppointments } = await supabase
     .from("appointments")
     .select("appointment_date")
+    .eq("salon_id", salonId)
     .gte("appointment_date", monthStart)
     .lte("appointment_date", monthEnd)
     .neq("status", "cancelled");
@@ -100,6 +110,7 @@ export default async function OwnerDashboard({
   const { data: monthWaitlist } = await supabase
     .from("waitlist")
     .select("preferred_date")
+    .eq("salon_id", salonId)
     .gte("preferred_date", monthStart)
     .lte("preferred_date", monthEnd);
 
@@ -108,6 +119,7 @@ export default async function OwnerDashboard({
   const { data: appointments, error } = await supabase
     .from("appointments")
     .select("*")
+    .eq("salon_id", salonId)
     .eq("appointment_date", selectedDate)
     .order("appointment_time", { ascending: true });
 
@@ -118,6 +130,7 @@ export default async function OwnerDashboard({
   } = await supabase
     .from("waitlist")
     .select("*", { count: "exact" })
+    .eq("salon_id", salonId)
     .eq("preferred_date", selectedDate)
     .order("created_at", { ascending: true })
     .limit(WAITLIST_LIMIT);
@@ -131,6 +144,7 @@ export default async function OwnerDashboard({
   const { data: tomorrowAppointments, error: tomorrowError } = await supabase
     .from("appointments")
     .select("*")
+    .eq("salon_id", salonId)
     .eq("appointment_date", nextBizDay)
     .neq("status", "cancelled")
     .order("appointment_time", { ascending: true });
@@ -138,6 +152,7 @@ export default async function OwnerDashboard({
   const { data: smsLog, error: smsError } = await supabase
     .from("sms_notifications")
     .select("*")
+    .eq("salon_id", salonId)
     .eq("status", "pending")
     .eq("appointment_date", selectedDate)
     .order("created_at", { ascending: true });
@@ -147,9 +162,9 @@ export default async function OwnerDashboard({
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <p className="font-display text-3xl text-gold mb-1">{SHOP_NAME}</p>
+            <p className="font-display text-3xl text-gold mb-1">{salonName}</p>
             <h1 className="text-sm font-medium text-cream-dim">Nadzorna plošča</h1>
-            <p className="text-sm text-cream-faint">{user?.email}</p>
+            <p className="text-sm text-cream-faint">{user.email}</p>
           </div>
           <form action={logout}>
             <button
@@ -226,6 +241,7 @@ export default async function OwnerDashboard({
         <AppointmentsHeader
           title={`Termini za ${isToday ? "danes" : dayLabel(selectedDate)}`}
           initialDate={selectedDate}
+          salonId={salonId}
         />
         <div className="border border-border rounded-lg divide-y divide-border-soft mb-10">
           {error && (
@@ -289,7 +305,7 @@ export default async function OwnerDashboard({
           )}
           {tomorrowAppointments?.map((a) => {
             const intro = isLiterallyTomorrow ? "jutri" : dayLabel(nextBizDay);
-            const reminderMessage = `Opomnik: ${intro} ob ${a.appointment_time} imaš rezervacijo za ${a.service} - ${SHOP_NAME}. Se vidimo!`;
+            const reminderMessage = `Opomnik: ${intro} ob ${a.appointment_time} imaš rezervacijo za ${a.service} - ${salonName}. Se vidimo!`;
             return (
               <div
                 key={a.id}

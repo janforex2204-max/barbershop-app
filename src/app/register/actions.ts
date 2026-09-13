@@ -6,6 +6,13 @@ import { randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyNewRegistration } from "@/lib/email";
+import { generateUniqueSlug } from "@/lib/slug";
+
+// Vsak nov salon dobi ta minimalni privzeti seznam storitev, da ima
+// rezervacijski obrazec takoj kaj za pokazati - lastnik ga lahko ureja prek
+// Supabase Table Editorja, dokler ne obstaja namenski UI za upravljanje
+// storitev.
+const DEFAULT_SERVICES = ["Prva storitev"];
 
 export async function registerOwner(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
@@ -46,19 +53,43 @@ export async function registerOwner(formData: FormData) {
   // ali z grobo silo najti (glej razlago varnosti v pogovoru s Claude).
   const approvalToken = randomBytes(32).toString("hex");
 
-  // Vstavi prek admin (service_role) klienta - takoj po signUp morda še ni
-  // aktivne seje (npr. če projekt zahteva potrditev e-pošte), zato se na
-  // navadni RLS-zaščiteni insert ne moremo zanesti.
+  // Vse spodaj prek admin (service_role) klienta - takoj po signUp morda še
+  // ni aktivne seje (npr. če projekt zahteva potrditev e-pošte), zato se na
+  // navadne RLS-zaščitene poizvedbe ne moremo zanesti.
   const admin = createAdminClient();
-  const { error: insertError } = await admin.from("salon_owners").insert({
-    user_id: data.user.id,
-    salon_name: salonName,
-    status: "pending",
-    approval_token: approvalToken,
-  });
+  const slug = await generateUniqueSlug(admin, salonName);
 
-  if (insertError) {
-    redirect(`/register?error=${encodeURIComponent(insertError.message)}`);
+  const { data: salon, error: insertError } = await admin
+    .from("salon_owners")
+    .insert({
+      user_id: data.user.id,
+      salon_name: salonName,
+      slug,
+      status: "pending",
+      approval_token: approvalToken,
+    })
+    .select("id")
+    .single();
+
+  if (insertError || !salon) {
+    redirect(
+      `/register?error=${encodeURIComponent(
+        insertError?.message ?? "Napaka pri registraciji."
+      )}`
+    );
+  }
+
+  const { error: servicesError } = await admin.from("services").insert(
+    DEFAULT_SERVICES.map((name, i) => ({
+      salon_id: salon.id,
+      name,
+      sort_order: i + 1,
+    }))
+  );
+  if (servicesError) {
+    // Ne prekini registracije zaradi tega - lastnik lahko storitve doda
+    // ročno prek Table Editorja.
+    console.error("Napaka pri dodajanju privzetih storitev:", servicesError);
   }
 
   try {

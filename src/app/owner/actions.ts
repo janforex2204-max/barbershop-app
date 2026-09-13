@@ -13,7 +13,7 @@ export async function login(formData: FormData) {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    redirect(`/owner/login?error=${encodeURIComponent(error.message)}`);
+    redirect(`/?error=${encodeURIComponent(error.message)}`);
   }
 
   redirect("/owner");
@@ -22,7 +22,7 @@ export async function login(formData: FormData) {
 export async function logout() {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  redirect("/owner/login");
+  redirect("/");
 }
 
 // Odpove termin in poišče stranke, ki jih je smiselno obvestiti o sprostitvi,
@@ -30,6 +30,12 @@ export async function logout() {
 // 1. stranke, ki imajo isti dan že rezerviran kasnejši termin za ISTO
 //    storitev - lahko bi prišle prej;
 // 2. ljudje na seznamu "Obvesti me", ki so izbrali to storitev (ali "vseeno").
+//
+// Izolacija med saloni: appointments/waitlist RLS (salon_id = my_salon_id())
+// poskrbi, da VSE poizvedbe spodaj že same po sebi vidijo samo vrstice
+// klicateljevega lastnega salona - eksplicitnega filtra po salon_id tu ni
+// treba dodajati (edina izjema je INSERT v sms_notifications, kjer moramo
+// salon_id sami nastaviti - glej appt.salon_id spodaj).
 export async function cancelAppointment(appointmentId: string) {
   const supabase = await createClient();
 
@@ -77,6 +83,7 @@ export async function cancelAppointment(appointmentId: string) {
 
   const newLogs = [
     ...earlierSlotMatches.map((a) => ({
+      salon_id: appt.salon_id,
       recipient_name: a.customer_name,
       recipient_phone: a.customer_phone,
       message: `Sprostil se je zgodnejši termin ob ${appt.appointment_time} - bi rad prišel prej?`,
@@ -85,6 +92,7 @@ export async function cancelAppointment(appointmentId: string) {
       appointment_date: appt.appointment_date,
     })),
     ...waitlistMatches.map((w) => ({
+      salon_id: appt.salon_id,
       recipient_name: w.customer_name,
       recipient_phone: w.customer_phone,
       message: `Sprostil se je termin za ${appt.service} ob ${appt.appointment_time} - se želiš rezervirati?`,
@@ -104,6 +112,7 @@ export async function cancelAppointment(appointmentId: string) {
 // Ko lastnik pošlje pripravljeno WhatsApp sporočilo stranki, obvestilo
 // označimo kot obravnavano (izgine s seznama čakajočih). Če stranka termin
 // dejansko potrdi, ga lastnik doda ročno prek "Dodaj termin" obrazca.
+// (sms_notifications RLS že sama omeji to na klicateljev lasten salon.)
 export async function markSmsSent(logId: string) {
   const supabase = await createClient();
 
@@ -124,15 +133,38 @@ export type ManualBookingState = {
     date: string;
     time: string;
     service: string;
+    salonName: string;
   };
 };
 
-// Lastnik ročno doda termin (npr. telefonska rezervacija mimo spletnega obrazca).
+// Lastnik ročno doda termin (npr. telefonska rezervacija mimo spletnega
+// obrazca). salon_id NAMENOMA razrešimo tu, s strežniške seje klicatelja -
+// nikoli iz podatkov, ki bi jih poslal klient (form ne vsebuje salon_id),
+// da se termina ne bi dalo "podtakniti" v tuj salon.
 export async function addManualAppointment(
   _prevState: ManualBookingState,
   formData: FormData
 ): Promise<ManualBookingState> {
   const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Seja je potekla. Prijavi se znova." };
+  }
+
+  const { data: ownerRow } = await supabase
+    .from("salon_owners")
+    .select("id, salon_name")
+    .eq("user_id", user.id)
+    .eq("status", "approved")
+    .maybeSingle();
+
+  if (!ownerRow) {
+    return { error: "Račun ni povezan z odobrenim salonom." };
+  }
 
   const customer_name = String(formData.get("customer_name") ?? "").trim();
   const customer_phone = String(formData.get("customer_phone") ?? "").trim();
@@ -149,6 +181,7 @@ export async function addManualAppointment(
   }
 
   const { error } = await supabase.from("appointments").insert({
+    salon_id: ownerRow.id,
     customer_name,
     customer_phone,
     service,
@@ -173,6 +206,7 @@ export async function addManualAppointment(
       date: appointment_date,
       time: appointment_time,
       service,
+      salonName: ownerRow.salon_name,
     },
   };
 }

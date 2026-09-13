@@ -9,9 +9,11 @@ import ManualBookingForm from "./manual-booking-form";
 export default function AppointmentsHeader({
   title,
   initialDate,
+  salonId,
 }: {
   title: string;
   initialDate: string;
+  salonId: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -33,6 +35,7 @@ export default function AppointmentsHeader({
       {open && (
         <ManualBookingForm
           initialDate={initialDate}
+          salonId={salonId}
           onClose={() => setOpen(false)}
         />
       )}

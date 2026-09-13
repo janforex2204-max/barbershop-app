@@ -1,6 +1,8 @@
-export const SHOP_NAME = "Barbershop pr' Kljuni";
 // Ime platforme - uporabi na splošnih/računskih straneh, ki niso specifične
 // za en salon (prijava, registracija, pozabljeno geslo, čakanje na odobritev).
+// Ime KONKRETNEGA salona ni več globalna konstanta - vsak salon ima svoje
+// (salon_owners.salon_name), razrešeno glede na prijavljenega uporabnika
+// (/owner) ali /[slug] iz URL-ja (javna rezervacijska stran).
 export const PLATFORM_NAME = "Fillio";
 // Kanonična produkcijska domena - uporabi za povezave v emailih (admin
 // odobritev), kjer mora povezava vedno kazati na pravo domeno, ne na
@@ -9,8 +11,6 @@ export const PLATFORM_URL = "https://fillio.si";
 // Po kolikšnem času preneha veljati povezava za odobritev novega lastnika
 // (glej src/app/admin/approve/route.ts).
 export const APPROVAL_TOKEN_EXPIRY_DAYS = 5;
-// Priprava na več frizerjev (funkcionalnost še ne obstaja) - privzeto ime lastnika.
-export const OWNER_NAME = "Žiga Kljun";
 
 export const HOURS = [
   "09:00",

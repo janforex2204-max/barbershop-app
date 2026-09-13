@@ -5,7 +5,6 @@ import { MessageCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
   HOURS,
-  SHOP_NAME,
   dayLabel,
   isBusinessDay,
   todayISO,
@@ -19,9 +18,11 @@ const initialState: ManualBookingState = {};
 
 export default function ManualBookingForm({
   initialDate,
+  salonId,
   onClose,
 }: {
   initialDate: string;
+  salonId: string;
   onClose: () => void;
 }) {
   const supabase = createClient();
@@ -37,24 +38,27 @@ export default function ManualBookingForm({
     initialState
   );
 
-  // Storitve naloži enkrat, ko se panel odpre (komponenta se namesti).
+  // Storitve TEGA salona naloži enkrat, ko se panel odpre.
   useEffect(() => {
     supabase
       .from("services")
       .select("id, name")
+      .eq("salon_id", salonId)
+      .eq("active", true)
       .order("sort_order", { ascending: true })
       .then(({ data, error }) => {
         if (!error && data) setServices(data);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [salonId]);
 
-  // Zasedenost izbranega dne - "loading"/reset se sproži v handleDateChange,
-  // efekt samo naredi poizvedbo.
+  // Zasedenost izbranega dne PRI TEM SALONU - "loading"/reset se sproži v
+  // handleDateChange, efekt samo naredi poizvedbo.
   useEffect(() => {
     supabase
       .from("public_availability")
       .select("appointment_time")
+      .eq("salon_id", salonId)
       .eq("appointment_date", date)
       .then(({ data, error }) => {
         if (!error && data) {
@@ -62,7 +66,7 @@ export default function ManualBookingForm({
         }
         setSlotsLoading(false);
       });
-  }, [date, supabase]);
+  }, [date, salonId, supabase]);
 
   // Po uspešni oddaji znova naloži zasedenost za isti dan (termin je zdaj zaseden).
   useEffect(() => {
@@ -70,6 +74,7 @@ export default function ManualBookingForm({
     supabase
       .from("public_availability")
       .select("appointment_time")
+      .eq("salon_id", salonId)
       .eq("appointment_date", date)
       .then(({ data, error }) => {
         if (!error && data) {
@@ -114,7 +119,7 @@ export default function ManualBookingForm({
               state.booked.phone,
               `Pozdravljen/a ${state.booked.name}, tvoja rezervacija je potrjena: ${dayLabel(
                 state.booked.date
-              )} ob ${state.booked.time}, ${state.booked.service} - ${SHOP_NAME}`
+              )} ob ${state.booked.time}, ${state.booked.service} - ${state.booked.salonName}`
             )}
             target="_blank"
             rel="noopener noreferrer"

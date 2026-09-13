@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { PLATFORM_NAME } from "@/lib/constants";
 
@@ -96,12 +97,12 @@ export default function ResetPasswordPage() {
               Povezava za ponastavitev gesla je neveljavna ali je potekla.
               Zahtevaj novo na prijavni strani.
             </p>
-            <a
-              href="/owner/login"
+            <Link
+              href="/"
               className="block text-center w-full rounded-md border border-border text-cream text-sm font-medium py-2 hover:bg-ink-soft"
             >
               Nazaj na prijavo
-            </a>
+            </Link>
           </div>
         )}
 
@@ -110,12 +111,12 @@ export default function ResetPasswordPage() {
             <p className="text-sm text-sage bg-[#16241a] border border-[#2a4a34] rounded-md px-3 py-2">
               Geslo je uspešno posodobljeno.
             </p>
-            <a
+            <Link
               href="/owner"
               className="block text-center w-full rounded-md bg-burgundy text-cream text-sm font-medium py-2 hover:opacity-90"
             >
               Pojdi na nadzorno ploščo
-            </a>
+            </Link>
           </div>
         )}
 

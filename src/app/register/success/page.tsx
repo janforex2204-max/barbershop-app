@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PLATFORM_NAME } from "@/lib/constants";
 
 export default async function RegisterSuccessPage({
@@ -22,12 +23,12 @@ export default async function RegisterSuccessPage({
           na odobritev. Ko bo odobren, se boš lahko prijavil/a in videl/a
           nadzorno ploščo.
         </p>
-        <a
-          href="/owner/login"
+        <Link
+          href="/"
           className="block w-full rounded-md border border-border text-cream text-sm font-medium py-2 hover:bg-ink-soft"
         >
           Nazaj na prijavo
-        </a>
+        </Link>
       </div>
     </div>
   );

@@ -1,7 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// Osveži Supabase sejo (auth cookie) ob vsakem requestu in zavaruje /owner poti.
+// Osveži Supabase sejo (auth cookie) ob vsakem requestu in zavaruje /owner
+// poti. "/" je primarna prijavna stran (glej src/app/page.tsx) - /owner/login
+// je samo alias, ki nanjo preusmeri.
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -30,12 +32,16 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isOwnerRoute = request.nextUrl.pathname.startsWith("/owner");
-  const isLoginRoute = request.nextUrl.pathname === "/owner/login";
+  const pathname = request.nextUrl.pathname;
+  const isOwnerRoute = pathname.startsWith("/owner");
+  // "/owner/login" ostane matchan tu samo zato, da vanj prijavljen uporabnik
+  // (če ga kdo od zunaj še vedno obišče) takoj odskoči na /owner namesto da
+  // gre skozi svojo lastno redirect-page logiko.
+  const isLoginRoute = pathname === "/" || pathname === "/owner/login";
 
-  if (isOwnerRoute && !isLoginRoute && !user) {
+  if (isOwnerRoute && pathname !== "/owner/login" && !user) {
     const url = request.nextUrl.clone();
-    url.pathname = "/owner/login";
+    url.pathname = "/";
     return NextResponse.redirect(url);
   }
 

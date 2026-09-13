@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { registerOwner } from "./actions";
 import { PLATFORM_NAME } from "@/lib/constants";
 
@@ -78,12 +79,12 @@ export default async function RegisterPage({
           </button>
         </form>
 
-        <a
-          href="/owner/login"
+        <Link
+          href="/"
           className="block text-center text-xs text-cream-dim hover:text-cream underline"
         >
           Že imaš račun? Prijava
-        </a>
+        </Link>
       </div>
     </div>
   );

@@ -13,6 +13,7 @@ export type Database = {
       services: {
         Row: {
           id: string;
+          salon_id: string;
           name: string;
           active: boolean;
           sort_order: number;
@@ -20,6 +21,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
+          salon_id: string;
           name: string;
           active?: boolean;
           sort_order?: number;
@@ -31,6 +33,7 @@ export type Database = {
       appointments: {
         Row: {
           id: string;
+          salon_id: string;
           customer_name: string;
           customer_phone: string;
           service: string;
@@ -42,6 +45,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
+          salon_id: string;
           customer_name: string;
           customer_phone: string;
           service: string;
@@ -57,6 +61,7 @@ export type Database = {
       waitlist: {
         Row: {
           id: string;
+          salon_id: string;
           customer_name: string;
           customer_phone: string;
           preferred_date: string;
@@ -66,6 +71,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
+          salon_id: string;
           customer_name: string;
           customer_phone: string;
           preferred_date: string;
@@ -79,6 +85,7 @@ export type Database = {
       sms_notifications: {
         Row: {
           id: string;
+          salon_id: string;
           recipient_name: string;
           recipient_phone: string;
           message: string;
@@ -90,6 +97,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
+          salon_id: string;
           recipient_name: string;
           recipient_phone: string;
           message: string;
@@ -107,6 +115,7 @@ export type Database = {
           id: string;
           user_id: string;
           salon_name: string;
+          slug: string;
           status: OwnerStatus;
           approval_token: string | null;
           approval_token_created_at: string;
@@ -117,6 +126,7 @@ export type Database = {
           id?: string;
           user_id: string;
           salon_name: string;
+          slug: string;
           status?: OwnerStatus;
           approval_token?: string | null;
           approval_token_created_at?: string;
@@ -130,13 +140,27 @@ export type Database = {
     Views: {
       public_availability: {
         Row: {
+          salon_id: string;
           appointment_date: string;
           appointment_time: string;
           status: AppointmentStatus;
         };
         Relationships: [];
       };
+      public_salons: {
+        Row: {
+          id: string;
+          salon_name: string;
+          slug: string;
+        };
+        Relationships: [];
+      };
     };
-    Functions: Record<string, never>;
+    Functions: {
+      my_salon_id: {
+        Args: Record<string, never>;
+        Returns: string | null;
+      };
+    };
   };
 };
