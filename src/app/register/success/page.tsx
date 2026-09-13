@@ -19,7 +19,7 @@ export default async function RegisterSuccessPage({
         </p>
         <p className="text-sm text-cream-muted">
           Salon <span className="text-cream font-medium">{salonName}</span> čaka
-          na ročno odobritev. Ko bo odobren, se boš lahko prijavil/a in videl/a
+          na odobritev. Ko bo odobren, se boš lahko prijavil/a in videl/a
           nadzorno ploščo.
         </p>
         <a

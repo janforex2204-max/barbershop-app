@@ -19,7 +19,7 @@ export default async function RegisterPage({
             Registracija lastnika
           </h1>
           <p className="text-xs text-cream-faint mt-1">
-            Po registraciji tvoj račun čaka na ročno odobritev.
+            Po registraciji tvoj račun čaka na odobritev.
           </p>
         </div>
 
