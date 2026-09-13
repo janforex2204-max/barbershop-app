@@ -28,7 +28,7 @@ export async function notifyNewRegistration({
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: `${PLATFORM_NAME} <onboarding@resend.dev>`,
+      from: `${PLATFORM_NAME} <noreply@fillio.si>`,
       to,
       subject: "Nova registracija lastnika salona",
       text: `Nova registracija čaka na odobritev:\n\nSalon: ${salonName}\nE-pošta: ${email}\n\nOdobri v Supabase → Table Editor → salon_owners → nastavi status na "approved".`,
