@@ -86,6 +86,11 @@ create table if not exists salon_owners (
   user_id uuid not null unique references auth.users(id) on delete cascade,
   salon_name text not null,
   status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  -- Naključen token za odobritev z enim klikom iz admin emaila (glej
+  -- src/app/admin/approve/route.ts) - ni namenjen prijavi, samo temu.
+  approval_token text unique,
+  -- Ni null, ko je bil token že uporabljen (prepreči ponovno uporabo).
+  approved_at timestamptz,
   created_at timestamptz not null default now()
 );
 

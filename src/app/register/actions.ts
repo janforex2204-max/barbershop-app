@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import { randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyNewRegistration } from "@/lib/email";
@@ -41,6 +42,10 @@ export async function registerOwner(formData: FormData) {
     );
   }
 
+  // 32 bajtov (256 bit) naključnosti - dovolj, da tokena ni mogoče uganiti
+  // ali z grobo silo najti (glej razlago varnosti v pogovoru s Claude).
+  const approvalToken = randomBytes(32).toString("hex");
+
   // Vstavi prek admin (service_role) klienta - takoj po signUp morda še ni
   // aktivne seje (npr. če projekt zahteva potrditev e-pošte), zato se na
   // navadni RLS-zaščiteni insert ne moremo zanesti.
@@ -49,6 +54,7 @@ export async function registerOwner(formData: FormData) {
     user_id: data.user.id,
     salon_name: salonName,
     status: "pending",
+    approval_token: approvalToken,
   });
 
   if (insertError) {
@@ -56,7 +62,7 @@ export async function registerOwner(formData: FormData) {
   }
 
   try {
-    await notifyNewRegistration({ email, salonName });
+    await notifyNewRegistration({ email, salonName, approvalToken });
   } catch (e) {
     console.error("Napaka pri pošiljanju email obvestila:", e);
   }

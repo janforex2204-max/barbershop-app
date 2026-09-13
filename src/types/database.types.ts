@@ -108,6 +108,8 @@ export type Database = {
           user_id: string;
           salon_name: string;
           status: OwnerStatus;
+          approval_token: string | null;
+          approved_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -115,6 +117,8 @@ export type Database = {
           user_id: string;
           salon_name: string;
           status?: OwnerStatus;
+          approval_token?: string | null;
+          approved_at?: string | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["salon_owners"]["Insert"]>;
