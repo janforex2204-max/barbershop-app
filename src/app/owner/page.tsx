@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { cancelAppointment, logout } from "./actions";
 import {
   SHOP_NAME,
+  PLATFORM_NAME,
   todayISO,
   dayLabel,
   monthOf,
@@ -50,7 +51,7 @@ export default async function OwnerDashboard({
       return (
         <div className="min-h-screen flex items-center justify-center bg-ink font-sans px-4">
           <div className="w-full max-w-sm border border-border rounded-lg p-6 space-y-4 text-center">
-            <p className="font-display text-lg text-gold">{SHOP_NAME}</p>
+            <p className="font-display text-lg text-gold">{PLATFORM_NAME}</p>
             <p className="text-sm text-cream">
               {ownerRow.status === "rejected"
                 ? "Tvoja registracija ni bila odobrena."

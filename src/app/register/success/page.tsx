@@ -1,10 +1,10 @@
-import { SHOP_NAME } from "@/lib/constants";
+import { PLATFORM_NAME } from "@/lib/constants";
 
 export default function RegisterSuccessPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-ink font-sans px-4">
       <div className="w-full max-w-sm border border-border rounded-lg p-6 space-y-4 text-center">
-        <p className="font-display text-lg text-gold">{SHOP_NAME}</p>
+        <p className="font-display text-lg text-gold">{PLATFORM_NAME}</p>
         <p className="text-sm text-sage bg-[#16241a] border border-[#2a4a34] rounded-md px-3 py-2">
           Registracija uspešna.
         </p>

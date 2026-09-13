@@ -1,4 +1,7 @@
 export const SHOP_NAME = "Barbershop pr' Kljuni";
+// Ime platforme - uporabi na splošnih/računskih straneh, ki niso specifične
+// za en salon (prijava, registracija, pozabljeno geslo, čakanje na odobritev).
+export const PLATFORM_NAME = "Fillio";
 // Priprava na več frizerjev (funkcionalnost še ne obstaja) - privzeto ime lastnika.
 export const OWNER_NAME = "Žiga Kljun";
 
