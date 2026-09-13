@@ -32,7 +32,7 @@ export default async function RegisterPage({
         <form action={registerOwner} className="space-y-4">
           <div className="space-y-1">
             <label htmlFor="salon_name" className="text-sm text-cream-dim">
-              Ime salona
+              Ime podjetja
             </label>
             <input
               id="salon_name"
