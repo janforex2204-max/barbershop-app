@@ -16,14 +16,14 @@ export function adminPage(title: string, message: string, ok: boolean) {
            min-height: 100vh; margin: 0; padding: 16px; box-sizing: border-box; }
     .card { max-width: 380px; width: 100%; border: 1px solid #3a342c; border-radius: 8px;
             padding: 28px 24px; text-align: center; }
-    .brand { color: #7a756a; font-size: 11px; letter-spacing: 0.02em; margin: 0 0 12px; }
+    .brand-logo { height: 16px; width: auto; opacity: 0.6; margin: 0 0 12px; }
     h1 { font-size: 18px; margin: 0 0 10px; }
     p.msg { font-size: 14px; margin: 0; color: ${ok ? "#7fa06b" : "#c97d7d"}; }
   </style>
 </head>
 <body>
   <div class="card">
-    <p class="brand">Powered by ${PLATFORM_NAME}</p>
+    <img class="brand-logo" src="/logo.png" width="3602" height="3020" alt="Powered by ${PLATFORM_NAME}" />
     <h1>${title}</h1>
     <p class="msg">${message}</p>
   </div>

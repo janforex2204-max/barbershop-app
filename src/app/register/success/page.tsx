@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PLATFORM_NAME } from "@/lib/constants";
+import PoweredBy from "@/components/powered-by";
 
 export default async function RegisterSuccessPage({
   searchParams,
@@ -12,9 +13,7 @@ export default async function RegisterSuccessPage({
   return (
     <div className="min-h-screen flex items-center justify-center bg-ink font-sans px-4">
       <div className="w-full max-w-sm border border-border rounded-lg p-6 space-y-4 text-center">
-        <p className="text-[11px] text-cream-ghost tracking-wide">
-          Powered by {PLATFORM_NAME}
-        </p>
+        <PoweredBy />
         <p className="text-sm text-sage bg-[#16241a] border border-[#2a4a34] rounded-md px-3 py-2">
           Registracija uspešna.
         </p>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { registerOwner } from "./actions";
-import { PLATFORM_NAME } from "@/lib/constants";
+import PoweredBy from "@/components/powered-by";
 
 export default async function RegisterPage({
   searchParams,
@@ -13,9 +13,7 @@ export default async function RegisterPage({
     <div className="min-h-screen flex items-center justify-center bg-ink font-sans px-4">
       <div className="w-full max-w-sm border border-border rounded-lg p-6 space-y-4">
         <div>
-          <p className="text-[11px] text-cream-ghost tracking-wide mb-2">
-            Powered by {PLATFORM_NAME}
-          </p>
+          <PoweredBy className="mb-2" />
           <h1 className="text-xl font-semibold text-cream">
             Registracija lastnika
           </h1>
