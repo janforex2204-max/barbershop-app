@@ -1,6 +1,8 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { isValidCustomerName, isValidPhone } from "@/lib/constants";
 
 // KRITIČNO: salon_id se za VSAK klic izpelje TUKAJ, na strežniku, iz `slug`
 // prek public_salons (samo odobreni saloni) - nikoli se ne sprejme salon_id,
@@ -39,11 +41,29 @@ export async function bookAppointment(
   slug: string,
   input: { name: string; phone: string; service: string; date: string; time: string }
 ): Promise<{ error?: string }> {
+  // Server Action je dosegljiv z neposrednim POST-om mimo UI-ja, zato se ne
+  // zanašamo samo na validacijo v booking-page.tsx (glej isValidCustomerName/
+  // isValidPhone v src/lib/constants.ts za pravili in razlago).
+  if (!isValidCustomerName(input.name)) {
+    return { error: "Vnesi ime in priimek (vsaj 3 znaki, npr. \"Jan Novak\")." };
+  }
+  if (!isValidPhone(input.phone)) {
+    return { error: "Vnesi veljavno telefonsko številko (npr. 040 123 456)." };
+  }
+
   const supabase = await createClient();
   const { salonId, error: resolveError } = await resolveSalonId(supabase, slug);
 
   if (!salonId) {
     return { error: resolveError ?? "Salon ne obstaja." };
+  }
+
+  // Preprečuje zlorabo (nekdo hitro zaporedoma zasede vse proste termine z
+  // izmišljenimi podatki) - glej src/lib/rate-limit.ts za oba limita.
+  const ip = await getClientIp();
+  const { limited, message } = await checkRateLimit("appointments", input.phone, ip);
+  if (limited) {
+    return { error: message };
   }
 
   const { error } = await supabase.from("appointments").insert({
@@ -54,6 +74,7 @@ export async function bookAppointment(
     appointment_date: input.date,
     appointment_time: input.time,
     status: "booked",
+    ip_address: ip,
   });
 
   if (error) {
@@ -70,11 +91,24 @@ export async function joinWaitlist(
   slug: string,
   input: { name: string; phone: string; service: string; date: string }
 ): Promise<{ error?: string }> {
+  if (!isValidCustomerName(input.name)) {
+    return { error: "Vnesi ime in priimek (vsaj 3 znaki, npr. \"Jan Novak\")." };
+  }
+  if (!isValidPhone(input.phone)) {
+    return { error: "Vnesi veljavno telefonsko številko (npr. 040 123 456)." };
+  }
+
   const supabase = await createClient();
   const { salonId, error: resolveError } = await resolveSalonId(supabase, slug);
 
   if (!salonId) {
     return { error: resolveError ?? "Salon ne obstaja." };
+  }
+
+  const ip = await getClientIp();
+  const { limited, message } = await checkRateLimit("waitlist", input.phone, ip);
+  if (limited) {
+    return { error: message };
   }
 
   const { error } = await supabase.from("waitlist").insert({
@@ -83,6 +117,7 @@ export async function joinWaitlist(
     customer_phone: input.phone,
     preferred_date: input.date,
     service_preference: input.service,
+    ip_address: ip,
   });
 
   if (error) {

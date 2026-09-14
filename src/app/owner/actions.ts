@@ -69,11 +69,15 @@ export async function cancelAppointment(appointmentId: string) {
     return true;
   });
 
+  // Ordered po created_at (prvi prijavljen na čakalno listo je prvi v
+  // seznamu) - uporablja tudi owner/page.tsx za prikaz prioritete v gumbu
+  // "Ponudi ta termin", zato mora biti vrstni red tu deterministen.
   const { data: waitMatches } = await supabase
     .from("waitlist")
     .select("*")
     .eq("preferred_date", appt.appointment_date)
-    .in("service_preference", ["vseeno", appt.service]);
+    .in("service_preference", ["vseeno", appt.service])
+    .order("created_at", { ascending: true });
 
   const waitlistSeen = new Set<string>();
   const waitlistMatches = (waitMatches ?? []).filter((w) => {

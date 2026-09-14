@@ -3,7 +3,6 @@ import { Clock, MessageCircle, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { cancelAppointment, logout } from "./actions";
 import {
-  PLATFORM_NAME,
   todayISO,
   dayLabel,
   monthOf,
@@ -14,6 +13,8 @@ import {
 import AppointmentsHeader from "./appointments-header";
 import NotificationsPanel from "./notifications-panel";
 import MonthCalendar from "./month-calendar";
+import WaitlistOffer from "./waitlist-offer";
+import PoweredBy from "@/components/powered-by";
 
 function waitlistCountLabel(n: number) {
   if (n === 1) return "1 stranka čaka na termin";
@@ -55,9 +56,7 @@ export default async function OwnerDashboard({
     return (
       <div className="min-h-screen flex items-center justify-center bg-ink font-sans px-4">
         <div className="w-full max-w-sm border border-border rounded-lg p-6 space-y-4 text-center">
-          <p className="text-[11px] text-cream-ghost tracking-wide">
-            Powered by {PLATFORM_NAME}
-          </p>
+          <PoweredBy />
           <p className="text-sm text-cream">
             {!ownerRow
               ? "Tvoj račun ni povezan z nobenim salonom."
@@ -169,6 +168,32 @@ export default async function OwnerDashboard({
     .eq("appointment_date", selectedDate)
     .order("created_at", { ascending: true });
 
+  // Za gumb "Ponudi ta termin" pod ravno odpovedanim terminom: cancelAppointment
+  // (./actions.ts) ob odpovedi za ujemajoče čakajoče stranke že USTVARI pending
+  // sms_notifications vrstico (reason: "waitlist", appointment_id = odpovedani
+  // termin) - tu jih samo grupiramo po terminu in razvrstimo po prioriteti
+  // (prvi prijavljen na čakalno listo je prvi ponujen). Prioriteto beremo iz
+  // `waitlist` (zanesljivo urejen po created_at), NE iz sms_notifications.created_at,
+  // ker so bile vrstice vstavljene v enem batch insertu in bi lahko imele
+  // enak timestamp.
+  type SmsNotificationRow = NonNullable<typeof smsLog>[number];
+
+  const waitlistPriority = new Map((waitlist ?? []).map((w, i) => [w.customer_phone, i]));
+  const waitlistOffersByAppointment = new Map<string, SmsNotificationRow[]>();
+  for (const log of smsLog ?? []) {
+    if (log.reason !== "waitlist" || !log.appointment_id) continue;
+    const list = waitlistOffersByAppointment.get(log.appointment_id) ?? [];
+    list.push(log);
+    waitlistOffersByAppointment.set(log.appointment_id, list);
+  }
+  for (const list of waitlistOffersByAppointment.values()) {
+    list.sort(
+      (a, b) =>
+        (waitlistPriority.get(a.recipient_phone) ?? Infinity) -
+        (waitlistPriority.get(b.recipient_phone) ?? Infinity)
+    );
+  }
+
   return (
     <div className="min-h-screen bg-ink text-cream font-sans px-6 py-10">
       <div className="max-w-2xl mx-auto">
@@ -264,41 +289,47 @@ export default async function OwnerDashboard({
           {!error && appointments?.length === 0 && (
             <p className="p-4 text-sm text-cream-dim">Ni terminov za ta dan.</p>
           )}
-          {appointments?.map((a) => (
-            <div
-              key={a.id}
-              className="flex items-center justify-between px-4 py-3 text-sm"
-            >
-              <div>
-                <span className="text-gold font-medium mr-3">
-                  {a.appointment_time}
-                </span>
-                <span
-                  className={
-                    a.status === "cancelled"
-                      ? "line-through text-cream-ghost"
-                      : "text-cream"
-                  }
-                >
-                  {a.customer_name}
-                </span>
-                {a.status === "filled" && (
-                  <span className="text-sage text-xs ml-2">(zapolnjeno)</span>
+          {appointments?.map((a) => {
+            const waitlistOffers =
+              a.status === "cancelled" ? waitlistOffersByAppointment.get(a.id) : undefined;
+            return (
+              <div key={a.id}>
+                <div className="flex items-center justify-between px-4 py-3 text-sm">
+                  <div>
+                    <span className="text-gold font-medium mr-3">
+                      {a.appointment_time}
+                    </span>
+                    <span
+                      className={
+                        a.status === "cancelled"
+                          ? "line-through text-cream-ghost"
+                          : "text-cream"
+                      }
+                    >
+                      {a.customer_name}
+                    </span>
+                    {a.status === "filled" && (
+                      <span className="text-sage text-xs ml-2">(zapolnjeno)</span>
+                    )}
+                    <span className="text-cream-faint"> — {a.service}</span>
+                  </div>
+                  {a.status === "booked" && (
+                    <form action={cancelAppointment.bind(null, a.id)}>
+                      <button
+                        type="submit"
+                        className="text-xs px-3 py-1.5 rounded border border-rose text-rose hover:bg-rose/10 cursor-pointer"
+                      >
+                        Odpovej
+                      </button>
+                    </form>
+                  )}
+                </div>
+                {waitlistOffers && waitlistOffers.length > 0 && (
+                  <WaitlistOffer offers={waitlistOffers} />
                 )}
-                <span className="text-cream-faint"> — {a.service}</span>
               </div>
-              {a.status === "booked" && (
-                <form action={cancelAppointment.bind(null, a.id)}>
-                  <button
-                    type="submit"
-                    className="text-xs px-3 py-1.5 rounded border border-rose text-rose hover:bg-rose/10 cursor-pointer"
-                  >
-                    Odpovej
-                  </button>
-                </form>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <h2 className="text-lg font-medium mb-1 flex items-center gap-2">

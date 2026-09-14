@@ -43,6 +43,9 @@ export type Database = {
           status: AppointmentStatus;
           barber_name: string;
           created_at: string;
+          // Samo za rate limiting (glej src/lib/rate-limit.ts), null pri
+          // rezervacijah, ki jih vnese lastnik (owner/actions.ts).
+          ip_address: string | null;
         };
         Insert: {
           id?: string;
@@ -55,6 +58,7 @@ export type Database = {
           status?: AppointmentStatus;
           barber_name?: string;
           created_at?: string;
+          ip_address?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["appointments"]["Insert"]>;
         Relationships: [];
@@ -69,6 +73,8 @@ export type Database = {
           service_preference: string;
           barber_name: string;
           created_at: string;
+          // Samo za rate limiting (glej src/lib/rate-limit.ts).
+          ip_address: string | null;
         };
         Insert: {
           id?: string;
@@ -79,6 +85,7 @@ export type Database = {
           service_preference?: string;
           barber_name?: string;
           created_at?: string;
+          ip_address?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["waitlist"]["Insert"]>;
         Relationships: [];

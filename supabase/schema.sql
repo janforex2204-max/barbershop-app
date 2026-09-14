@@ -80,6 +80,18 @@ create unique index if not exists appointments_salon_date_time_active_idx
 
 create index if not exists appointments_salon_date_idx on appointments (salon_id, appointment_date);
 
+-- IP odjemalca ob rezervaciji, SAMO za rate limiting (glej
+-- src/lib/rate-limit.ts) - nikoli prikazano lastniku salona. "alter table
+-- add column if not exists", ne "create table", ker appointments v produkciji
+-- verjetno že obstaja.
+alter table appointments add column if not exists ip_address inet;
+
+-- Podpirata poizvedbi v src/lib/rate-limit.ts (štetje rezervacij po
+-- telefonu/IP v zadnjem časovnem oknu) - namenoma GLOBALNA, čez vse salone,
+-- zato brez salon_id.
+create index if not exists appointments_phone_created_idx on appointments (customer_phone, created_at);
+create index if not exists appointments_ip_created_idx on appointments (ip_address, created_at) where ip_address is not null;
+
 -- ---------------------------------------------------------------------------
 -- ČAKALNA VRSTA (waitlist)
 -- ---------------------------------------------------------------------------
@@ -96,6 +108,16 @@ create table if not exists waitlist (
 );
 
 create index if not exists waitlist_salon_date_idx on waitlist (salon_id, preferred_date);
+
+-- IP odjemalca ob prijavi v čakalno vrsto, SAMO za rate limiting (glej
+-- src/lib/rate-limit.ts) - nikoli prikazano lastniku salona.
+alter table waitlist add column if not exists ip_address inet;
+
+-- Podpirata poizvedbi v src/lib/rate-limit.ts (štetje vnosov po telefonu/IP v
+-- zadnjem časovnem oknu) - namenoma GLOBALNA, čez vse salone, zato brez
+-- salon_id.
+create index if not exists waitlist_phone_created_idx on waitlist (customer_phone, created_at);
+create index if not exists waitlist_ip_created_idx on waitlist (ip_address, created_at) where ip_address is not null;
 
 -- ---------------------------------------------------------------------------
 -- SMS OBVESTILA (log tega, kar bo kasneje pošiljal Twilio)

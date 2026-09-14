@@ -4,7 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Scissors } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { HOURS, todayISO, dayLabel, upcomingBusinessWeeks } from "@/lib/constants";
+import {
+  HOURS,
+  todayISO,
+  dayLabel,
+  upcomingBusinessWeeks,
+  isValidCustomerName,
+  isValidPhone,
+} from "@/lib/constants";
 import DatePicker from "./date-picker";
 import { bookAppointment as bookAppointmentAction, joinWaitlist as joinWaitlistAction } from "./actions";
 
@@ -212,6 +219,14 @@ export default function BookingPage({
       showToast("Izpolni ime, telefon in izberi uro.");
       return;
     }
+    if (!isValidCustomerName(form.name)) {
+      showToast('Vnesi ime in priimek (vsaj 3 znaki, npr. "Jan Novak").');
+      return;
+    }
+    if (!isValidPhone(form.phone)) {
+      showToast("Vnesi veljavno telefonsko številko (npr. 040 123 456).");
+      return;
+    }
     setSubmitting(true);
     const { error } = await bookAppointmentAction(slug, {
       name: form.name,
@@ -238,6 +253,14 @@ export default function BookingPage({
   async function joinWaitlist() {
     if (!waitForm.name || !waitForm.phone) {
       showToast("Izpolni ime in telefon.");
+      return;
+    }
+    if (!isValidCustomerName(waitForm.name)) {
+      showToast('Vnesi ime in priimek (vsaj 3 znaki, npr. "Jan Novak").');
+      return;
+    }
+    if (!isValidPhone(waitForm.phone)) {
+      showToast("Vnesi veljavno telefonsko številko (npr. 040 123 456).");
       return;
     }
     setSubmitting(true);
@@ -344,6 +367,7 @@ export default function BookingPage({
                 className={inputClass}
               />
               <input
+                type="tel"
                 placeholder="Telefon"
                 value={form.phone}
                 onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
@@ -382,6 +406,7 @@ export default function BookingPage({
               className={inputClass}
             />
             <input
+              type="tel"
               placeholder="Telefon"
               value={waitForm.phone}
               onChange={(e) => setWaitForm((f) => ({ ...f, phone: e.target.value }))}

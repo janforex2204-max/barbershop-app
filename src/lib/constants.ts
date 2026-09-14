@@ -191,6 +191,39 @@ export function monthGrid(monthStr: string): (string | null)[][] {
   return weeks;
 }
 
+// ---------------------------------------------------------------------------
+// Validacija vnosa na javnem rezervacijskem obrazcu (/[slug]) - uporabljeno
+// TAKO na klientu (takojšen toast) KOT na strežniku (actions.ts, ker je
+// Server Action dosegljiv z neposrednim POST-om mimo UI-ja, glej
+// node_modules/next/dist/docs/.../data-security.md - "Validating client
+// input"). Namenoma ohlapno (ne zahtevamo črkovnega nabora, ločil ipd.) - cilj
+// je zavrniti OČITNO nesmiselne vnose ("A", "12"), ne biti frustrirajoč za
+// prave stranke (šumniki, vezaji, dvojni priimki ...).
+// ---------------------------------------------------------------------------
+export const MIN_NAME_LENGTH = 3;
+export const MIN_PHONE_DIGITS = 8;
+export const MAX_PHONE_DIGITS = 15;
+
+// Vsaj 3 znaki IN vsaj en presledek (namiguje na "ime priimek", ne eno samo
+// besedo) - brez zahtev po abecedi, da ne zavrne veljavnih imen s šumniki,
+// vezaji ipd.
+export function isValidCustomerName(name: string): boolean {
+  const trimmed = name.trim();
+  if (trimmed.length < MIN_NAME_LENGTH) return false;
+  return /\S\s+\S/.test(trimmed);
+}
+
+// Dovoli presledke/vezaje/oklepaje in neobvezen vodilni "+" (npr. "+386 40
+// 123 456", "040-123-456", "(040) 123 456"), nato preveri samo ŠTEVILO
+// številk - dovolj za slovensko lokalno (9: "0" + 8) ali mednarodno (11:
+// "386" + 8) obliko, brez vezave na en sam natančen format.
+export function isValidPhone(phone: string): boolean {
+  const trimmed = phone.trim();
+  if (!/^\+?[\d\s()-]+$/.test(trimmed)) return false;
+  const digits = trimmed.replace(/\D/g, "");
+  return digits.length >= MIN_PHONE_DIGITS && digits.length <= MAX_PHONE_DIGITS;
+}
+
 // Pretvori lokalno slovensko številko (npr. "040 123 456") v mednarodni
 // format brez "+", ki ga zahteva wa.me (npr. "386401234456").
 export function toWhatsAppPhone(phone: string): string {
