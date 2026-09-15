@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Scissors } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import ThemeToggle from "@/components/theme-toggle";
+import BarberPoleWatermark from "./barber-pole-watermark";
 import {
   HOURS,
   todayISO,
@@ -18,6 +20,11 @@ import { bookAppointment as bookAppointmentAction, joinWaitlist as joinWaitlistA
 type Service = { id: string; name: string };
 type BookingForm = { name: string; phone: string; service: string; time: string };
 type WaitForm = { name: string; phone: string; service: string };
+
+// Vodni žig samo za ta konkreten salon (glej barber-pole-watermark.tsx) - ne
+// splošna platformska funkcija, zato preverjamo dobesedni slug, ne kake
+// nastavitve salona v bazi.
+const BARBER_POLE_WATERMARK_SLUG = "barbershop-pr-kljuni";
 
 // Prvi razpoložljivi delovni dan (torek-sobota) - privzeto izbrani datum.
 const INITIAL_DATE = upcomingBusinessWeeks()[0]?.dates[0] ?? todayISO();
@@ -282,17 +289,19 @@ export default function BookingPage({
   }
 
   return (
-    <div className="min-h-screen bg-ink font-sans">
-      <header className="border-b border-border px-6 py-7">
+    <div className="relative min-h-screen bg-ink font-sans">
+      {slug === BARBER_POLE_WATERMARK_SLUG && <BarberPoleWatermark />}
+      <header className="relative border-b border-border px-6 py-7">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Scissors size={22} className="text-gold" />
             <h1 className="font-display text-2xl font-semibold tracking-tight text-cream">
               {salonName}
             </h1>
+            <ThemeToggle />
           </div>
           <nav className="flex gap-1 bg-ink-soft p-1 rounded-md">
-            <span className="px-4 py-2 text-sm font-medium rounded bg-burgundy text-cream">
+            <span className="px-4 py-2 text-sm font-medium rounded bg-burgundy text-on-accent">
               Rezerviraj
             </span>
             <Link
@@ -350,7 +359,7 @@ export default function BookingPage({
                   onClick={() => setForm((f) => ({ ...f, time: t }))}
                   className={`py-2.5 text-[13px] rounded-md cursor-pointer border transition-colors ${
                     form.time === t
-                      ? "border-gold bg-[#3A2A1A] text-cream"
+                      ? "border-gold bg-selected text-cream"
                       : "border-border text-cream bg-transparent"
                   }`}
                 >
@@ -387,7 +396,7 @@ export default function BookingPage({
               <button
                 onClick={bookAppointment}
                 disabled={submitting}
-                className="w-full py-3 rounded-md border-none bg-burgundy text-cream text-sm font-semibold cursor-pointer mt-1 disabled:opacity-60"
+                className="w-full py-3 rounded-md border-none bg-burgundy text-on-accent text-sm font-semibold cursor-pointer mt-1 disabled:opacity-60"
               >
                 Rezerviraj termin{form.time ? ` — ${form.time}` : ""}
               </button>
@@ -427,7 +436,7 @@ export default function BookingPage({
             <button
               onClick={joinWaitlist}
               disabled={submitting}
-              className="w-full py-3 rounded-md border-none bg-burgundy text-cream text-sm font-semibold cursor-pointer mt-1 disabled:opacity-60"
+              className="w-full py-3 rounded-md border-none bg-burgundy text-on-accent text-sm font-semibold cursor-pointer mt-1 disabled:opacity-60"
             >
               Obvesti me, ko se kaj sprosti
             </button>

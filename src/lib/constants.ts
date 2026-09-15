@@ -12,6 +12,12 @@ export const PLATFORM_URL = "https://fillio.si";
 // (glej src/app/admin/approve/route.ts).
 export const APPROVAL_TOKEN_EXPIRY_DAYS = 5;
 
+// Koliko delovnih tednov vnaprej lahko stranka rezervira na /[slug] (glej
+// upcomingBusinessWeeks spodaj) - namenoma trda omejitev, v nasprotju z
+// lastnikovim mesečnim koledarjem na /owner (month-calendar.tsx), ki meje
+// NIMA (shiftMonth je čista datumska aritmetika, gre v neskončnost).
+export const BOOKING_WINDOW_WEEKS = 4;
+
 export const HOURS = [
   "09:00",
   "10:00",
@@ -115,7 +121,7 @@ function formatDayRange(startIso: string, endIso: string): string {
 // naslednji trije (cca. 4 tedne vnaprej). Pretekli dnevi v tekočem tednu so
 // izpuščeni. Oznaka vsake skupine je dejanski datumski razpon tistega bloka
 // dni ("Ta teden" ima dodano predpono, ostali imajo samo datume).
-export function upcomingBusinessWeeks(weekCount = 4): BusinessWeek[] {
+export function upcomingBusinessWeeks(weekCount = BOOKING_WINDOW_WEEKS): BusinessWeek[] {
   const today = todayISO();
   const monday = mondayOf(today);
 

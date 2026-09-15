@@ -111,7 +111,7 @@ export default function ManualBookingForm({
 
       {state.success && state.booked && (
         <div className="mb-3 space-y-2">
-          <p className="text-xs text-sage bg-[#16241a] border border-[#2a4a34] rounded-md px-3 py-2">
+          <p className="text-xs text-sage bg-success-bg border border-success-border rounded-md px-3 py-2">
             Termin je bil dodan.
           </p>
           <a
@@ -130,7 +130,7 @@ export default function ManualBookingForm({
         </div>
       )}
       {state.error && (
-        <p className="text-xs text-rose bg-[#2A1616] border border-[#4A2626] rounded-md px-3 py-2 mb-3">
+        <p className="text-xs text-rose bg-danger-bg border border-danger-border rounded-md px-3 py-2 mb-3">
           {state.error}
         </p>
       )}
@@ -190,7 +190,7 @@ export default function ManualBookingForm({
                       onClick={() => setTime(h)}
                       className={`py-2 text-xs rounded-md border cursor-pointer transition-colors disabled:cursor-not-allowed disabled:opacity-30 ${
                         time === h
-                          ? "border-gold bg-[#3A2A1A] text-cream"
+                          ? "border-gold bg-selected text-cream"
                           : "border-border text-cream bg-transparent"
                       }`}
                     >
@@ -208,7 +208,7 @@ export default function ManualBookingForm({
         <button
           type="submit"
           disabled={pending || !validDay || !time || freeTimes.length === 0}
-          className="w-full py-2.5 rounded-md border-none bg-burgundy text-cream text-sm font-semibold cursor-pointer mt-1 disabled:opacity-50"
+          className="w-full py-2.5 rounded-md border-none bg-burgundy text-on-accent text-sm font-semibold cursor-pointer mt-1 disabled:opacity-50"
         >
           Dodaj termin{time ? ` — ${time}` : ""}
         </button>

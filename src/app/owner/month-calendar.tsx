@@ -102,7 +102,7 @@ function DayCell({
       href={`/owner?date=${iso}&month=${monthStr}`}
       className={`aspect-square flex flex-col items-center justify-center gap-0.5 rounded-md border text-xs transition-colors ${
         isSelected
-          ? "border-gold bg-[#3A2A1A] text-cream"
+          ? "border-gold bg-selected text-cream"
           : isToday
             ? "border-cream-faint text-cream hover:border-gold"
             : "border-transparent text-cream hover:border-border"

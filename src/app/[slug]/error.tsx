@@ -25,7 +25,7 @@ export default function SalonPageError({
         </p>
         <button
           onClick={reset}
-          className="w-full rounded-md bg-burgundy text-cream text-sm font-semibold py-2.5 cursor-pointer"
+          className="w-full rounded-md bg-burgundy text-on-accent text-sm font-semibold py-2.5 cursor-pointer"
         >
           Poskusi znova
         </button>

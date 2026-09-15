@@ -14,7 +14,7 @@ export default async function RegisterSuccessPage({
     <div className="min-h-screen flex items-center justify-center bg-ink font-sans px-4">
       <div className="w-full max-w-sm border border-border rounded-lg p-6 space-y-4 text-center">
         <PoweredBy />
-        <p className="text-sm text-sage bg-[#16241a] border border-[#2a4a34] rounded-md px-3 py-2">
+        <p className="text-sm text-sage bg-success-bg border border-success-border rounded-md px-3 py-2">
           Registracija uspešna.
         </p>
         <p className="text-sm text-cream-muted">

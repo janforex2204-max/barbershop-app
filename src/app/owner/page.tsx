@@ -15,6 +15,7 @@ import NotificationsPanel from "./notifications-panel";
 import MonthCalendar from "./month-calendar";
 import WaitlistOffer from "./waitlist-offer";
 import PoweredBy from "@/components/powered-by";
+import ThemeToggle from "@/components/theme-toggle";
 
 function waitlistCountLabel(n: number) {
   if (n === 1) return "1 stranka čaka na termin";
@@ -197,6 +198,10 @@ export default async function OwnerDashboard({
   return (
     <div className="min-h-screen bg-ink text-cream font-sans px-6 py-10">
       <div className="max-w-2xl mx-auto">
+        <div className="flex items-center gap-3 mb-4">
+          <PoweredBy size="md" />
+          <ThemeToggle />
+        </div>
         <div className="flex items-center justify-between mb-8">
           <div>
             <p className="font-display text-3xl text-gold mb-1">{salonName}</p>
@@ -226,7 +231,7 @@ export default async function OwnerDashboard({
             Napaka pri branju čakajočih: {waitlistError.message}
           </p>
         ) : (
-          <div className="mb-10 rounded-lg border border-gold/40 bg-gradient-to-br from-[#2E2620] to-[#1B1815] p-5">
+          <div className="mb-10 rounded-lg border border-gold/40 bg-gradient-to-br from-ink-elevated to-ink p-5">
             <div className="flex items-center gap-2 mb-1">
               <Users size={18} className="text-gold" />
               <span className="font-display text-lg text-cream">

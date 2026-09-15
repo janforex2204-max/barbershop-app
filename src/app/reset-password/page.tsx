@@ -91,7 +91,7 @@ export default function ResetPasswordPage() {
 
         {status === "invalid" && (
           <div className="space-y-3">
-            <p className="text-sm text-rose bg-[#2A1616] border border-[#4A2626] rounded-md px-3 py-2">
+            <p className="text-sm text-rose bg-danger-bg border border-danger-border rounded-md px-3 py-2">
               Povezava za ponastavitev gesla je neveljavna ali je potekla.
               Zahtevaj novo na prijavni strani.
             </p>
@@ -106,12 +106,12 @@ export default function ResetPasswordPage() {
 
         {status === "done" && (
           <div className="space-y-3">
-            <p className="text-sm text-sage bg-[#16241a] border border-[#2a4a34] rounded-md px-3 py-2">
+            <p className="text-sm text-sage bg-success-bg border border-success-border rounded-md px-3 py-2">
               Geslo je uspešno posodobljeno.
             </p>
             <Link
               href="/owner"
-              className="block text-center w-full rounded-md bg-burgundy text-cream text-sm font-medium py-2 hover:opacity-90"
+              className="block text-center w-full rounded-md bg-burgundy text-on-accent text-sm font-medium py-2 hover:opacity-90"
             >
               Pojdi na nadzorno ploščo
             </Link>
@@ -121,7 +121,7 @@ export default function ResetPasswordPage() {
         {status === "ready" && (
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <p className="text-sm text-rose bg-[#2A1616] border border-[#4A2626] rounded-md px-3 py-2">
+              <p className="text-sm text-rose bg-danger-bg border border-danger-border rounded-md px-3 py-2">
                 {error}
               </p>
             )}
@@ -157,7 +157,7 @@ export default function ResetPasswordPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full rounded-md bg-burgundy text-cream text-sm font-medium py-2 hover:opacity-90 cursor-pointer disabled:opacity-60"
+              className="w-full rounded-md bg-burgundy text-on-accent text-sm font-medium py-2 hover:opacity-90 cursor-pointer disabled:opacity-60"
             >
               Shrani novo geslo
             </button>

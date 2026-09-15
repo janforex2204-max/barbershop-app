@@ -68,7 +68,7 @@ export default function DatePicker({
                       }}
                       className={`py-2 rounded-md border cursor-pointer transition-colors capitalize ${
                         selectedDate === d
-                          ? "border-gold bg-[#3A2A1A] text-cream"
+                          ? "border-gold bg-selected text-cream"
                           : "border-border text-cream bg-transparent hover:border-cream-faint"
                       }`}
                     >

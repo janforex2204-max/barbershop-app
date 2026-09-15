@@ -2,7 +2,10 @@
 
 /*
   Barvna paleta in tipografija povzeta iz reference/barbershop-mvp.jsx —
-  fiksna temna "brand" tema (ne sledi sistemskemu light/dark).
+  tokeni (--color-*) so poimenovani po VLOGI (ink = ozadje, cream = besedilo,
+  ...), ne po dobesedni barvi, zato lahko [data-theme="light"] spodaj vse
+  vrednosti invertira brez spreminjanja katerekoli komponente, ki jih
+  uporablja (glej src/components/theme-provider.tsx za preklop teme).
 */
 @theme inline {
   --font-display: var(--font-fraunces);
@@ -20,12 +23,63 @@
   --color-cream-faint: #8a8377;
   --color-cream-ghost: #7a756a;
   --color-gold: #a67c3d;
-  --color-burgundy: #8c2f2f;
+  --color-gold-soft: #c99a52;
   --color-rose: #c97d7d;
   --color-sage: #7fa06b;
+  --color-selected: #3a2a1a;
+  --color-danger-bg: #2a1616;
+  --color-danger-border: #4a2626;
+  --color-success-bg: #16241a;
+  --color-success-border: #2a4a34;
+
+  /* Konstantna (ne obrne se z NOBENO temo) - burgundy je vedno temna,
+     nasičena barva gumba ("Prijava", "Rezerviraj" ...), zato tudi besedilo
+     na njej ostane vedno svetlo, ne glede na temo strani okoli gumba. */
+  --color-burgundy: #8c2f2f;
+  --color-on-accent: #f5ede0;
+
+  /* Uporabljeno samo v BarberPoleWatermark (src/app/[slug]/barber-pole-watermark.tsx) */
+  --watermark-red: #d16b64;
+  --watermark-neutral: #efe6d8;
+  --watermark-blue: #6f8fc2;
+}
+
+/*
+  Svetla tema - iste vloge tokenov, obrnjena svetlost + potemnjeni akcentni
+  toni (gold/rose/sage), da ohranijo zadosten kontrast na svetlem ozadju.
+  Nenaslovljeno (unlayered) pravilo tu namenoma premaga Tailwindov @theme
+  privzetek (ki pristane v @layer theme) kadarkoli je na <html> prisoten
+  [data-theme="light"] - glej ThemeProvider.
+*/
+:root[data-theme="light"] {
+  --color-ink: #f7f3ec;
+  --color-ink-soft: #efe7d8;
+  --color-ink-elevated: #e9dfcb;
+  --color-ink-field: #ffffff;
+  --color-border: #ddd0b8;
+  --color-border-soft: #e8dfcb;
+  --color-cream: #211d17;
+  --color-cream-muted: #4c4235;
+  --color-cream-dim: #6f6455;
+  --color-cream-faint: #8d8272;
+  --color-cream-ghost: #a89d8c;
+  --color-gold: #7a5822;
+  --color-gold-soft: #93711f;
+  --color-rose: #a83f3f;
+  --color-sage: #4c7a3a;
+  --color-selected: #f3e2c4;
+  --color-danger-bg: #fbe9e9;
+  --color-danger-border: #f0c3c3;
+  --color-success-bg: #e8f3e4;
+  --color-success-border: #c3ddb9;
+
+  --watermark-red: #a83f3f;
+  --watermark-neutral: #2a241c;
+  --watermark-blue: #35507a;
 }
 
 body {
   background: var(--color-ink);
   color: var(--color-cream);
+  transition: background-color 0.15s ease, color 0.15s ease;
 }

@@ -52,7 +52,7 @@ export default function NotificationsPanel({
           type="button"
           onClick={() => setMode("manual")}
           className={`px-3 py-1.5 text-xs font-medium rounded cursor-pointer transition-colors ${
-            mode === "manual" ? "bg-burgundy text-cream" : "text-cream-dim hover:text-cream"
+            mode === "manual" ? "bg-burgundy text-on-accent" : "text-cream-dim hover:text-cream"
           }`}
         >
           Ročno
@@ -61,7 +61,7 @@ export default function NotificationsPanel({
           type="button"
           onClick={() => setMode("auto")}
           className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded cursor-pointer transition-colors ${
-            mode === "auto" ? "bg-burgundy text-cream" : "text-cream-dim hover:text-cream"
+            mode === "auto" ? "bg-burgundy text-on-accent" : "text-cream-dim hover:text-cream"
           }`}
         >
           Avtomatsko
@@ -177,7 +177,7 @@ function AutoPanel({ log }: { log: AutoSmsLog[] }) {
 
 function AutoComingSoon() {
   return (
-    <div className="relative rounded-lg p-5 overflow-hidden border border-gold/40 bg-gradient-to-br from-[#2E2620] to-[#1B1815]">
+    <div className="relative rounded-lg p-5 overflow-hidden border border-gold/40 bg-gradient-to-br from-ink-elevated to-ink">
       <div className="flex items-center gap-2 mb-2">
         <Sparkles size={16} className="text-gold" />
         <span className="text-xs font-semibold tracking-wide text-gold uppercase">
@@ -218,7 +218,7 @@ function AutoComingSoon() {
       <button
         type="button"
         disabled
-        className="w-full py-2.5 rounded-md text-sm font-semibold text-ink cursor-not-allowed bg-gradient-to-r from-gold to-[#c99a52] opacity-70"
+        className="w-full py-2.5 rounded-md text-sm font-semibold text-ink cursor-not-allowed bg-gradient-to-r from-gold to-gold-soft opacity-70"
       >
         Kmalu na voljo
       </button>

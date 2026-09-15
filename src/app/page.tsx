@@ -2,6 +2,7 @@ import Link from "next/link";
 import { login } from "./owner/actions";
 import ForgotPassword from "./forgot-password";
 import PoweredBy from "@/components/powered-by";
+import ThemeToggle from "@/components/theme-toggle";
 
 // Primarna prijavna stran (fillio.si) za lastnike salonov na platformi.
 // /owner/login je samo alias, ki sem preusmeri.
@@ -13,17 +14,20 @@ export default async function LoginPage({
   const { error } = await searchParams;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-ink font-sans px-4">
+    <div className="min-h-screen relative flex items-center justify-center bg-ink font-sans px-4">
+      <div className="absolute top-6 left-6 flex items-center gap-3">
+        <PoweredBy size="lg" href="/" />
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-sm border border-border rounded-lg p-6 space-y-4">
         <div>
-          <PoweredBy className="mb-2" />
           <h1 className="text-xl font-semibold text-cream">
             Prijava za lastnika
           </h1>
         </div>
 
         {error && (
-          <p className="text-sm text-rose bg-[#2A1616] border border-[#4A2626] rounded-md px-3 py-2">
+          <p className="text-sm text-rose bg-danger-bg border border-danger-border rounded-md px-3 py-2">
             {error}
           </p>
         )}
@@ -57,7 +61,7 @@ export default async function LoginPage({
 
           <button
             type="submit"
-            className="w-full rounded-md bg-burgundy hover:opacity-90 text-cream text-sm font-medium py-2 transition-opacity cursor-pointer"
+            className="w-full rounded-md bg-burgundy hover:opacity-90 text-on-accent text-sm font-medium py-2 transition-opacity cursor-pointer"
           >
             Prijava
           </button>
