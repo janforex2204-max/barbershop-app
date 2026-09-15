@@ -18,6 +18,9 @@ export type Database = {
           name: string;
           active: boolean;
           sort_order: number;
+          // V EUR, 2 decimalki - null, dokler lastnik cene ni sam nastavil
+          // (glej supabase/schema.sql in src/lib/constants.ts formatPrice).
+          price: number | null;
           created_at: string;
         };
         Insert: {
@@ -26,6 +29,7 @@ export type Database = {
           name: string;
           active?: boolean;
           sort_order?: number;
+          price?: number | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["services"]["Insert"]>;

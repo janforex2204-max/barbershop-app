@@ -10,6 +10,7 @@ import {
   HOURS,
   todayISO,
   dayLabel,
+  formatPrice,
   upcomingBusinessWeeks,
   isValidCustomerName,
   isValidPhone,
@@ -17,7 +18,14 @@ import {
 import DatePicker from "./date-picker";
 import { bookAppointment as bookAppointmentAction, joinWaitlist as joinWaitlistAction } from "./actions";
 
-type Service = { id: string; name: string };
+type Service = { id: string; name: string; price: number | null };
+
+// "Striženje - 15,00 €" če je cena nastavljena, sicer samo "Striženje" - NIKOLI
+// "0,00 €" ali podobno zavajajoče za storitve, kjer lastnik cene še ni vnesel
+// (glej /owner/services, kjer jo nastavi).
+function serviceLabel(s: Service) {
+  return s.price ? `${s.name} - ${formatPrice(s.price)}` : s.name;
+}
 type BookingForm = { name: string; phone: string; service: string; time: string };
 type WaitForm = { name: string; phone: string; service: string };
 
@@ -108,7 +116,7 @@ export default function BookingPage({
     Promise.resolve(
       supabase
         .from("services")
-        .select("id, name")
+        .select("id, name, price")
         .eq("salon_id", salonId)
         .eq("active", true)
         .order("sort_order", { ascending: true })
@@ -440,7 +448,7 @@ export default function BookingPage({
               >
                 {services.map((s) => (
                   <option key={s.id} value={s.name}>
-                    {s.name}
+                    {serviceLabel(s)}
                   </option>
                 ))}
               </select>
@@ -480,7 +488,7 @@ export default function BookingPage({
               <option value="vseeno">Vseeno katera storitev</option>
               {services.map((s) => (
                 <option key={s.id} value={s.name}>
-                  {s.name}
+                  {serviceLabel(s)}
                 </option>
               ))}
             </select>

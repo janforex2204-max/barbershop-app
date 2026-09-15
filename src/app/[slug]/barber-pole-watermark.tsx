@@ -8,11 +8,19 @@
 // izgubi - ta token se zato obrne z ostalimi temami (glej globals.css), tudi
 // rdeča/modra sta nekoliko potemnjeni za svetlo temo, da vzorec ostane viden
 // v OBEH temah, ne le v temni.
+//
+// POMEMBNO: "fixed", NE "absolute" - stran (veliko prostih terminov, dolg
+// obrazec ...) je pogosto višja od enega zaslona. Z "absolute" bi se
+// flex-centriranje spodaj nanašalo na CELOTNO (scrollable) višino strani,
+// zato bi bil drog lahko sredi strani daleč pod vidnim delom zaslona ob
+// nalaganju - videti bi bilo, kot da vodnega žiga sploh ni. "fixed" ga
+// centrira v TRENUTNO VIDNEM oknu, ne glede na to, kje je uporabnik
+// scrollan ali kako dolga je stran.
 export default function BarberPoleWatermark() {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none select-none absolute inset-0 -z-10 flex items-center justify-center overflow-hidden"
+      className="pointer-events-none select-none fixed inset-0 -z-10 flex items-center justify-center overflow-hidden"
     >
       <svg
         viewBox="0 0 300 900"

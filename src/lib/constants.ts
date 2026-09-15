@@ -18,6 +18,17 @@ export const APPROVAL_TOKEN_EXPIRY_DAYS = 5;
 // NIMA (shiftMonth je čista datumska aritmetika, gre v neskončnost).
 export const BOOKING_WINDOW_WEEKS = 4;
 
+// Format cene v EUR - VEDNO 2 decimalki, sl-SI konvencija (vejica, presledek
+// pred €: "15,00 €") - dosledno s slovenskimi ceniki/računi. Namenoma vedno 2
+// decimalki tudi za cele zneske ("15,00 €", ne "15 €"), da je jasno prikazana
+// CELOTNA cena, ne prikrajšana/zaokrožena. Klicatelj naj funkcijo pokliče
+// SAMO, če je cena nastavljena (price je null ALI 0 pomeni "lastnik cene še
+// ni nastavil" - glej booking-page.tsx in owner/services-manager.tsx, kjer se
+// v tem primeru prikaže samo ime storitve, brez "0,00 €").
+export function formatPrice(price: number): string {
+  return price.toLocaleString("sl-SI", { style: "currency", currency: "EUR" });
+}
+
 export const HOURS = [
   "09:00",
   "10:00",

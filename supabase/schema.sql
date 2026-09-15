@@ -54,6 +54,13 @@ create table if not exists services (
 
 create index if not exists services_salon_idx on services (salon_id);
 
+-- Cena storitve v EUR (do 9999.99, 2 decimalki - centi). "alter table add
+-- column if not exists", ne "create table", ker services v produkciji
+-- verjetno že obstaja (glej ip_address zgoraj za isti vzorec). NULL = lastnik
+-- cene še ni nastavil - /[slug] in /owner to obravnavata enako kot 0 (brez
+-- cene prikažeta samo ime storitve, glej src/lib/constants.ts formatPrice).
+alter table services add column if not exists price numeric(6, 2) check (price is null or price >= 0);
+
 -- ---------------------------------------------------------------------------
 -- TERMINI (appointments)
 -- ---------------------------------------------------------------------------

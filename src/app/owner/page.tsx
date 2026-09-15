@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { Clock, MessageCircle, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { cancelAppointment, logout } from "./actions";
@@ -212,14 +213,22 @@ export default async function OwnerDashboard({
             <h1 className="text-sm font-medium text-cream-dim">Nadzorna plošča</h1>
             <p className="text-sm text-cream-faint">{user.email}</p>
           </div>
-          <form action={logout}>
-            <button
-              type="submit"
-              className="text-sm border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft cursor-pointer"
+          <div className="flex items-center gap-2">
+            <Link
+              href="/owner/services"
+              className="text-sm border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft"
             >
-              Odjava
-            </button>
-          </form>
+              Storitve in cenik
+            </Link>
+            <form action={logout}>
+              <button
+                type="submit"
+                className="text-sm border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft cursor-pointer"
+              >
+                Odjava
+              </button>
+            </form>
+          </div>
         </div>
 
         <MonthCalendar
