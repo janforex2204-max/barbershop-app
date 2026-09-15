@@ -1,10 +1,11 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isBusinessDay, toWhatsAppPhone } from "@/lib/constants";
 import { isTwilioConfigured, sendSms } from "@/lib/sms";
+import { OWNER_CALENDAR_TAG } from "./cached-queries";
 
 export async function login(formData: FormData) {
   const supabase = await createClient();
@@ -142,6 +143,7 @@ export async function cancelAppointment(appointmentId: string) {
     }
   }
 
+  updateTag(OWNER_CALENDAR_TAG);
   revalidatePath("/owner");
 }
 
@@ -157,6 +159,7 @@ export async function markSmsSent(logId: string) {
     .update({ status: "sent" })
     .eq("id", logId);
 
+  updateTag(OWNER_CALENDAR_TAG);
   revalidatePath("/owner");
 }
 
@@ -233,6 +236,7 @@ export async function addManualAppointment(
     return { error: error.message };
   }
 
+  updateTag(OWNER_CALENDAR_TAG);
   revalidatePath("/owner");
   return {
     success: true,

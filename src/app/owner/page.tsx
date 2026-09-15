@@ -17,6 +17,11 @@ import MonthCalendar from "./month-calendar";
 import WaitlistOffer from "./waitlist-offer";
 import PoweredBy from "@/components/powered-by";
 import ThemeToggle from "@/components/theme-toggle";
+import {
+  getCachedDayData,
+  getCachedMonthOverview,
+  getCachedTomorrowAppointments,
+} from "./cached-queries";
 
 function waitlistCountLabel(n: number) {
   if (n === 1) return "1 stranka čaka na termin";
@@ -26,7 +31,6 @@ function waitlistCountLabel(n: number) {
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const WAITLIST_LIMIT = 50;
 const MONTH_RE = /^\d{4}-\d{2}$/;
 
 export default async function OwnerDashboard({
@@ -99,80 +103,41 @@ export default async function OwnerDashboard({
   const nextBizDay = nextBusinessDayAfterToday();
   const isLiterallyTomorrow = nextBizDay === tomorrow;
 
-  // Nobena od teh 7 poizvedb ni odvisna od katere druge (vse samo filtrirajo
-  // po salonId + že izračunanih datumih) - prej so tekle ena za drugo
-  // (await, await, await, ...), kar je na počasnejši/hladni Supabase povezavi
-  // seštelo latenco VSEH klicev skupaj. Promise.all jih sproži hkrati, tako
-  // da skupni čas ni vsota, ampak čas NAJPOČASNEJŠE med njimi.
-  const [
-    { data: monthAppointments },
-    { data: monthWaitlist },
-    { data: appointments, error },
-    { data: waitlist, error: waitlistError, count: waitlistTotal },
-    { data: tomorrowAppointments, error: tomorrowError },
-    { data: smsLog, error: smsError },
-    { data: autoSmsLog },
-  ] = await Promise.all([
-    supabase
-      .from("appointments")
-      .select("appointment_date")
-      .eq("salon_id", salonId)
-      .gte("appointment_date", monthStart)
-      .lte("appointment_date", monthEnd)
-      .neq("status", "cancelled"),
-    supabase
-      .from("waitlist")
-      .select("preferred_date")
-      .eq("salon_id", salonId)
-      .gte("preferred_date", monthStart)
-      .lte("preferred_date", monthEnd),
-    supabase
-      .from("appointments")
-      .select("*")
-      .eq("salon_id", salonId)
-      .eq("appointment_date", selectedDate)
-      .order("appointment_time", { ascending: true }),
-    supabase
-      .from("waitlist")
-      .select("*", { count: "exact" })
-      .eq("salon_id", salonId)
-      .eq("preferred_date", selectedDate)
-      .order("created_at", { ascending: true })
-      .limit(WAITLIST_LIMIT),
-    supabase
-      .from("appointments")
-      .select("*")
-      .eq("salon_id", salonId)
-      .eq("appointment_date", nextBizDay)
-      .neq("status", "cancelled")
-      .order("appointment_time", { ascending: true }),
-    supabase
-      .from("sms_notifications")
-      .select("*")
-      .eq("salon_id", salonId)
-      .eq("status", "pending")
-      .eq("appointment_date", selectedDate)
-      .order("created_at", { ascending: true }),
-    // Samo za prikaz v zavihku "Avtomatsko" (Fillio Pro) - dnevnik SMS-ov, ki
-    // jih je sistem že sam poskusil poslati (glej cancelAppointment v
-    // ./actions.ts). Free plan tega nikoli ne ustvari (vedno ostane
-    // 'pending'), zato poizvedba plan-u ni treba dodatno pogojevati.
-    supabase
-      .from("sms_notifications")
-      .select("*")
-      .eq("salon_id", salonId)
-      .eq("auto_sent", true)
-      .eq("appointment_date", selectedDate)
-      .order("created_at", { ascending: true }),
+  // Prej: 7 med seboj neodvisnih poizvedb (Promise.all - torej že vzporedno,
+  // ne zaporedno), a VSE od njih so se znova izvedle ob VSAKEM kliku na
+  // koledarju, tudi za mesec/dan, ki se ni spremenil (npr. klik na drug dan
+  // ZNOTRAJ istega meseca je vseeno znova prebral cel mesec, čeprav se ta ni
+  // spremenil - in obratno). getCachedMonthOverview/getCachedDayData/
+  // getCachedTomorrowAppointments (./cached-queries.ts) to popravijo: vsak je
+  // kratek čas predpomnjen PO (salonId, mesec/dan) - obisk ISTEGA meseca/dne
+  // v tem oknu je torej brez nove poizvedbe na Supabase. Ob dejanski
+  // spremembi (odpoved/dodan termin, ./actions.ts) se cache takoj invalidira.
+  const [monthOverview, dayData, tomorrowData] = await Promise.all([
+    getCachedMonthOverview(salonId, monthStart, monthEnd),
+    getCachedDayData(salonId, selectedDate),
+    getCachedTomorrowAppointments(salonId, nextBizDay),
   ]);
 
+  const { appointments: monthAppointments, waitlist: monthWaitlist } = monthOverview;
+  const {
+    appointments,
+    error,
+    waitlist,
+    waitlistError,
+    waitlistTotal,
+    smsLog,
+    smsError,
+    autoSmsLog,
+  } = dayData;
+  const { appointments: tomorrowAppointments, error: tomorrowError } = tomorrowData;
+
   const countsByDate: Record<string, number> = {};
-  for (const a of monthAppointments ?? []) {
+  for (const a of monthAppointments) {
     countsByDate[a.appointment_date] = (countsByDate[a.appointment_date] ?? 0) + 1;
   }
 
-  const waitingDates = new Set((monthWaitlist ?? []).map((w) => w.preferred_date));
-  const waitlistExtra = Math.max((waitlistTotal ?? 0) - (waitlist?.length ?? 0), 0);
+  const waitingDates = new Set(monthWaitlist.map((w) => w.preferred_date));
+  const waitlistExtra = Math.max(waitlistTotal - waitlist.length, 0);
 
   // Za gumb "Ponudi ta termin" pod ravno odpovedanim terminom: cancelAppointment
   // (./actions.ts) ob odpovedi za ujemajoče čakajoče stranke že USTVARI pending
@@ -182,7 +147,7 @@ export default async function OwnerDashboard({
   // `waitlist` (zanesljivo urejen po created_at), NE iz sms_notifications.created_at,
   // ker so bile vrstice vstavljene v enem batch insertu in bi lahko imele
   // enak timestamp.
-  type SmsNotificationRow = NonNullable<typeof smsLog>[number];
+  type SmsNotificationRow = (typeof smsLog)[number];
 
   const waitlistPriority = new Map((waitlist ?? []).map((w, i) => [w.customer_phone, i]));
   const waitlistOffersByAppointment = new Map<string, SmsNotificationRow[]>();
@@ -241,7 +206,7 @@ export default async function OwnerDashboard({
 
         {waitlistError ? (
           <p className="text-sm text-rose mb-10">
-            Napaka pri branju čakajočih: {waitlistError.message}
+            Napaka pri branju čakajočih: {waitlistError}
           </p>
         ) : (
           <div className="mb-10 rounded-lg border border-gold/40 bg-gradient-to-br from-ink-elevated to-ink p-5">
@@ -301,7 +266,7 @@ export default async function OwnerDashboard({
         <div className="border border-border rounded-lg divide-y divide-border-soft mb-10">
           {error && (
             <p className="p-4 text-sm text-rose">
-              Napaka pri branju terminov: {error.message}
+              Napaka pri branju terminov: {error}
             </p>
           )}
           {!error && appointments?.length === 0 && (
@@ -358,7 +323,7 @@ export default async function OwnerDashboard({
         <div className="border border-border rounded-lg divide-y divide-border-soft mb-10">
           {tomorrowError && (
             <p className="p-4 text-sm text-rose">
-              Napaka pri branju terminov: {tomorrowError.message}
+              Napaka pri branju terminov: {tomorrowError}
             </p>
           )}
           {!tomorrowError && tomorrowAppointments?.length === 0 && (
@@ -394,7 +359,7 @@ export default async function OwnerDashboard({
 
         {smsError ? (
           <p className="text-sm text-rose">
-            Napaka pri branju obvestil: {smsError.message}
+            Napaka pri branju obvestil: {smsError}
           </p>
         ) : (
           <NotificationsPanel
