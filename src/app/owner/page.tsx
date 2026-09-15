@@ -94,80 +94,84 @@ export default async function OwnerDashboard({
   const isToday = selectedDate === today;
   const { start: monthStart, end: monthEnd } = monthRange(monthStr);
 
-  const { data: monthAppointments } = await supabase
-    .from("appointments")
-    .select("appointment_date")
-    .eq("salon_id", salonId)
-    .gte("appointment_date", monthStart)
-    .lte("appointment_date", monthEnd)
-    .neq("status", "cancelled");
+  const tomorrow = todayISO(1);
+  const nextBizDay = nextBusinessDayAfterToday();
+  const isLiterallyTomorrow = nextBizDay === tomorrow;
+
+  // Nobena od teh 7 poizvedb ni odvisna od katere druge (vse samo filtrirajo
+  // po salonId + že izračunanih datumih) - prej so tekle ena za drugo
+  // (await, await, await, ...), kar je na počasnejši/hladni Supabase povezavi
+  // seštelo latenco VSEH klicev skupaj. Promise.all jih sproži hkrati, tako
+  // da skupni čas ni vsota, ampak čas NAJPOČASNEJŠE med njimi.
+  const [
+    { data: monthAppointments },
+    { data: monthWaitlist },
+    { data: appointments, error },
+    { data: waitlist, error: waitlistError, count: waitlistTotal },
+    { data: tomorrowAppointments, error: tomorrowError },
+    { data: smsLog, error: smsError },
+    { data: autoSmsLog },
+  ] = await Promise.all([
+    supabase
+      .from("appointments")
+      .select("appointment_date")
+      .eq("salon_id", salonId)
+      .gte("appointment_date", monthStart)
+      .lte("appointment_date", monthEnd)
+      .neq("status", "cancelled"),
+    supabase
+      .from("waitlist")
+      .select("preferred_date")
+      .eq("salon_id", salonId)
+      .gte("preferred_date", monthStart)
+      .lte("preferred_date", monthEnd),
+    supabase
+      .from("appointments")
+      .select("*")
+      .eq("salon_id", salonId)
+      .eq("appointment_date", selectedDate)
+      .order("appointment_time", { ascending: true }),
+    supabase
+      .from("waitlist")
+      .select("*", { count: "exact" })
+      .eq("salon_id", salonId)
+      .eq("preferred_date", selectedDate)
+      .order("created_at", { ascending: true })
+      .limit(WAITLIST_LIMIT),
+    supabase
+      .from("appointments")
+      .select("*")
+      .eq("salon_id", salonId)
+      .eq("appointment_date", nextBizDay)
+      .neq("status", "cancelled")
+      .order("appointment_time", { ascending: true }),
+    supabase
+      .from("sms_notifications")
+      .select("*")
+      .eq("salon_id", salonId)
+      .eq("status", "pending")
+      .eq("appointment_date", selectedDate)
+      .order("created_at", { ascending: true }),
+    // Samo za prikaz v zavihku "Avtomatsko" (Fillio Pro) - dnevnik SMS-ov, ki
+    // jih je sistem že sam poskusil poslati (glej cancelAppointment v
+    // ./actions.ts). Free plan tega nikoli ne ustvari (vedno ostane
+    // 'pending'), zato poizvedba plan-u ni treba dodatno pogojevati.
+    supabase
+      .from("sms_notifications")
+      .select("*")
+      .eq("salon_id", salonId)
+      .eq("auto_sent", true)
+      .eq("appointment_date", selectedDate)
+      .order("created_at", { ascending: true }),
+  ]);
 
   const countsByDate: Record<string, number> = {};
   for (const a of monthAppointments ?? []) {
     countsByDate[a.appointment_date] = (countsByDate[a.appointment_date] ?? 0) + 1;
   }
 
-  const { data: monthWaitlist } = await supabase
-    .from("waitlist")
-    .select("preferred_date")
-    .eq("salon_id", salonId)
-    .gte("preferred_date", monthStart)
-    .lte("preferred_date", monthEnd);
-
   const waitingDates = new Set((monthWaitlist ?? []).map((w) => w.preferred_date));
-
-  const { data: appointments, error } = await supabase
-    .from("appointments")
-    .select("*")
-    .eq("salon_id", salonId)
-    .eq("appointment_date", selectedDate)
-    .order("appointment_time", { ascending: true });
-
-  const {
-    data: waitlist,
-    error: waitlistError,
-    count: waitlistTotal,
-  } = await supabase
-    .from("waitlist")
-    .select("*", { count: "exact" })
-    .eq("salon_id", salonId)
-    .eq("preferred_date", selectedDate)
-    .order("created_at", { ascending: true })
-    .limit(WAITLIST_LIMIT);
-
   const waitlistExtra = Math.max((waitlistTotal ?? 0) - (waitlist?.length ?? 0), 0);
-
-  const tomorrow = todayISO(1);
-  const nextBizDay = nextBusinessDayAfterToday();
-  const isLiterallyTomorrow = nextBizDay === tomorrow;
-
-  const { data: tomorrowAppointments, error: tomorrowError } = await supabase
-    .from("appointments")
-    .select("*")
-    .eq("salon_id", salonId)
-    .eq("appointment_date", nextBizDay)
-    .neq("status", "cancelled")
-    .order("appointment_time", { ascending: true });
-
-  const { data: smsLog, error: smsError } = await supabase
-    .from("sms_notifications")
-    .select("*")
-    .eq("salon_id", salonId)
-    .eq("status", "pending")
-    .eq("appointment_date", selectedDate)
-    .order("created_at", { ascending: true });
-
-  // Samo za prikaz v zavihku "Avtomatsko" (Fillio Pro) - dnevnik SMS-ov, ki
-  // jih je sistem že sam poskusil poslati (glej cancelAppointment v
-  // ./actions.ts). Free plan tega nikoli ne ustvari (vedno ostane 'pending'),
-  // zato poizvedba plan-u ni treba dodatno pogojevati.
-  const { data: autoSmsLog } = await supabase
-    .from("sms_notifications")
-    .select("*")
-    .eq("salon_id", salonId)
-    .eq("auto_sent", true)
-    .eq("appointment_date", selectedDate)
-    .order("created_at", { ascending: true });
 
   // Za gumb "Ponudi ta termin" pod ravno odpovedanim terminom: cancelAppointment
   // (./actions.ts) ob odpovedi za ujemajoče čakajoče stranke že USTVARI pending
