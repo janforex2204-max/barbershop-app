@@ -29,9 +29,9 @@ const BARBER_POLE_WATERMARK_SLUG = "barbershop-pr-kljuni";
 // Prvi razpoložljivi delovni dan (torek-sobota) - privzeto izbrani datum.
 const INITIAL_DATE = upcomingBusinessWeeks()[0]?.dates[0] ?? todayISO();
 
-// Vsi datumi, ki jih DatePicker ponuja (isti nabor, iz istega izvora) -
-// uporabljeno za ugotavljanje "sosednjih" datumov pri prednalaganju
-// zasedenosti v ozadju (glej prefetchNeighbors spodaj).
+// Vsi datumi, ki jih DatePicker ponuja (isti nabor, iz istega izvora) - prvi
+// in zadnji tvorita razpon za EN sam poizvedbo, ki naenkrat naloži
+// zasedenost za CEL prikazan koledar (glej loadAllAvailability spodaj).
 const ALL_DATES = upcomingBusinessWeeks().flatMap((w) => w.dates);
 
 export default function BookingPage({
@@ -62,12 +62,13 @@ export default function BookingPage({
   // "zastarelih" odgovorov, če stranka hitro preklaplja med dnevi in starejši
   // klic (za prej izbrani dan) pride nazaj PO novejšem.
   const latestDateRef = useRef(INITIAL_DATE);
-  // Predpomnilnik zasedenosti po datumu (v ref-u, ne state - branje/pisanje
-  // sem NE sme sprožiti rerenderja, saj se med drugim uporablja tudi za tihe
-  // prednalaganje SOSEDNJIH datumov, ki jih uporabnik še ne gleda). Ob izbiri
-  // že predpomnjenega datuma se termini prikažejo TAKOJ (brez "Nalagam..."),
-  // v ozadju pa se podatki vseeno osvežijo (stale-while-revalidate), ker se
-  // zasedenost lahko medtem spremeni (druga stranka je rezervirala termin).
+  // Predpomnilnik zasedenosti po datumu (v ref-u, ne state - pisanje sem NE
+  // sme sprožiti rerenderja, ker se polni v enem samem "bulk" klicu za VES
+  // prikazan koledar - glej loadAllAvailability spodaj). Ob izbiri
+  // kateregakoli datuma iz koledarja se termini zato prikažejo TAKOJ (brez
+  // "Nalagam..."), v ozadju pa se ta datum vseeno tiho osveži
+  // (stale-while-revalidate), ker se zasedenost lahko medtem spremeni (druga
+  // stranka je rezervirala termin).
   const availabilityCacheRef = useRef<Map<string, Set<string>>>(new Map());
   // Poveča se ob kliku na "Poskusi znova" - v deps spodnjega useEffect-a, da
   // gumb lahko ponovno sproži nalaganje storitev (loadAvailability za
@@ -131,10 +132,16 @@ export default function BookingPage({
   }, [salonId, supabase, servicesRetryTick]);
 
   // Ista zaščita (Promise.resolve + .catch + "cancelled"/zastarel-odgovor
-  // preverba) uporabljena za nalaganje zasedenosti. "background" (za tiho
-  // prednalaganje sosednjih dni) samo zapiše v cache, NIKOLI ne dotakne
-  // slotsLoading/slotsError/takenTimes - te se posodobijo le, če je `date`
-  // (še vedno) tisti, ki ga uporabnik trenutno gleda.
+  // preverba) uporabljena za nalaganje zasedenosti EN datum naenkrat -
+  // uporabljeno za tiho osvežitev TRENUTNO gledanega dne (stale-while-
+  // revalidate spodaj) in po uspešni rezervaciji/na "Poskusi znova". Za
+  // PRVO nalaganje celega koledarja glej loadAllAvailability spodaj -
+  // ta funkcija namenoma NI uporabljena za prehode med datumi, ker bi to
+  // pomenilo novo omrežno poizvedbo ob vsakem kliku (prav to je bilo prej
+  // opazno počasno pri preklapljanju na datum, ki še ni bil predpomnjen).
+  // "background" samo zapiše v cache brez prikaza napake - klicatelj že ima
+  // prikazane (morda zastarele) podatke, tiha osvežitev naj jih ne zamenja
+  // z opozorilom o napaki.
   const loadAvailability = useCallback(
     async (date: string, opts?: { background?: boolean }) => {
       const background = opts?.background ?? false;
@@ -158,8 +165,8 @@ export default function BookingPage({
       const taken = new Set(data.map((r) => r.appointment_time));
       availabilityCacheRef.current.set(date, taken);
 
-      // Stran je medtem preklopila na drug dan (ali gre za tiho prednalaganje
-      // sosednjega dne) - ne dotikaj se vidnega stanja za NEK DRUG dan.
+      // Stran je medtem preklopila na drug dan - ne dotikaj se vidnega
+      // stanja za NEK DRUG dan, kot ga uporabnik trenutno gleda.
       if (date !== latestDateRef.current) return;
 
       setSlotsError(false);
@@ -169,26 +176,70 @@ export default function BookingPage({
     [salonId, supabase]
   );
 
-  // Po uspešnem nalaganju trenutnega dne tiho (brez loading/error stanja)
-  // prednaloži sosednja datuma v koledarju - če jih stranka nato izbere, so
-  // termini že v cache-u in se prikažejo takoj, brez čakanja na omrežje.
-  const prefetchNeighbors = useCallback(
-    (date: string) => {
-      const idx = ALL_DATES.indexOf(date);
-      if (idx === -1) return;
-      for (const neighbor of [ALL_DATES[idx - 1], ALL_DATES[idx + 1]]) {
-        if (neighbor && !availabilityCacheRef.current.has(neighbor)) {
-          loadAvailability(neighbor, { background: true });
-        }
+  // Naloži zasedenost za CEL prikazan koledar (vseh ~24 delovnih dni iz
+  // ALL_DATES) v ENI sami poizvedbi, ob prvem obisku strani - isti pristop
+  // kot mesečni pregled na /owner (glej owner/page.tsx: ena poizvedba za cel
+  // mesec, ne po dnevih). To predpolni celoten cache PREDEN uporabnik sploh
+  // utegne kliknit na katerikoli datum, zato je vsak klik na DatePicker od
+  // tu naprej trenuten (bere iz cache-a), ne glede na to, ali je datum
+  // "sosednji" prej obiskanemu ali ne.
+  const loadAllAvailability = useCallback(async () => {
+    const from = ALL_DATES[0];
+    const to = ALL_DATES[ALL_DATES.length - 1];
+    if (!from || !to) return;
+
+    // Prazen Set za VSAK datum najprej - datum brez rezervacij mora v
+    // cache-u obstajati kot "že naložen" (prazna zasedenost), sicer bi ga
+    // selectDate spodaj obravnaval kot "še ni v cache-u" in prikazal
+    // nepotreben "Nalagam...".
+    for (const date of ALL_DATES) {
+      if (!availabilityCacheRef.current.has(date)) {
+        availabilityCacheRef.current.set(date, new Set());
       }
-    },
-    [loadAvailability]
-  );
+    }
+
+    const { data, error } = await Promise.resolve(
+      supabase
+        .from("public_availability")
+        .select("appointment_date, appointment_time")
+        .eq("salon_id", salonId)
+        .gte("appointment_date", from)
+        .lte("appointment_date", to)
+    ).catch((err) => ({ data: null, error: err }));
+
+    if (error || !data) {
+      console.error("Napaka pri nalaganju zasedenosti za koledar:", error);
+      // Bulk klic ni uspel - vseeno poskusi naložiti VSAJ trenutno gledani
+      // dan posamično, da uporabnik ni popolnoma blokiran.
+      loadAvailability(latestDateRef.current);
+      return;
+    }
+
+    for (const row of data) {
+      availabilityCacheRef.current.get(row.appointment_date)?.add(row.appointment_time);
+    }
+
+    const current = availabilityCacheRef.current.get(latestDateRef.current);
+    if (current) {
+      setSlotsError(false);
+      setTakenTimes(current);
+      setSlotsLoading(false);
+    }
+  }, [salonId, supabase, loadAvailability]);
+
+  useEffect(() => {
+    loadAllAvailability();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [salonId, supabase]);
 
   useEffect(() => {
     latestDateRef.current = selectedDate;
-    loadAvailability(selectedDate).then(() => prefetchNeighbors(selectedDate));
-  }, [selectedDate, loadAvailability, prefetchNeighbors]);
+    // Tiha osvežitev (stale-while-revalidate) za novoizbrani dan - podatki
+    // so že v cache-u iz bulk klica zgoraj (ali iz prejšnjega obiska tega
+    // dne), to samo poskrbi, da se morebitna medtemska rezervacija druge
+    // stranke odraža brez ponovnega "Nalagam...".
+    loadAvailability(selectedDate, { background: true });
+  }, [selectedDate, loadAvailability]);
 
   function selectDate(date: string) {
     setSelectedDate(date);

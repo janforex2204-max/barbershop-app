@@ -199,7 +199,7 @@ export default async function OwnerDashboard({
     <div className="min-h-screen bg-ink text-cream font-sans px-6 py-10">
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center gap-3 mb-4">
-          <PoweredBy size="md" />
+          <PoweredBy size="lg" />
           <ThemeToggle />
         </div>
         <div className="flex items-center justify-between mb-8">

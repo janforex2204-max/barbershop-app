@@ -10,13 +10,10 @@ import { PLATFORM_NAME } from "@/lib/constants";
 //
 // - "sm" (~16px, priglušen): majhna "powered by" značka - /register/success,
 //   /reset-password, "ni odobren" kartica na /owner.
-//   md" (~24px, priglušen): diskretna oznaka na /owner nadzorni plošči, kjer
-//   je v ospredju ime salona, logotip mu ne sme konkurirati.
-// - "lg" (~36px, poln): glavni logotip na splošnih platformskih straneh (/,
-//   /register), kjer JE logotip glavna vsebina strani.
+// - "lg" (~36px, poln): glavni logotip v zgornjem levem kotu - /, /register
+//   IN /owner (dashboard) - vsepovsod dovolj velik, da je dejansko viden.
 const SIZE_CLASSES = {
   sm: "h-4 w-auto opacity-60",
-  md: "h-6 w-auto opacity-70",
   lg: "h-9 w-auto",
 } as const;
 
