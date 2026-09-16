@@ -111,29 +111,57 @@ export default function BookingPage({
   // dev logih za drugo tabelo) PA se obljuba lahko zavrne. Brez .catch tu bi
   // takrat setServicesLoading(false) NIKOLI ne bil klican in "Nalagam proste
   // termine..." bi obtičalo za vedno, tudi po osvežitvi strani.
+  //
+  // Prehodna varovalka: dokler `services.price` morda še ni dodan v
+  // produkcijsko bazo (supabase/schema.sql migracija je bila poslana, a še
+  // ni bila zagnana - glej pogovor s Claude), bi "column services.price does
+  // not exist" (42703) tu obrnil CELOTNO javno rezervacijsko stran v napako,
+  // čeprav gre samo za manjkajoč cenik. Če pride TA specifična napaka,
+  // poskusi še enkrat brez price (cene se preprosto ne prikažejo, dokler
+  // stolpec ne obstaja) - bolje delujoča rezervacija brez cen kot popolnoma
+  // pokvarjena stran.
   useEffect(() => {
     let cancelled = false;
-    Promise.resolve(
-      supabase
-        .from("services")
-        .select("id, name, price")
-        .eq("salon_id", salonId)
-        .eq("active", true)
-        .order("sort_order", { ascending: true })
-    )
-      .catch((err) => ({ data: null, error: err }))
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error || !data) {
-          console.error("Napaka pri nalaganju storitev:", error);
-          setServicesError(true);
-        } else {
-          setServicesError(false);
-          setServices(data);
-          setForm((f) => ({ ...f, service: f.service || data[0]?.name || "" }));
-        }
-        setServicesLoading(false);
-      });
+
+    async function loadServices() {
+      let { data, error } = await Promise.resolve(
+        supabase
+          .from("services")
+          .select("id, name, price")
+          .eq("salon_id", salonId)
+          .eq("active", true)
+          .order("sort_order", { ascending: true })
+      ).catch((err) => ({ data: null, error: err }));
+
+      if (error?.code === "42703") {
+        console.error(
+          "services.price še ne obstaja v bazi (manjkajoča migracija) - nadaljujem brez cen."
+        );
+        const fallback = await Promise.resolve(
+          supabase
+            .from("services")
+            .select("id, name")
+            .eq("salon_id", salonId)
+            .eq("active", true)
+            .order("sort_order", { ascending: true })
+        ).catch((err) => ({ data: null, error: err }));
+        data = fallback.data?.map((s) => ({ ...s, price: null })) ?? null;
+        error = fallback.error;
+      }
+
+      if (cancelled) return;
+      if (error || !data) {
+        console.error("Napaka pri nalaganju storitev:", error);
+        setServicesError(true);
+      } else {
+        setServicesError(false);
+        setServices(data);
+        setForm((f) => ({ ...f, service: f.service || data[0]?.name || "" }));
+      }
+      setServicesLoading(false);
+    }
+
+    loadServices();
     return () => {
       cancelled = true;
     };
