@@ -35,13 +35,20 @@ async function waitForAuthUser(
   userId: string,
   maxAttempts = 5,
   delayMs = 400
-): Promise<boolean> {
+): Promise<{ ok: boolean; lastError: string | null }> {
+  let lastError: string | null = null;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const { data, error } = await admin.auth.admin.getUserById(userId);
-    if (!error && data.user) return true;
+    if (!error && data.user) return { ok: true, lastError: null };
+    // Ločimo "uporabnika (še) ni" (error==null, data.user==null - pravi
+    // primer za čakanje) od DEJANSKE napake klica (npr. neveljaven/napačen
+    // SUPABASE_SERVICE_ROLE_KEY na Vercel - to bi se OBNAŠALO enako kot
+    // "ni ga še", a se z čakanjem NIKOLI ne popravi). Zapišemo zadnjo
+    // dejansko napako, da jo lahko pokažemo namesto tihega "poskusi znova".
+    if (error) lastError = error.message;
     await sleep(delayMs);
   }
-  return false;
+  return { ok: false, lastError };
 }
 
 export async function registerOwner(formData: FormData) {
@@ -80,6 +87,13 @@ export async function registerOwner(formData: FormData) {
     options: { emailRedirectTo: `${origin}/auth/confirm` },
   });
 
+  // Diagnostično beleženje (Vercel function logs) - da naslednjič, če se kaj
+  // od spodaj ponovi, vidimo natančno, kaj je signUp() dejansko vrnil, ne
+  // samo končno napako.
+  console.log(
+    `[register] signUp za ${email}: error=${error?.message ?? "null"}, user.id=${data.user?.id ?? "null"}, identities=${data.user?.identities?.length ?? "null"}`
+  );
+
   if (error || !data.user) {
     redirect(
       `/register?error=${encodeURIComponent(
@@ -101,11 +115,20 @@ export async function registerOwner(formData: FormData) {
   // viden, preden nadaljujemo na insert, ki nanj referencira (salon_owners
   // user_id FK). Če po vseh poskusih še vedno ni viden, ne silimo insert-a v
   // gotov FK zlom - raje jasna napaka, ki jo lahko uporabnik poskusi znova.
-  const authUserReady = await waitForAuthUser(admin, data.user.id);
-  if (!authUserReady) {
+  const authCheck = await waitForAuthUser(admin, data.user.id);
+  if (!authCheck.ok) {
+    console.error(
+      `[register] waitForAuthUser ni uspel za user.id=${data.user.id}, zadnja napaka:`,
+      authCheck.lastError
+    );
+    // Diagnostično (začasno): če je bila DEJANSKA napaka (ne samo "uporabnika
+    // še ni"), jo pokažemo - najverjetneje gre za nastavitev na Vercel
+    // (napačen/manjkajoč SUPABASE_SERVICE_ROLE_KEY), ne za resnično čakanje.
     redirect(
       `/register?error=${encodeURIComponent(
-        "Prišlo je do začasne napake pri ustvarjanju računa. Poskusi znova čez trenutek."
+        authCheck.lastError
+          ? `Napaka pri preverjanju računa: ${authCheck.lastError}`
+          : "Prišlo je do začasne napake pri ustvarjanju računa. Poskusi znova čez trenutek."
       )}`
     );
   }
@@ -164,7 +187,11 @@ export async function registerOwner(formData: FormData) {
     // Vse 3 poskuse zgoraj obrne isti FK zlom - raje jasno, akcijsko
     // sporočilo kot surovo Postgres besedilo ("violates foreign key
     // constraint salon_owners_user_id_fkey"), ki je bilo prej vidno na tem
-    // mestu.
+    // mestu. Zapišemo v log, da vemo, če se to (redko) še dogaja, potem ko
+    // je waitForAuthUser zgoraj že preverila, da uporabnik obstaja.
+    console.error(
+      `[register] insert v salon_owners 3x zapored padel na 23503 za user.id=${data.user.id}`
+    );
     redirect(
       `/register?error=${encodeURIComponent(
         "Prišlo je do začasne napake pri ustvarjanju računa. Poskusi znova čez trenutek."
