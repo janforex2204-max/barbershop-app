@@ -82,6 +82,28 @@ export async function registerOwner(formData: FormData) {
     .select("id")
     .single();
 
+  if (insertError?.code === "23505") {
+    // salon_owners.user_id je "unique" - to NI dirkalno stanje (auth.users in
+    // salon_owners sta v ISTI Postgres bazi, signUp() zgoraj se vrne šele, ko
+    // je auth uporabnik že zapisan/commitan, zato FK vedno vidi pravo
+    // vrstico). Do tega pride, ko je isti e-poštni naslov ŽE PREJ uspešno
+    // opravil ta isti signUp+insert (npr. uporabnik je poskusil registracijo
+    // dvakrat - dvojni klik, ponovno pošiljanje obrazca, vrnitev na stran in
+    // ponovna oddaja). Supabase auth.signUp() za NEPOTRJEN obstoječ e-mail
+    // (namenoma, proti ugibanju obstoječih računov) tiho vrne isti user.id
+    // namesto napake, zato bi brez tega preverjanja uporabnik tu dobil
+    // zavajajočo surovo "duplicate key" napako namesto smiselnega sporočila.
+    const { data: existing } = await admin
+      .from("salon_owners")
+      .select("salon_name")
+      .eq("user_id", data.user.id)
+      .maybeSingle();
+
+    redirect(
+      `/register/success?salon=${encodeURIComponent(existing?.salon_name ?? salonName)}`
+    );
+  }
+
   if (insertError || !salon) {
     redirect(
       `/register?error=${encodeURIComponent(
