@@ -372,7 +372,7 @@ export default function BookingPage({
     }
 
     setWaitForm({ name: "", phone: "", service: "vseeno" });
-    showToast("Obvestili te bomo, ko se kaj sprosti.");
+    showToast("Obvestili te bomo, če se kaj sprosti.");
   }
 
   return (
@@ -493,7 +493,7 @@ export default function BookingPage({
           <div className="border border-border rounded-lg p-5">
             <p className="text-sm text-cream-muted mb-4">
               Ta dan je popolnoma zaseden. Povej nam, katero storitev želiš, in
-              te obvestimo, ko se kaj sprosti.
+              te obvestimo, če se kaj sprosti.
             </p>
             <input
               placeholder="Ime in priimek"
@@ -525,7 +525,7 @@ export default function BookingPage({
               disabled={submitting}
               className="w-full py-3 rounded-md border-none bg-burgundy text-on-accent text-sm font-semibold cursor-pointer mt-1 disabled:opacity-60"
             >
-              Obvesti me, ko se kaj sprosti
+              Obvesti me, če se kaj sprosti
             </button>
           </div>
         )}
