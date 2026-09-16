@@ -1,8 +1,10 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
-import { isValidCustomerName, isValidPhone } from "@/lib/constants";
+import { dayLabel, isValidCustomerName, isValidPhone } from "@/lib/constants";
+import { sendBookingNotification } from "@/lib/email";
 
 // KRITIČNO: salon_id se za VSAK klic izpelje TUKAJ, na strežniku, iz `slug`
 // prek public_salons (samo odobreni saloni) - nikoli se ne sprejme salon_id,
@@ -35,6 +37,53 @@ async function resolveSalonId(
     return { salonId: null, error: "Salon ne obstaja." };
   }
   return { salonId: data.id, error: null };
+}
+
+// Pošlje lastniku email TAKOJ ob novi rezervaciji, če ima to vklopljeno
+// (glej salon_owners.notification_preference, nastavljivo na /owner - glej
+// owner/notification-settings.tsx). Anon klient (stranka, ki rezervira) ne
+// more sam brati salon_owners (RLS jo omeji na "svojega" lastnika, glej
+// salon_owners_self_select v supabase/schema.sql) - zato tu admin klient, z
+// eksplicitnim `.eq("id", salonId)`, kjer je salonId ŽE zaupanja vreden
+// (razrešen prek resolveSalonId zgoraj, ne iz podatkov klienta). NAMENOMA
+// nefatalno (try/catch, klicatelj ne čaka na rezultat) - stranki mora
+// rezervacija uspeti tudi, če email pošiljanje odpove.
+async function notifyOwnerOfBooking(
+  salonId: string,
+  booking: { name: string; phone: string; service: string; date: string; time: string }
+) {
+  try {
+    const admin = createAdminClient();
+    const { data: owner } = await admin
+      .from("salon_owners")
+      .select("plan, notification_preference, user_id, salon_name")
+      .eq("id", salonId)
+      .maybeSingle();
+
+    if (!owner || owner.plan !== "pro" || owner.notification_preference !== "per_booking") {
+      return;
+    }
+
+    const { data: authUser, error: authError } = await admin.auth.admin.getUserById(
+      owner.user_id
+    );
+    if (authError || !authUser.user?.email) {
+      console.error(`[${salonId}] Ni bilo mogoče najti email naslova lastnika za obvestilo.`);
+      return;
+    }
+
+    await sendBookingNotification({
+      to: authUser.user.email,
+      salonName: owner.salon_name,
+      customerName: booking.name,
+      customerPhone: booking.phone,
+      service: booking.service,
+      dateLabel: dayLabel(booking.date),
+      time: booking.time,
+    });
+  } catch (e) {
+    console.error(`[${salonId}] Napaka pri pošiljanju email obvestila o rezervaciji:`, e);
+  }
 }
 
 export async function bookAppointment(
@@ -83,6 +132,8 @@ export async function bookAppointment(
     }
     return { error: error.message };
   }
+
+  await notifyOwnerOfBooking(salonId, input);
 
   return {};
 }

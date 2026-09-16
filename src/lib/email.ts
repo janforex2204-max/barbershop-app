@@ -72,3 +72,139 @@ export async function notifyNewRegistration({
     throw new Error(`Resend napaka (${res.status}): ${body}`);
   }
 }
+
+// Skupna pomožna funkcija za spodnji dve - isti graceful-skip (manjkajoč
+// RESEND_API_KEY ne sme podreti rezervacije/crona) in isto obravnavo napak
+// kot notifyNewRegistration zgoraj.
+async function sendOwnerEmail(to: string, subject: string, text: string, html: string) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.warn("RESEND_API_KEY ni nastavljen - email lastniku preskočen.");
+    return;
+  }
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: `${PLATFORM_NAME} <noreply@fillio.si>`,
+      to,
+      subject,
+      text,
+      html,
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Resend napaka (${res.status}): ${body}`);
+  }
+}
+
+// Poslano lastniku (glej salon_owners.notification_preference = 'per_booking')
+// TAKOJ ob vsaki novi rezervaciji na /[slug] - glej bookAppointment v
+// src/app/[slug]/actions.ts. `to` je lastnikov auth email (getUserById), NE
+// admin kontakt email (OWNER_NOTIFICATION_EMAIL zgoraj je za NAS, ne za
+// salone).
+export async function sendBookingNotification({
+  to,
+  salonName,
+  customerName,
+  customerPhone,
+  service,
+  dateLabel,
+  time,
+}: {
+  to: string;
+  salonName: string;
+  customerName: string;
+  customerPhone: string;
+  service: string;
+  dateLabel: string;
+  time: string;
+}) {
+  const safeName = escapeHtml(customerName);
+  const safePhone = escapeHtml(customerPhone);
+  const safeService = escapeHtml(service);
+  const safeSalon = escapeHtml(salonName);
+  const safeDate = escapeHtml(dateLabel);
+
+  await sendOwnerEmail(
+    to,
+    `Nova rezervacija - ${dateLabel} ob ${time}`,
+    `Nova rezervacija za ${salonName}:\n\n${customerName} (${customerPhone})\n${service}\n${dateLabel} ob ${time}\n\nOglej si nadzorno ploščo: ${PLATFORM_URL}/owner`,
+    `
+      <div style="font-family:system-ui,sans-serif;max-width:420px;margin:0 auto;">
+        <p style="font-size:15px;color:#1b1815;">Nova rezervacija za <b>${safeSalon}</b>:</p>
+        <p style="font-size:14px;color:#1b1815;margin:0 0 20px;">
+          <b>${safeName}</b> (${safePhone})<br>
+          ${safeService}<br>
+          ${safeDate} ob ${time}
+        </p>
+        <a href="${PLATFORM_URL}/owner"
+           style="display:inline-block;background:#8C2F2F;color:#EFE6D8;text-decoration:none;
+                  padding:12px 20px;border-radius:6px;font-size:14px;font-weight:600;">
+          Odpri nadzorno ploščo
+        </a>
+      </div>
+    `
+  );
+}
+
+// Poslano lastniku (glej salon_owners.notification_preference = 'daily') iz
+// dnevnega cron opravila - glej src/app/api/cron/daily-digest/route.ts.
+export async function sendDailyDigest({
+  to,
+  salonName,
+  dateLabel,
+  appointments,
+}: {
+  to: string;
+  salonName: string;
+  dateLabel: string;
+  appointments: { time: string; customerName: string; service: string }[];
+}) {
+  const safeSalon = escapeHtml(salonName);
+  const safeDate = escapeHtml(dateLabel);
+
+  const rowsText =
+    appointments.length === 0
+      ? "Danes ni rezerviranih terminov."
+      : appointments.map((a) => `${a.time} - ${a.customerName} (${a.service})`).join("\n");
+
+  const rowsHtml =
+    appointments.length === 0
+      ? `<p style="font-size:14px;color:#8a8377;">Danes ni rezerviranih terminov.</p>`
+      : `<table style="width:100%;border-collapse:collapse;font-size:14px;color:#1b1815;">
+          ${appointments
+            .map(
+              (a) => `
+            <tr>
+              <td style="padding:4px 8px 4px 0;font-weight:600;white-space:nowrap;">${escapeHtml(a.time)}</td>
+              <td style="padding:4px 8px 4px 0;">${escapeHtml(a.customerName)}</td>
+              <td style="padding:4px 0;color:#8a8377;">${escapeHtml(a.service)}</td>
+            </tr>`
+            )
+            .join("")}
+        </table>`;
+
+  await sendOwnerEmail(
+    to,
+    `Dnevni povzetek - ${salonName} - ${dateLabel}`,
+    `Termini za ${salonName}, ${dateLabel}:\n\n${rowsText}\n\nOglej si nadzorno ploščo: ${PLATFORM_URL}/owner`,
+    `
+      <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;">
+        <p style="font-size:15px;color:#1b1815;">Termini za <b>${safeSalon}</b>, ${safeDate}:</p>
+        <div style="margin:0 0 20px;">${rowsHtml}</div>
+        <a href="${PLATFORM_URL}/owner"
+           style="display:inline-block;background:#8C2F2F;color:#EFE6D8;text-decoration:none;
+                  padding:12px 20px;border-radius:6px;font-size:14px;font-weight:600;">
+          Odpri nadzorno ploščo
+        </a>
+      </div>
+    `
+  );
+}

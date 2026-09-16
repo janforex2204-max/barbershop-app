@@ -13,6 +13,7 @@ import {
 } from "@/lib/constants";
 import AppointmentsHeader from "./appointments-header";
 import NotificationsPanel from "./notifications-panel";
+import NotificationSettings from "./notification-settings";
 import MonthCalendar from "./month-calendar";
 import WaitlistOffer from "./waitlist-offer";
 import PoweredBy from "@/components/powered-by";
@@ -89,6 +90,18 @@ export default async function OwnerDashboard({
 
   const salonId = ownerRow.id;
   const salonName = ownerRow.salon_name;
+
+  // Ločena, izolirana poizvedba - dokler migracija (supabase/schema.sql) za
+  // notification_preference morda še ni pognana v produkciji, ta stolpec
+  // morda ne obstaja. Če pade, privzeto "off" namesto da podre CELO
+  // nadzorno ploščo (isti nauk kot pri services.price prej - glej
+  // [slug]/booking-page.tsx).
+  const { data: notificationRow } = await supabase
+    .from("salon_owners")
+    .select("notification_preference")
+    .eq("id", salonId)
+    .maybeSingle();
+  const notificationPreference = notificationRow?.notification_preference ?? "off";
 
   const today = todayISO();
   const params = await searchParams;
@@ -195,6 +208,8 @@ export default async function OwnerDashboard({
             </form>
           </div>
         </div>
+
+        <NotificationSettings current={notificationPreference} plan={ownerRow.plan} />
 
         <MonthCalendar
           monthStr={monthStr}

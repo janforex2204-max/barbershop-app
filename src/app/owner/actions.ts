@@ -3,10 +3,12 @@
 import { redirect } from "next/navigation";
 import { revalidatePath, updateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { isBusinessDay, toWhatsAppPhone } from "@/lib/constants";
 import { isTwilioConfigured, sendSms } from "@/lib/sms";
 import { OWNER_CALENDAR_TAG } from "./cached-queries";
 import { translateAuthError } from "@/lib/auth-errors";
+import type { NotificationPreference } from "@/types/database.types";
 
 export async function login(formData: FormData) {
   const supabase = await createClient();
@@ -251,4 +253,52 @@ export async function addManualAppointment(
       salonName: ownerRow.salon_name,
     },
   };
+}
+
+const NOTIFICATION_PREFERENCES: NotificationPreference[] = ["off", "daily", "per_booking"];
+
+// Lastnik sam izbere email obveščanje (glej ./notification-settings.tsx).
+// salon_owners NIMA "self update" RLS police (namenoma - lastnik ne sme sam
+// spreminjati npr. status/plan, glej supabase/schema.sql), zato gre prek
+// admin klienta - isti vzorec kot addManualAppointment zgoraj: salonId se
+// razreši TU, iz klicateljeve LASTNE (RLS-zaščitene) seje, nikoli iz
+// podatkov, ki bi jih poslal klient, in update eksplicitno spremeni SAMO
+// notification_preference (nič drugega).
+export async function updateNotificationPreference(formData: FormData) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    redirect("/");
+  }
+
+  const { data: ownerRow } = await supabase
+    .from("salon_owners")
+    .select("id, plan")
+    .eq("user_id", user.id)
+    .eq("status", "approved")
+    .maybeSingle();
+  if (!ownerRow) {
+    redirect("/owner");
+  }
+
+  const requested = String(formData.get("notification_preference") ?? "off");
+  const preference = NOTIFICATION_PREFERENCES.includes(requested as NotificationPreference)
+    ? (requested as NotificationPreference)
+    : "off";
+
+  // Strežniško preverjanje, NE samo onemogočen UI - "daily"/"per_booking" sta
+  // na voljo samo za plan 'pro', ne glede na to, kaj bi (morda z ročno
+  // sestavljenim POST-om, mimo onemogočenih radio gumbov) poslal klient.
+  const finalPreference: NotificationPreference = ownerRow.plan === "pro" ? preference : "off";
+
+  const admin = createAdminClient();
+  await admin
+    .from("salon_owners")
+    .update({ notification_preference: finalPreference })
+    .eq("id", ownerRow.id);
+
+  revalidatePath("/owner");
 }

@@ -40,6 +40,18 @@ create table if not exists salon_owners (
 
 create index if not exists salon_owners_slug_idx on salon_owners (slug);
 
+-- Email obveščanje lastnika (glej src/app/owner/notification-settings.tsx) -
+-- 'daily' (dnevni povzetek, glej src/app/api/cron/daily-digest) in
+-- 'per_booking' (email ob vsaki novi rezervaciji, glej
+-- src/app/[slug]/actions.ts bookAppointment) sta na voljo SAMO za plan =
+-- 'pro' - free lastnik lahko izbere samo 'off' (preverjeno tudi na strežniku
+-- v updateNotificationPreference, ne samo v UI). "alter table add column if
+-- not exists", ne "create table", ker salon_owners v produkciji že obstaja
+-- (isti vzorec kot phone/whatsapp_consent/plan zgoraj).
+alter table salon_owners add column if not exists notification_preference text
+  not null default 'off'
+  check (notification_preference in ('off', 'daily', 'per_booking'));
+
 -- ---------------------------------------------------------------------------
 -- STORITVE (services)
 -- ---------------------------------------------------------------------------

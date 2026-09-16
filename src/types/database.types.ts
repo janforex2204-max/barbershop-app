@@ -7,6 +7,7 @@ export type SmsReason = "waitlist" | "earlier_slot";
 export type SmsStatus = "pending" | "sent" | "claimed" | "failed";
 export type OwnerStatus = "pending" | "approved" | "rejected";
 export type OwnerPlan = "free" | "pro";
+export type NotificationPreference = "off" | "daily" | "per_booking";
 
 export type Database = {
   public: {
@@ -133,6 +134,7 @@ export type Database = {
           phone: string | null;
           whatsapp_consent: boolean;
           plan: OwnerPlan;
+          notification_preference: NotificationPreference;
           status: OwnerStatus;
           approval_token: string | null;
           approval_token_created_at: string;
@@ -147,6 +149,7 @@ export type Database = {
           phone?: string | null;
           whatsapp_consent?: boolean;
           plan?: OwnerPlan;
+          notification_preference?: NotificationPreference;
           status?: OwnerStatus;
           approval_token?: string | null;
           approval_token_created_at?: string;
