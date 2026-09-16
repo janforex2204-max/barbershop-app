@@ -14,6 +14,36 @@ import { generateUniqueSlug } from "@/lib/slug";
 // storitev.
 const DEFAULT_SERVICES = ["Prva storitev"];
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Dokazano v produkciji (uporabnik je dejansko dobil "violates foreign key
+// constraint salon_owners_user_id_fkey" takoj po registraciji): kljub temu,
+// da je auth.users v ISTI Postgres bazi kot salon_owners (nobene ločene
+// replike, ki bi lahko "zamujala"), se OBČASNO zgodi, da salon_owners insert
+// (prek admin/PostgREST poti) še ne vidi vrstice, ki jo je signUp() (prek
+// GoTrue/auth poti) pravkar vrnil kot uspešno ustvarjeno - najverjetneje gre
+// za to, da GoTrue odgovor vrne, PREDEN je pošiljanje potrditvenega emaila
+// (ki je del istega zahtevka) v celoti zaključeno, kar odgovor lahko zakasni
+// glede na dejanski commit. To PREVERI neposredno prek admin auth API-ja
+// (getUserById, ki gre direktno na GoTrue, mimo PostgREST-a) in počaka s
+// kratkimi poskusi, namesto da bi ugibali - veliko zanesljivejše kot samo
+// "počakaj X ms in upaj".
+async function waitForAuthUser(
+  admin: ReturnType<typeof createAdminClient>,
+  userId: string,
+  maxAttempts = 5,
+  delayMs = 400
+): Promise<boolean> {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const { data, error } = await admin.auth.admin.getUserById(userId);
+    if (!error && data.user) return true;
+    await sleep(delayMs);
+  }
+  return false;
+}
+
 export async function registerOwner(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
@@ -66,33 +96,59 @@ export async function registerOwner(formData: FormData) {
   // ni aktivne seje (npr. če projekt zahteva potrditev e-pošte), zato se na
   // navadne RLS-zaščitene poizvedbe ne moremo zanesti.
   const admin = createAdminClient();
+
+  // Glej waitForAuthUser zgoraj - počakaj, da je auth uporabnik DEJANSKO
+  // viden, preden nadaljujemo na insert, ki nanj referencira (salon_owners
+  // user_id FK). Če po vseh poskusih še vedno ni viden, ne silimo insert-a v
+  // gotov FK zlom - raje jasna napaka, ki jo lahko uporabnik poskusi znova.
+  const authUserReady = await waitForAuthUser(admin, data.user.id);
+  if (!authUserReady) {
+    redirect(
+      `/register?error=${encodeURIComponent(
+        "Prišlo je do začasne napake pri ustvarjanju računa. Poskusi znova čez trenutek."
+      )}`
+    );
+  }
+
   const slug = await generateUniqueSlug(admin, salonName);
 
-  const { data: salon, error: insertError } = await admin
-    .from("salon_owners")
-    .insert({
-      user_id: data.user.id,
-      salon_name: salonName,
-      slug,
-      phone,
-      whatsapp_consent: whatsappConsent,
-      status: "pending",
-      approval_token: approvalToken,
-    })
-    .select("id")
-    .single();
+  let salon: { id: string } | null = null;
+  let insertError: { code?: string; message: string } | null = null;
+
+  // Dodatna, ožja varovalka poleg waitForAuthUser - če bi FK napaka (23503)
+  // vseeno ušla skozi (npr. drugačna pooler povezava kot getUserById je
+  // uporabil), poskusi še dvakrat s kratkim premorom, preden odnehamo.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { data: inserted, error } = await admin
+      .from("salon_owners")
+      .insert({
+        user_id: data.user.id,
+        salon_name: salonName,
+        slug,
+        phone,
+        whatsapp_consent: whatsappConsent,
+        status: "pending",
+        approval_token: approvalToken,
+      })
+      .select("id")
+      .single();
+
+    salon = inserted;
+    insertError = error;
+
+    if (!error || error.code !== "23503") break;
+    await sleep(400);
+  }
 
   if (insertError?.code === "23505") {
-    // salon_owners.user_id je "unique" - to NI dirkalno stanje (auth.users in
-    // salon_owners sta v ISTI Postgres bazi, signUp() zgoraj se vrne šele, ko
-    // je auth uporabnik že zapisan/commitan, zato FK vedno vidi pravo
-    // vrstico). Do tega pride, ko je isti e-poštni naslov ŽE PREJ uspešno
-    // opravil ta isti signUp+insert (npr. uporabnik je poskusil registracijo
-    // dvakrat - dvojni klik, ponovno pošiljanje obrazca, vrnitev na stran in
-    // ponovna oddaja). Supabase auth.signUp() za NEPOTRJEN obstoječ e-mail
-    // (namenoma, proti ugibanju obstoječih računov) tiho vrne isti user.id
-    // namesto napake, zato bi brez tega preverjanja uporabnik tu dobil
-    // zavajajočo surovo "duplicate key" napako namesto smiselnega sporočila.
+    // salon_owners.user_id je "unique". Do tega pride, ko je isti e-poštni
+    // naslov ŽE PREJ uspešno opravil ta isti signUp+insert (npr. uporabnik
+    // je poskusil registracijo dvakrat - dvojni klik, ponovno pošiljanje
+    // obrazca, vrnitev na stran in ponovna oddaja). Supabase auth.signUp()
+    // za NEPOTRJEN obstoječ e-mail (namenoma, proti ugibanju obstoječih
+    // računov) tiho vrne isti user.id namesto napake, zato bi brez tega
+    // preverjanja uporabnik tu dobil zavajajočo surovo "duplicate key"
+    // napako namesto smiselnega sporočila.
     const { data: existing } = await admin
       .from("salon_owners")
       .select("salon_name")
@@ -101,6 +157,18 @@ export async function registerOwner(formData: FormData) {
 
     redirect(
       `/register/success?salon=${encodeURIComponent(existing?.salon_name ?? salonName)}`
+    );
+  }
+
+  if (insertError?.code === "23503") {
+    // Vse 3 poskuse zgoraj obrne isti FK zlom - raje jasno, akcijsko
+    // sporočilo kot surovo Postgres besedilo ("violates foreign key
+    // constraint salon_owners_user_id_fkey"), ki je bilo prej vidno na tem
+    // mestu.
+    redirect(
+      `/register?error=${encodeURIComponent(
+        "Prišlo je do začasne napake pri ustvarjanju računa. Poskusi znova čez trenutek."
+      )}`
     );
   }
 
