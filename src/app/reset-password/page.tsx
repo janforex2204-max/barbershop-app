@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import PoweredBy from "@/components/powered-by";
+import { translateAuthError } from "@/lib/auth-errors";
 
 type Status = "checking" | "ready" | "invalid" | "done";
 
@@ -68,7 +69,8 @@ export default function ResetPasswordPage() {
     setSubmitting(false);
 
     if (error) {
-      setError(error.message);
+      console.error("[reset-password] updateUser:", error.message);
+      setError(translateAuthError(error.message));
       return;
     }
 

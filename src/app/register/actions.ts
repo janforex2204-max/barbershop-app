@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyNewRegistration } from "@/lib/email";
 import { generateUniqueSlug } from "@/lib/slug";
+import { translateAuthError } from "@/lib/auth-errors";
 
 // Vsak nov salon dobi ta minimalni privzeti seznam storitev, da ima
 // rezervacijski obrazec takoj kaj za pokazati - lastnik ga lahko ureja prek
@@ -18,18 +19,15 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Dokazano v produkciji (uporabnik je dejansko dobil "violates foreign key
-// constraint salon_owners_user_id_fkey" takoj po registraciji): kljub temu,
-// da je auth.users v ISTI Postgres bazi kot salon_owners (nobene ločene
-// replike, ki bi lahko "zamujala"), se OBČASNO zgodi, da salon_owners insert
-// (prek admin/PostgREST poti) še ne vidi vrstice, ki jo je signUp() (prek
-// GoTrue/auth poti) pravkar vrnil kot uspešno ustvarjeno - najverjetneje gre
-// za to, da GoTrue odgovor vrne, PREDEN je pošiljanje potrditvenega emaila
-// (ki je del istega zahtevka) v celoti zaključeno, kar odgovor lahko zakasni
-// glede na dejanski commit. To PREVERI neposredno prek admin auth API-ja
-// (getUserById, ki gre direktno na GoTrue, mimo PostgREST-a) in počaka s
-// kratkimi poskusi, namesto da bi ugibali - veliko zanesljivejše kot samo
-// "počakaj X ms in upaj".
+// Prvotno dodano po napaki "violates foreign key constraint
+// salon_owners_user_id_fkey" v produkciji - izkazalo se je, da je bil
+// PRAVI vzrok tiste konkretne napake ponovna uporaba istega testnega emaila
+// (glej 23505 vejo spodaj), ne pravo dirkalno stanje - z resničnim, prej
+// neuporabljenim emailom je auth uporabnik viden TAKOJ (preverjeno v živo).
+// To preverjanje kljub temu pustimo kot poceni varovalko za resnično redek
+// primer (npr. začasna napaka na admin API klicu) - ločimo "uporabnika
+// (še) ni" od DEJANSKE napake klica (glej lastError spodaj), namesto da bi
+// samo ugibali s fiksnim počakaj-in-upaj zamikom.
 async function waitForAuthUser(
   admin: ReturnType<typeof createAdminClient>,
   userId: string,
@@ -97,7 +95,7 @@ export async function registerOwner(formData: FormData) {
   if (error || !data.user) {
     redirect(
       `/register?error=${encodeURIComponent(
-        error?.message ?? "Napaka pri registraciji."
+        translateAuthError(error?.message, "Napaka pri registraciji.")
       )}`
     );
   }
@@ -121,14 +119,12 @@ export async function registerOwner(formData: FormData) {
       `[register] waitForAuthUser ni uspel za user.id=${data.user.id}, zadnja napaka:`,
       authCheck.lastError
     );
-    // Diagnostično (začasno): če je bila DEJANSKA napaka (ne samo "uporabnika
-    // še ni"), jo pokažemo - najverjetneje gre za nastavitev na Vercel
-    // (napačen/manjkajoč SUPABASE_SERVICE_ROLE_KEY), ne za resnično čakanje.
     redirect(
       `/register?error=${encodeURIComponent(
-        authCheck.lastError
-          ? `Napaka pri preverjanju računa: ${authCheck.lastError}`
-          : "Prišlo je do začasne napake pri ustvarjanju računa. Poskusi znova čez trenutek."
+        translateAuthError(
+          authCheck.lastError,
+          "Prišlo je do začasne napake pri ustvarjanju računa. Poskusi znova čez trenutek."
+        )
       )}`
     );
   }

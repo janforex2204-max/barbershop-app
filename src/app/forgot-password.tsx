@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { translateAuthError } from "@/lib/auth-errors";
 
 export default function ForgotPassword() {
   const supabase = createClient();
@@ -18,9 +19,10 @@ export default function ForgotPassword() {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     setSubmitting(false);
+    if (error) console.error("[forgot-password] resetPasswordForEmail:", error.message);
     setMessage(
       error
-        ? error.message
+        ? translateAuthError(error.message)
         : "Če ta e-pošta obstaja, je bila poslana povezava za ponastavitev gesla."
     );
   }

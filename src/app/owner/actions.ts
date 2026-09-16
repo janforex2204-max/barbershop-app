@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isBusinessDay, toWhatsAppPhone } from "@/lib/constants";
 import { isTwilioConfigured, sendSms } from "@/lib/sms";
 import { OWNER_CALENDAR_TAG } from "./cached-queries";
+import { translateAuthError } from "@/lib/auth-errors";
 
 export async function login(formData: FormData) {
   const supabase = await createClient();
@@ -15,7 +16,8 @@ export async function login(formData: FormData) {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    redirect(`/?error=${encodeURIComponent(error.message)}`);
+    console.error("[login] signInWithPassword:", error.message);
+    redirect(`/?error=${encodeURIComponent(translateAuthError(error.message))}`);
   }
 
   redirect("/owner");
