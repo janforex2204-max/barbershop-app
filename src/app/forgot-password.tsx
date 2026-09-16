@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { translateAuthError } from "@/lib/auth-errors";
+import { PLATFORM_URL } from "@/lib/constants";
 
 export default function ForgotPassword() {
   const supabase = createClient();
@@ -15,8 +16,16 @@ export default function ForgotPassword() {
   async function sendResetLink(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
+    // Isti razlog kot emailRedirectTo v register/actions.ts - NE
+    // window.location.origin naravnost, ker Vercel poleg prave domene servira
+    // tudi svoj "<projekt>.vercel.app" naslov; če je uporabnik TAM, bi
+    // povezava za ponastavitev pristala na napačni domeni.
+    const isLocalOrigin =
+      window.location.origin.startsWith("http://localhost") ||
+      window.location.origin.startsWith("http://127.0.0.1");
+    const redirectOrigin = isLocalOrigin ? window.location.origin : PLATFORM_URL;
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${redirectOrigin}/reset-password`,
     });
     setSubmitting(false);
     if (error) console.error("[forgot-password] resetPasswordForEmail:", error.message);

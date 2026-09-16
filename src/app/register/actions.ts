@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyNewRegistration } from "@/lib/email";
 import { generateUniqueSlug } from "@/lib/slug";
 import { translateAuthError } from "@/lib/auth-errors";
+import { PLATFORM_URL } from "@/lib/constants";
 
 // Vsak nov salon dobi ta minimalni privzeti seznam storitev, da ima
 // rezervacijski obrazec takoj kaj za pokazati - lastnik ga lahko ureja prek
@@ -75,14 +76,28 @@ export async function registerOwner(formData: FormData) {
   // Kam naj potrditveni email preusmeri - eksplicitno, da ne glede na
   // Supabase projekta Site URL nastavitev pravilno pristane na route
   // handlerju, ki sejo vzpostavi in pravilno shrani (glej src/app/auth/confirm).
+  //
+  // NAMENOMA hardkodiran PLATFORM_URL (fillio.si), NE request-ov `origin`
+  // header - Vercel vsakemu deploy-u poleg prave domene doda tudi svoj
+  // "<projekt>.vercel.app" naslov, ki prav tako streže isto aplikacijo. Če
+  // je nekdo obrazec oddal prek TEGA vercel.app naslova (npr. bookmark,
+  // deljena povezava, ali celo test med razvojem), bi `origin` kazal nanj in
+  // bi potrditvena povezava v emailu pristala tam - to je bilo dejansko
+  // videno v produkciji (uporabnik je iz Gmaila pristal na
+  // barbershop-app-inky.vercel.app namesto fillio.si). Enak vzorec kot
+  // notifyNewRegistration (src/lib/email.ts) že uporablja za admin
+  // odobritveni email. Izjema: localhost med razvojem, kjer mora povezava
+  // ostati na dev strežniku.
   const headersList = await headers();
   const origin = headersList.get("origin") ?? "";
+  const isLocalOrigin = origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1");
+  const redirectOrigin = isLocalOrigin ? origin : PLATFORM_URL;
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { emailRedirectTo: `${origin}/auth/confirm` },
+    options: { emailRedirectTo: `${redirectOrigin}/auth/confirm` },
   });
 
   // Diagnostično beleženje (Vercel function logs) - da naslednjič, če se kaj
