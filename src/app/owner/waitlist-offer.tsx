@@ -26,7 +26,7 @@ export default function WaitlistOffer({ offers }: { offers: Offer[] }) {
   return (
     <div className="mx-4 mb-3 -mt-1 rounded-md border border-gold/30 bg-ink-soft px-3 py-2.5">
       <p className="text-xs text-gold font-medium mb-2">
-        Na čakalni listi za ta dan - ponudi sproščeni termin:
+        Naročeni na obvestilo o prostem terminu za ta dan - ponudi sproščeni termin:
       </p>
       <div className="flex flex-col gap-1.5">
         {offers.map((o, i) => (

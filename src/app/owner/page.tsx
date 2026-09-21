@@ -25,13 +25,6 @@ import {
   getCachedTomorrowAppointments,
 } from "./cached-queries";
 
-function waitlistCountLabel(n: number) {
-  if (n === 1) return "1 stranka čaka na termin";
-  if (n === 2) return "2 stranki čakata na termin";
-  if (n === 3 || n === 4) return `${n} stranke čakajo na termin`;
-  return `${n} strank čaka na termin`;
-}
-
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MONTH_RE = /^\d{4}-\d{2}$/;
 
@@ -229,17 +222,18 @@ export default async function OwnerDashboard({
 
         {waitlistError ? (
           <p className="text-sm text-rose mb-10">
-            Napaka pri branju čakajočih: {waitlistError}
+            Napaka pri branju obvestil o prostem terminu: {waitlistError}
           </p>
         ) : (
           <div className="mb-10 rounded-lg border border-gold/40 bg-gradient-to-br from-ink-elevated to-ink p-5">
             <div className="flex items-center gap-2 mb-1">
               <Users size={18} className="text-gold" />
               <span className="font-display text-lg text-cream">
-                {waitlistTotal && waitlistTotal > 0
-                  ? waitlistCountLabel(waitlistTotal)
-                  : "Čakajo na termin"}
+                Obvestila o prostem terminu
               </span>
+              {waitlistTotal && waitlistTotal > 0 && (
+                <span className="text-sm text-cream-faint">({waitlistTotal})</span>
+              )}
             </div>
             <p className="text-xs text-cream-faint mb-2 capitalize">
               {dayLabel(selectedDate)}
@@ -248,8 +242,9 @@ export default async function OwnerDashboard({
 
             {!waitlist || waitlist.length === 0 ? (
               <p className="text-sm text-cream-muted">
-                Trenutno ni čakajočih - ko bo salon poln, se bodo stranke lahko
-                prijavile tukaj.
+                Trenutno ni nikogar naročenega na obvestila. Ko bodo vsi
+                termini zasedeni, se bodo tukaj prikazale stranke, ki so se
+                naročile na obvestilo o prostem terminu.
               </p>
             ) : (
               <div className="mt-3 divide-y divide-border-soft">
@@ -275,7 +270,7 @@ export default async function OwnerDashboard({
             )}
             {waitlistExtra > 0 && (
               <p className="mt-2 text-xs text-cream-faint">
-                +{waitlistExtra} dodatnih čaka
+                +{waitlistExtra} dodatnih naročenih na obvestila
               </p>
             )}
           </div>

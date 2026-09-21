@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { Scissors } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import ThemeToggle from "@/components/theme-toggle";
@@ -521,7 +520,7 @@ export default function BookingPage({
     <div data-theme={salonTheme} className="relative min-h-screen bg-ink font-sans">
       {slug === BARBER_POLE_WATERMARK_SLUG && <BarberPoleWatermark />}
       <header className="relative border-b border-border px-6 py-7">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
+        <div className="max-w-4xl mx-auto flex items-center">
           <div className="flex items-center gap-3">
             <Scissors size={22} className="text-gold" />
             <h1 className="font-display text-2xl font-semibold tracking-tight text-cream">
@@ -532,17 +531,8 @@ export default function BookingPage({
                 zmaga) - gumb bi bil samo zavajajoč mrtev kontrolnik. */}
             {!salonTheme && <ThemeToggle />}
           </div>
-          <nav className="flex gap-1 bg-ink-soft p-1 rounded-md">
-            <span className="px-4 py-2 text-sm font-medium rounded bg-burgundy text-on-accent">
-              Rezerviraj
-            </span>
-            <Link
-              href="/owner"
-              className="px-4 py-2 text-sm font-medium rounded text-cream-dim hover:text-cream transition-colors"
-            >
-              Nadzorna plošča
-            </Link>
-          </nav>
+          {/* Povezava na /owner ("Nadzorna plošča") je bila tu odstranjena -
+              ta stran je JAVNA, namenjena strankam, ne lastniku salona. */}
         </div>
       </header>
 
@@ -720,7 +710,7 @@ export default function BookingPage({
                   disabled={submitting}
                   className="w-full py-3 rounded-md border-none bg-burgundy text-on-accent text-sm font-semibold cursor-pointer mt-1 disabled:opacity-60"
                 >
-                  Obvesti me, če se kaj sprosti
+                  Obvestite me, ko se sprosti termin
                 </button>
               </div>
             )}
