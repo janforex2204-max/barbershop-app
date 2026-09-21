@@ -46,11 +46,18 @@ function serviceDetails(s: Service): string {
 }
 
 // "Striženje - 15,00 €, 30 min" - polna oznaka, uporabljena kjer ime in
-// podrobnosti nista prikazana ločeno (čakalna lista spodaj, stranski
-// povzetek).
+// podrobnosti nista prikazana ločeno (čakalna lista spodaj).
 function serviceLabel(s: Service) {
   const details = serviceDetails(s);
   return details ? `${s.name} - ${details}` : s.name;
+}
+
+// "Striženje - 15,00 €" - BREZ trajanja, za stranski povzetek (glej
+// "Pregled termina" spodaj), kjer je trajanje prikazano v svoji LASTNI
+// vrstici (isti vzorec kot ločena Datum/Ura rezervacije), ne stlačeno v isto
+// vrstico kot ime/cena.
+function serviceNameAndPrice(s: Service): string {
+  return s.price ? `${s.name} - ${formatPrice(s.price)}` : s.name;
 }
 
 // Storitve razvrsti v skupine po category, v vrstnem redu PRVEGA POJAVA
@@ -731,7 +738,23 @@ export default function BookingPage({
                   Storitev
                 </p>
                 <p className={selectedService ? "text-cream" : "text-cream-faint"}>
-                  {selectedService ? serviceLabel(selectedService) : "Še ni izbrano"}
+                  {selectedService ? serviceNameAndPrice(selectedService) : "Še ni izbrano"}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-cream-faint mb-0.5">
+                  Trajanje
+                </p>
+                <p
+                  className={
+                    selectedService?.duration_minutes ? "text-cream" : "text-cream-faint"
+                  }
+                >
+                  {!selectedService
+                    ? "Še ni izbrano"
+                    : selectedService.duration_minutes
+                      ? formatDuration(selectedService.duration_minutes)
+                      : "Ni določeno"}
                 </p>
               </div>
               <div>
@@ -742,7 +765,7 @@ export default function BookingPage({
               </div>
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wide text-cream-faint mb-0.5">
-                  Ura
+                  Ura rezervacije
                 </p>
                 <p className={form.time ? "text-cream" : "text-cream-faint"}>
                   {form.time || "Še ni izbrano"}
