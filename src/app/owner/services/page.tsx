@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { formatPrice } from "@/lib/constants";
+import { formatPrice, formatDuration, resolveSalonTheme } from "@/lib/constants";
 import { addService, deleteService, updateService } from "../services-actions";
 import PoweredBy from "@/components/powered-by";
 import ThemeToggle from "@/components/theme-toggle";
@@ -29,7 +29,7 @@ export default async function ServicesPage({
   // poizvedba spodaj MORA filtrirati po salonId.
   const { data: ownerRow } = await supabase
     .from("salon_owners")
-    .select("id, status")
+    .select("id, status, category")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -38,6 +38,7 @@ export default async function ServicesPage({
   }
 
   const salonId = ownerRow.id;
+  const salonTheme = resolveSalonTheme(ownerRow.category);
 
   const { data: services, error: servicesError } = await supabase
     .from("services")
@@ -46,11 +47,11 @@ export default async function ServicesPage({
     .order("sort_order", { ascending: true });
 
   return (
-    <div className="min-h-screen bg-ink text-cream font-sans px-6 py-10">
+    <div data-theme={salonTheme} className="min-h-screen bg-ink text-cream font-sans px-6 py-10">
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center gap-3 mb-4">
           <PoweredBy size="lg" />
-          <ThemeToggle />
+          {!salonTheme && <ThemeToggle />}
         </div>
 
         <div className="flex items-center justify-between mb-8">
@@ -110,6 +111,28 @@ export default async function ServicesPage({
                     className={inputClass}
                   />
                 </div>
+                <div className="w-28 space-y-1">
+                  <label className="text-xs text-cream-faint">Trajanje (min)</label>
+                  <input
+                    name="duration_minutes"
+                    type="number"
+                    min="1"
+                    step="1"
+                    placeholder="—"
+                    defaultValue={service.duration_minutes ?? ""}
+                    className={inputClass}
+                  />
+                </div>
+                <div className="w-32 space-y-1">
+                  <label className="text-xs text-cream-faint">Kategorija</label>
+                  <input
+                    name="category"
+                    type="text"
+                    placeholder="npr. Nohti"
+                    defaultValue={service.category ?? ""}
+                    className={inputClass}
+                  />
+                </div>
                 <label className="flex items-center gap-1.5 text-xs text-cream-dim pt-4">
                   <input
                     type="checkbox"
@@ -139,6 +162,11 @@ export default async function ServicesPage({
                     Cena še ni nastavljena - stranke bodo videle samo ime storitve.
                   </p>
                 )}
+                {!service.duration_minutes && (
+                  <p className="w-full text-xs text-cream-faint">
+                    Trajanje še ni nastavljeno.
+                  </p>
+                )}
               </form>
             ))}
           </div>
@@ -162,6 +190,26 @@ export default async function ServicesPage({
                 className={inputClass}
               />
             </div>
+            <div className="w-28 space-y-1">
+              <label className="text-xs text-cream-faint">Trajanje (min)</label>
+              <input
+                name="duration_minutes"
+                type="number"
+                min="1"
+                step="1"
+                placeholder="—"
+                className={inputClass}
+              />
+            </div>
+            <div className="w-32 space-y-1">
+              <label className="text-xs text-cream-faint">Kategorija</label>
+              <input
+                name="category"
+                type="text"
+                placeholder="npr. Nohti"
+                className={inputClass}
+              />
+            </div>
             <button
               type="submit"
               className="text-xs px-4 py-2 rounded-md bg-burgundy text-on-accent font-medium cursor-pointer hover:opacity-90"
@@ -181,10 +229,18 @@ export default async function ServicesPage({
   );
 }
 
-function formatPreview(services: { name: string; price: number | null; active: boolean }[]) {
+function formatPreview(
+  services: { name: string; price: number | null; duration_minutes: number | null; active: boolean }[]
+) {
   const active = services.filter((s) => s.active);
   if (active.length === 0) return "trenutno ni aktivnih storitev.";
   return active
-    .map((s) => (s.price ? `${s.name} - ${formatPrice(s.price)}` : s.name))
+    .map((s) => {
+      const details = [
+        s.price ? formatPrice(s.price) : null,
+        s.duration_minutes ? formatDuration(s.duration_minutes) : null,
+      ].filter(Boolean);
+      return details.length > 0 ? `${s.name} - ${details.join(", ")}` : s.name;
+    })
     .join(" · ");
 }

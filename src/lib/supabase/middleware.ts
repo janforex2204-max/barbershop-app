@@ -2,8 +2,9 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Osveži Supabase sejo (auth cookie) ob vsakem requestu in zavaruje /owner
-// poti. "/" je primarna prijavna stran (glej src/app/page.tsx) - /owner/login
-// je samo alias, ki nanjo preusmeri.
+// poti. "/" je zdaj marketinška domača stran (glej src/app/page.tsx) -
+// prijava je na /owner/login, registracija pa na /owner/register (oba JAVNA,
+// zato izrecno izvzeta iz spodnjega /owner guarda).
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -34,14 +35,15 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
   const isOwnerRoute = pathname.startsWith("/owner");
-  // "/owner/login" ostane matchan tu samo zato, da vanj prijavljen uporabnik
-  // (če ga kdo od zunaj še vedno obišče) takoj odskoči na /owner namesto da
-  // gre skozi svojo lastno redirect-page logiko.
-  const isLoginRoute = pathname === "/" || pathname === "/owner/login";
+  // Javne /owner poti - dostopne BREZ prijave (nasprotje vsega ostalega pod
+  // /owner, npr. /owner ali /owner/services, ki so nadzorna plošča).
+  const isPublicOwnerRoute =
+    pathname === "/owner/login" || pathname.startsWith("/owner/register");
+  const isLoginRoute = pathname === "/owner/login";
 
-  if (isOwnerRoute && pathname !== "/owner/login" && !user) {
+  if (isOwnerRoute && !isPublicOwnerRoute && !user) {
     const url = request.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = "/owner/login";
     return NextResponse.redirect(url);
   }
 

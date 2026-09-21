@@ -10,6 +10,10 @@
 @theme inline {
   --font-display: var(--font-fraunces);
   --font-sans: var(--font-inter);
+  /* Samo za marketinške strani (/, /about, /contact, /owner/register) - NE
+     spreminja privzeti --font-sans zgoraj, da aplikacijske strani (prijava,
+     nadzorna plošča, rezervacijska stran) ostanejo pri Inter. */
+  --font-marketing: var(--font-manrope);
 }
 
 /*
@@ -56,6 +60,20 @@
 }
 
 /*
+  Fillio marketinška paleta (fillio.si) - LOČENA od ink/cream sistema zgoraj
+  in namenoma VEDNO temna (brez [data-theme="light"] preklopa). Uporabljena
+  samo na /, /about, /contact in /owner/register - glej te strani za
+  bg-fillio-dark/text-white razrede na najbolj zunanjem elementu.
+*/
+@theme {
+  --color-fillio-dark: #101113;
+  --color-fillio-panel: #17181b;
+  --color-fillio-tealLight: #7fd6d5;
+  --color-fillio-tealDark: #1d8785;
+  --color-fillio-light: #f6f4f1;
+}
+
+/*
   Svetla tema - iste vloge tokenov, obrnjena svetlost + potemnjeni akcentni
   toni (gold/rose/sage), da ohranijo zadosten kontrast na svetlem ozadju.
   Nenaslovljeno (unlayered) pravilo tu namenoma premaga Tailwindov @theme
@@ -93,4 +111,52 @@ body {
   background: var(--color-ink);
   color: var(--color-cream);
   transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+/*
+  "spa" tema - IZBIRNA, po salon_owners.category ("Kozmetični salon"), NE po
+  osebni nastavitvi kot ink/cream zgoraj. Zato NAMENOMA brez ":root" - ta
+  selektor deluje na KATEREMKOLI elementu (glej wrapper divs v
+  owner/page.tsx, owner/services/page.tsx, [slug]/booking-page.tsx), ne samo
+  na <html>, in kaskadno prepiše ink/cream vrednosti za vse potomce, ne glede
+  na svetlo/temno nastavitev na <html> (isti "unlayered premaga @theme
+  layer" trik kot :root[data-theme="light"] zgoraj).
+
+  Izpeljano iz 4 sidrnih barv (ozadje #FAF6F1, besedilo #3A332E, glavni
+  poudarek #C98B7A, sekundarni poudarek #A3B18A) - isti sorazmerni HSL
+  premiki med vlogami kot pri svetli temi zgoraj (glej pogovor s Claude za
+  natančen izračun). En odklon: --color-gold/--color-sage sta ZATEMNJENA
+  glede na sidrne poudarke (uporabljata se kot BESEDILO - naslovi/sporočila o
+  uspehu - surova #C98B7A/#A3B18A na tem ozadju dasta ~2.6:1/2.1:1 kontrast,
+  daleč pod WCAG AA 4.5:1). --color-burgundy (CTA gumb OZADJE) obdrži
+  natančno #C98B7A - za UI-komponente velja manj strog 3:1 prag, temno
+  besedilo nanj doseže 4.41:1. --color-rose (napaka) ni bila podana -
+  obdržana nevtralna rdeča iz svetle teme zgoraj.
+*/
+[data-theme="spa"] {
+  --color-ink: #faf6f1;
+  --color-ink-soft: #f3e9dc;
+  --color-ink-elevated: #eee0ce;
+  --color-ink-field: #ffffff;
+  --color-border: #e3d1ba;
+  --color-border-soft: #eddfce;
+  --color-cream: #3a332e;
+  --color-cream-muted: #63574e;
+  --color-cream-dim: #827871;
+  --color-cream-faint: #9c9793;
+  --color-cream-ghost: #b8b1ac;
+  --color-gold: #a85a44;
+  --color-gold-soft: #c15d41;
+  --color-rose: #a83f3f;
+  --color-sage: #66744d;
+  --color-selected: #f1dfda;
+  --color-danger-bg: #fbe9e9;
+  --color-danger-border: #f0c3c3;
+  --color-success-bg: #eef2e5;
+  --color-success-border: #d0dbbd;
+
+  /* Za razliko od ink/cream zgoraj - burgundy/on-accent NISTA konstantna čez
+     teme, ker je ravno "svoj CTA poudarek" bistvo spa teme. */
+  --color-burgundy: #c98b7a;
+  --color-on-accent: #3a332e;
 }

@@ -9,6 +9,17 @@ export type OwnerStatus = "pending" | "approved" | "rejected";
 export type OwnerPlan = "free" | "pro";
 export type NotificationPreference = "off" | "daily" | "per_booking";
 
+// salon_owners.hours (jsonb) - po-dnevni urnik, zbran na registracijskem
+// wizardu (glej src/app/owner/register/page.tsx). "day" je slovensko ime dne
+// (Ponedeljek..Nedelja), "from"/"to" sta "HH:MM" in se ignorirata, ko je
+// closed = true.
+export type SalonDayHours = {
+  day: string;
+  closed: boolean;
+  from: string;
+  to: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -22,6 +33,13 @@ export type Database = {
           // V EUR, 2 decimalki - null, dokler lastnik cene ni sam nastavil
           // (glej supabase/schema.sql in src/lib/constants.ts formatPrice).
           price: number | null;
+          // V minutah - null, dokler lastnik trajanja ni sam nastavil (glej
+          // src/lib/constants.ts formatDuration). Trenutno samo shranjeno/
+          // prikazano, ne vpliva na dolžino prostih terminov na /[slug].
+          duration_minutes: number | null;
+          // Prosto-besedilna skupina (npr. "Nohti") - null = brez skupine,
+          // prikaže se v "Ostalo" na /[slug] (glej booking-page.tsx).
+          category: string | null;
           created_at: string;
         };
         Insert: {
@@ -31,6 +49,8 @@ export type Database = {
           active?: boolean;
           sort_order?: number;
           price?: number | null;
+          duration_minutes?: number | null;
+          category?: string | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["services"]["Insert"]>;
@@ -51,6 +71,9 @@ export type Database = {
           // Samo za rate limiting (glej src/lib/rate-limit.ts), null pri
           // rezervacijah, ki jih vnese lastnik (owner/actions.ts).
           ip_address: string | null;
+          // POSNETEK trajanja izbrane storitve ob rezervaciji (ne živa FK na
+          // services.duration_minutes) - glej src/lib/availability.ts.
+          duration_minutes: number | null;
         };
         Insert: {
           id?: string;
@@ -64,6 +87,7 @@ export type Database = {
           barber_name?: string;
           created_at?: string;
           ip_address?: string | null;
+          duration_minutes?: number | null;
         };
         Update: Partial<Database["public"]["Tables"]["appointments"]["Insert"]>;
         Relationships: [];
@@ -140,6 +164,10 @@ export type Database = {
           approval_token_created_at: string;
           approved_at: string | null;
           created_at: string;
+          category: string | null;
+          subtype: string | null;
+          address: string | null;
+          hours: SalonDayHours[] | null;
         };
         Insert: {
           id?: string;
@@ -155,6 +183,10 @@ export type Database = {
           approval_token_created_at?: string;
           approved_at?: string | null;
           created_at?: string;
+          category?: string | null;
+          subtype?: string | null;
+          address?: string | null;
+          hours?: SalonDayHours[] | null;
         };
         Update: Partial<Database["public"]["Tables"]["salon_owners"]["Insert"]>;
         Relationships: [];
@@ -166,6 +198,7 @@ export type Database = {
           salon_id: string;
           appointment_date: string;
           appointment_time: string;
+          duration_minutes: number | null;
           status: AppointmentStatus;
         };
         Relationships: [];
@@ -175,6 +208,8 @@ export type Database = {
           id: string;
           salon_name: string;
           slug: string;
+          hours: SalonDayHours[] | null;
+          category: string | null;
         };
         Relationships: [];
       };

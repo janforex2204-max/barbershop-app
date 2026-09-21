@@ -52,6 +52,33 @@ alter table salon_owners add column if not exists notification_preference text
   not null default 'off'
   check (notification_preference in ('off', 'daily', 'per_booking'));
 
+-- Zbrano na 4-koračnem registracijskem obrazcu (glej
+-- src/app/owner/register/page.tsx + actions.ts) - vse nullable, ker so
+-- vrstice, vstavljene PRED to migracijo, teh podatkov nimajo. Prikazano
+-- lastniku ob odobritvi in v prihodnje za privzet nabor storitev glede na
+-- category/subtype (glej DEFAULT_SERVICES v actions.ts - za zdaj še vedno
+-- fiksen seznam, ne pogojen na category).
+alter table salon_owners add column if not exists category text;
+alter table salon_owners add column if not exists subtype text;
+alter table salon_owners add column if not exists address text;
+alter table salon_owners add column if not exists hours text;
+
+-- hours je bil sprva prost tekst (glej "add column ... text" zgoraj), zdaj
+-- pa je wizard prešel na po-dnevni urnik (glej SalonDayHours v
+-- database.types.ts) - array objektov {day, closed, from, to}, zato mora
+-- stolpec postati jsonb. "alter column type" NAMENOMA ne pade na starih
+-- prostotekstovnih vrednostih (npr. "Pon-Pet 9-19"), ki niso veljaven JSON -
+-- USING jih zavije v {"legacy_text": "..."} namesto da bi migracija padla
+-- ali obstoječe podatke tiho izbrisala. Novi wizard take vrstice ne bere -
+-- lastnik urnik samo ponovno vnese prek prihodnjega "uredi profil" UI-ja
+-- (še ne obstaja).
+alter table salon_owners alter column hours type jsonb using (
+  case
+    when hours is null or hours = '' then null
+    else jsonb_build_object('legacy_text', hours)
+  end
+);
+
 -- ---------------------------------------------------------------------------
 -- STORITVE (services)
 -- ---------------------------------------------------------------------------
@@ -71,7 +98,38 @@ create index if not exists services_salon_idx on services (salon_id);
 -- verjetno že obstaja (glej ip_address zgoraj za isti vzorec). NULL = lastnik
 -- cene še ni nastavil - /[slug] in /owner to obravnavata enako kot 0 (brez
 -- cene prikažeta samo ime storitve, glej src/lib/constants.ts formatPrice).
+--
+-- POZOR (2026-09): ta stolpec je bil v to datoteko dodan že prej, a je bil v
+-- produkciji dejansko preverjen kot ŠE VEDNO manjkajoč (PostgREST vrne
+-- "42703 column services.price does not exist" na živi bazi - glej git
+-- log "Fix public booking page outage" in pogovor s Claude) - ne gre za
+-- zastarel PostgREST schema cache. Ta vrstica MORA biti dejansko pognana v
+-- Supabase SQL Editorju (ne samo obstajati tu v repozitoriju), po njej pa
+-- za vsak slučaj poženi tudi `notify pgrst, 'reload schema';` spodaj, če se
+-- napaka vseeno ponovi.
 alter table services add column if not exists price numeric(6, 2) check (price is null or price >= 0);
+
+-- Trajanje storitve v minutah - zbrano ob dodajanju/urejanju storitve (glej
+-- src/app/owner/services/page.tsx) in privzeto nastavljeno na predlogah ob
+-- registraciji (glej SERVICE_TEMPLATES v src/app/owner/register/actions.ts).
+-- NULL = lastnik trajanja še ni nastavil. Trenutno SAMO shranjeno/prikazano
+-- lastniku - javna rezervacijska stran (/[slug]) še vedno uporablja fiksno
+-- urno mrežo (glej HOURS v src/lib/constants.ts), trajanje NE vpliva (še) na
+-- dolžino/razmik prostih terminov.
+alter table services add column if not exists duration_minutes int check (duration_minutes is null or duration_minutes > 0);
+
+-- Neobvezna, prosto-besedilna skupina storitve (npr. "Nohti", "Pedikura") -
+-- zbrana na /owner/services. NULL = lastnik kategorije ni nastavil - taka
+-- storitev se na /[slug] prikaže v splošni skupini "Ostalo" na dnu (glej
+-- groupServicesByCategory v [slug]/booking-page.tsx). Namenoma prosto
+-- besedilo, ne fiksen seznam - vsak salon ima svoje smiselne skupine.
+alter table services add column if not exists category text;
+
+-- Če po zgornjih ALTER stavkih PostgREST še vedno vrača "column ... does not
+-- exist" za stolpec, ki OČITNO obstaja (npr. viden v Table Editorju), gre za
+-- zastarel schema cache, ne za manjkajočo migracijo - to ga prisili, da ga
+-- takoj osveži (enakovredno gumbu "Reload schema" v Dashboard > API Settings).
+notify pgrst, 'reload schema';
 
 -- ---------------------------------------------------------------------------
 -- TERMINI (appointments)
@@ -110,6 +168,22 @@ alter table appointments add column if not exists ip_address inet;
 -- zato brez salon_id.
 create index if not exists appointments_phone_created_idx on appointments (customer_phone, created_at);
 create index if not exists appointments_ip_created_idx on appointments (ip_address, created_at) where ip_address is not null;
+
+-- Trajanje TEGA KONKRETNEGA termina v minutah - POSNETEK trajanja izbrane
+-- storitve v trenutku rezervacije (isti vzorec kot `service` zgoraj, ki je
+-- prosto besedilo, ne živa FK na services.id) - če lastnik kasneje spremeni
+-- trajanje storitve na /owner/services, že rezervirani termini ostanejo
+-- nespremenjeni. Uporabljeno za izračun prostih terminov (glej
+-- src/lib/availability.ts) - prilega se storitev v celoti med obstoječe
+-- rezervacije in konec delovnika, ne samo "je ta točen čas prost".
+alter table appointments add column if not exists duration_minutes int
+  check (duration_minutes is null or duration_minutes > 0);
+
+-- Obstoječi (že rezervirani) termini so bili vsi rezervirani pod prejšnjo,
+-- implicitno urno mrežo (glej HOURS v src/lib/constants.ts) - zato 60 min
+-- kot najbolj verjetna dejanska dolžina, da izračun prekrivanja zanje ne
+-- pade na NULL (kar bi se obravnavalo kot "brez dolžine").
+update appointments set duration_minutes = 60 where duration_minutes is null;
 
 -- ---------------------------------------------------------------------------
 -- ČAKALNA VRSTA (waitlist)
@@ -251,20 +325,32 @@ create policy "sms_notifications_owner_full_access" on sms_notifications
 -- lastnika (ne klicatelja), zato ga anon lahko bere kljub temu, da nima
 -- SELECT pravice neposredno na appointments/salon_owners.
 -- ---------------------------------------------------------------------------
+-- duration_minutes dodan, da lahko /[slug] izračuna PRAVO prekrivanje
+-- (ne samo enak appointment_time) - glej src/lib/availability.ts.
 create or replace view public_availability
   with (security_invoker = false) as
-  select appointment_date, appointment_time, status, salon_id
+  select appointment_date, appointment_time, duration_minutes, status, salon_id
   from appointments
   where status <> 'cancelled';
 
 grant select on public_availability to anon, authenticated;
 
--- Samo id/ime/slug ODOBRENIH salonov - za razrešitev /[slug] -> salon in
--- prikaz imena na javni strani. NIKOLI ne izpostavi approval_token/user_id.
+-- Samo id/ime/slug/hours/category ODOBRENIH salonov - za razrešitev
+-- /[slug] -> salon, prikaz imena na javni strani, izračun delovnega časa po
+-- dnevih (glej src/lib/availability.ts resolveDayWindow) IN izbiro barvne
+-- teme (category === "Kozmetični salon" -> spa, glej [slug]/page.tsx in
+-- pogovor s Claude o data-theme="spa"). subtype/address NIKOLI izpostavljena
+-- (lastnikovi interni registracijski podatki, ne za javnost) - category
+-- je bila prej tudi tu, a je zdaj potrebna za temo.
 create or replace view public_salons
   with (security_invoker = false) as
-  select id, salon_name, slug
+  select id, salon_name, slug, hours, category
   from salon_owners
   where status = 'approved';
 
 grant select on public_salons to anon, authenticated;
+
+-- Enako kot notify po services zgoraj - vrne PostgREST-ov schema cache po
+-- ZGORNJIH ALTER/VIEW spremembah (novi stolpci/view-i so sicer dostopni šele
+-- po naslednjem samodejnem osvežitvenem ciklu, ki lahko traja nekaj minut).
+notify pgrst, 'reload schema';

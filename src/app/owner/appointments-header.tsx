@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import ManualBookingForm from "./manual-booking-form";
+import type { SalonDayHours } from "@/types/database.types";
 
 // Naslov "Termini za ..." in gumb za ročni vnos morata vedno ostati v svoji
 // vrstici (fiksne širine) - sam obrazec (ko je odprt) se izriše kot ločen
@@ -10,10 +11,12 @@ export default function AppointmentsHeader({
   title,
   initialDate,
   salonId,
+  salonHours,
 }: {
   title: string;
   initialDate: string;
   salonId: string;
+  salonHours: SalonDayHours[] | null;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -36,6 +39,7 @@ export default function AppointmentsHeader({
         <ManualBookingForm
           initialDate={initialDate}
           salonId={salonId}
+          salonHours={salonHours}
           onClose={() => setOpen(false)}
         />
       )}

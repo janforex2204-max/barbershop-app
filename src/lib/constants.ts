@@ -12,6 +12,18 @@ export const PLATFORM_URL = "https://fillio.si";
 // (glej src/app/admin/approve/route.ts).
 export const APPROVAL_TOKEN_EXPIRY_DAYS = 5;
 
+// Izbira barvne teme glede na salon_owners.category (glej data-theme="spa" v
+// globals.css). "category" je vedno ena od TOČNO treh vrednosti, ki jih
+// wizard zapiše (glej categoryDisplay v owner/register/page.tsx: "Frizerski
+// salon" | "Kozmetični salon" | "Druga dejavnost") ali null za salone,
+// registrirane pred to funkcionalnostjo. Za "Druga dejavnost"/null
+// namenoma undefined (obstoječa temna ink/cream tema) - spa paleta je
+// vizualno preveč specifično vezana na kozmetiko, da bi bila smiseln
+// splošen privzetek za poljubno "drugo" dejavnost (glej pogovor s Claude).
+export function resolveSalonTheme(category: string | null | undefined): "spa" | undefined {
+  return category === "Kozmetični salon" ? "spa" : undefined;
+}
+
 // Koliko delovnih tednov vnaprej lahko stranka rezervira na /[slug] (glej
 // upcomingBusinessWeeks spodaj) - namenoma trda omejitev, v nasprotju z
 // lastnikovim mesečnim koledarjem na /owner (month-calendar.tsx), ki meje
@@ -27,6 +39,17 @@ export const BOOKING_WINDOW_WEEKS = 4;
 // v tem primeru prikaže samo ime storitve, brez "0,00 €").
 export function formatPrice(price: number): string {
   return price.toLocaleString("sl-SI", { style: "currency", currency: "EUR" });
+}
+
+// "30" -> "30 min", "60" -> "1 h", "90" -> "1 h 30 min". Klicatelj naj
+// pokliče SAMO, če je trajanje nastavljeno (glej formatPrice zgoraj za isti
+// null-pomeni-"še ni nastavljeno" vzorec).
+export function formatDuration(durationMinutes: number): string {
+  const hours = Math.floor(durationMinutes / 60);
+  const minutes = durationMinutes % 60;
+  if (hours === 0) return `${minutes} min`;
+  if (minutes === 0) return `${hours} h`;
+  return `${hours} h ${minutes} min`;
 }
 
 export const HOURS = [

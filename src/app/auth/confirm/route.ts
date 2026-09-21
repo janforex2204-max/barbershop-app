@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { translateAuthError } from "@/lib/auth-errors";
 
 // Cilj povezave za potrditev e-pošte (glej emailRedirectTo v
-// src/app/register/actions.ts). Supabase pošlje sem bodisi PKCE "code" bodisi
+// src/app/owner/register/actions.ts). Supabase pošlje sem bodisi PKCE "code" bodisi
 // starejši "token_hash"+"type" format - v obeh primerih moramo sejo
 // vzpostaviti TUKAJ (route handler), ker Server Component (npr. /owner
 // samo) ne sme trajno nastaviti cookie-jev. Šele po tem se seja dejansko
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
   if (error) {
     console.error("[auth/confirm] Potrditev e-pošte ni uspela:", error.message);
     return NextResponse.redirect(
-      `${origin}/?error=${encodeURIComponent(
+      `${origin}/owner/login?error=${encodeURIComponent(
         translateAuthError(
           error.message,
           "Potrditev e-pošte ni uspela. Če si povezavo odprl/a v drugem brskalniku ali napravi kot tisto, s katero si se registriral/a, jo poskusi odpreti v isti napravi, ali zahtevaj novo povezavo."

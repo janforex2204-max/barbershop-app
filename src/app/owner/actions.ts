@@ -4,10 +4,16 @@ import { redirect } from "next/navigation";
 import { revalidatePath, updateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isBusinessDay, toWhatsAppPhone } from "@/lib/constants";
+import { toWhatsAppPhone } from "@/lib/constants";
 import { isTwilioConfigured, sendSms } from "@/lib/sms";
 import { OWNER_CALENDAR_TAG } from "./cached-queries";
 import { translateAuthError } from "@/lib/auth-errors";
+import {
+  resolveDayWindow,
+  isSlotAvailable,
+  DEFAULT_SERVICE_DURATION_MINUTES,
+  type BusyInterval,
+} from "@/lib/availability";
 import type { NotificationPreference } from "@/types/database.types";
 
 export async function login(formData: FormData) {
@@ -19,7 +25,7 @@ export async function login(formData: FormData) {
 
   if (error) {
     console.error("[login] signInWithPassword:", error.message);
-    redirect(`/?error=${encodeURIComponent(translateAuthError(error.message))}`);
+    redirect(`/owner/login?error=${encodeURIComponent(translateAuthError(error.message))}`);
   }
 
   redirect("/owner");
@@ -28,7 +34,7 @@ export async function login(formData: FormData) {
 export async function logout() {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  redirect("/");
+  redirect("/owner/login");
 }
 
 // Odpove termin in poišče stranke, ki jih je smiselno obvestiti o sprostitvi,
@@ -200,7 +206,7 @@ export async function addManualAppointment(
 
   const { data: ownerRow } = await supabase
     .from("salon_owners")
-    .select("id, salon_name")
+    .select("id, salon_name, hours")
     .eq("user_id", user.id)
     .eq("status", "approved")
     .maybeSingle();
@@ -219,19 +225,88 @@ export async function addManualAppointment(
     return { error: "Izpolni vsa polja." };
   }
 
-  if (!isBusinessDay(appointment_date)) {
-    return { error: "Salon ta dan ne dela (odprto torek-sobota)." };
+  const window = resolveDayWindow(ownerRow.hours, appointment_date);
+  if (!window) {
+    return { error: "Salon ta dan ne dela." };
   }
 
-  const { error } = await supabase.from("appointments").insert({
+  // Trajanje IZBRANE storitve razrešimo TU, na strežniku - isti vzorec kot
+  // bookAppointment v [slug]/actions.ts (nikoli ne zaupamo trajanju, ki bi
+  // ga poslal klient - obrazec ga sploh ne pošilja).
+  const { data: serviceRow } = await supabase
+    .from("services")
+    .select("duration_minutes")
+    .eq("salon_id", ownerRow.id)
+    .eq("name", service)
+    .eq("active", true)
+    .maybeSingle();
+  const durationMinutes = serviceRow?.duration_minutes ?? DEFAULT_SERVICE_DURATION_MINUTES;
+
+  // Ponovna preverba prekrivanja NA STREŽNIKU tik pred vpisom - isti razlog
+  // kot na [slug]/actions.ts: klientov seznam prostih terminov je lahko
+  // zastarel, ali kdo pošlje POST mimo UI-ja. Beremo NEPOSREDNO iz
+  // appointments (RLS: appointments_owner_full_access), ne prek
+  // public_availability - lastnik že ima dostop do svoje tabele.
+  let { data: busyRows, error: busyError } = await supabase
+    .from("appointments")
+    .select("appointment_time, duration_minutes")
+    .eq("salon_id", ownerRow.id)
+    .eq("appointment_date", appointment_date)
+    .neq("status", "cancelled");
+
+  // Prehodna varovalka: dokler appointments.duration_minutes morda še ni v
+  // produkcijski bazi (isti vzorec kot [slug]/actions.ts) - brez tega bi
+  // manjkajoč stolpec blokiral CEL ročni vnos, ne samo prikaz trajanja.
+  if (busyError?.code === "42703") {
+    const fallback = await supabase
+      .from("appointments")
+      .select("appointment_time")
+      .eq("salon_id", ownerRow.id)
+      .eq("appointment_date", appointment_date)
+      .neq("status", "cancelled");
+    busyRows = fallback.data?.map((r) => ({ ...r, duration_minutes: null })) ?? null;
+    busyError = fallback.error;
+  }
+
+  if (busyError) {
+    return { error: "Prišlo je do začasne napake. Poskusi znova čez trenutek." };
+  }
+
+  const busy: BusyInterval[] = (busyRows ?? []).map((r) => ({
+    time: r.appointment_time,
+    durationMinutes: r.duration_minutes ?? 60,
+  }));
+
+  if (!isSlotAvailable(window, busy, durationMinutes, appointment_time)) {
+    return { error: "Ta termin se prekriva z drugo rezervacijo. Izberi drugega." };
+  }
+
+  let { error } = await supabase.from("appointments").insert({
     salon_id: ownerRow.id,
     customer_name,
     customer_phone,
     service,
     appointment_date,
     appointment_time,
+    duration_minutes: durationMinutes,
     status: "booked",
   });
+
+  // Ista KRITIČNA varovalka kot v [slug]/actions.ts bookAppointment - brez
+  // nje bi manjkajoč stolpec blokiral VSAK ročni vnos, dokler nekdo ne
+  // požene SQL migracije.
+  if (error?.code === "42703") {
+    const fallback = await supabase.from("appointments").insert({
+      salon_id: ownerRow.id,
+      customer_name,
+      customer_phone,
+      service,
+      appointment_date,
+      appointment_time,
+      status: "booked",
+    });
+    error = fallback.error;
+  }
 
   if (error) {
     if (error.code === "23505") {
@@ -271,7 +346,7 @@ export async function updateNotificationPreference(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    redirect("/");
+    redirect("/owner/login");
   }
 
   const { data: ownerRow } = await supabase

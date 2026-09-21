@@ -1,34 +1,7 @@
-import Link from "next/link";
-import { PLATFORM_NAME } from "@/lib/constants";
-import PoweredBy from "@/components/powered-by";
+import { redirect } from "next/navigation";
 
-export default async function RegisterSuccessPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ salon?: string }>;
-}) {
-  const { salon } = await searchParams;
-  const salonName = salon?.trim() || PLATFORM_NAME;
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-ink font-sans px-4">
-      <div className="w-full max-w-sm border border-border rounded-lg p-6 space-y-4 text-center">
-        <PoweredBy />
-        <p className="text-sm text-sage bg-success-bg border border-success-border rounded-md px-3 py-2">
-          Registracija uspešna.
-        </p>
-        <p className="text-sm text-cream-muted">
-          Salon <span className="text-cream font-medium">{salonName}</span> čaka
-          na odobritev. Ko bo odobren, se boš lahko prijavil/a in videl/a
-          nadzorno ploščo.
-        </p>
-        <Link
-          href="/"
-          className="block w-full rounded-md border border-border text-cream text-sm font-medium py-2 hover:bg-ink-soft"
-        >
-          Nazaj na prijavo
-        </Link>
-      </div>
-    </div>
-  );
+// Alias za nazaj združljivost - novi wizard (glej /owner/register) uspešno
+// registracijo prikaže sam (korak 4), ne prek posebne /success strani.
+export default function RegisterSuccessRedirect() {
+  redirect("/owner/register");
 }

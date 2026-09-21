@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Fraunces, Inter } from "next/font/google";
+import { Fraunces, Inter, Manrope } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
@@ -32,6 +32,14 @@ const inter = Inter({
   weight: ["400", "500", "600"],
 });
 
+// Samo za marketinške strani (glej --font-marketing v globals.css) - app
+// strani (prijava, nadzorna plošča ...) ostanejo pri Inter zgoraj.
+const manrope = Manrope({
+  variable: "--font-manrope",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+});
+
 export const metadata: Metadata = {
   title: "Fillio — rezervacije",
   description: "Rezervacijski sistem za frizerske salone",
@@ -42,7 +50,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="sl"
       suppressHydrationWarning
-      className={`${fraunces.variable} ${inter.variable} h-full antialiased`}
+      className={`${fraunces.variable} ${inter.variable} ${manrope.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />

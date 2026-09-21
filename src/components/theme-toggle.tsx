@@ -5,7 +5,7 @@ import { useTheme } from "./theme-provider";
 
 // Majhen, diskreten preklopnik - ikona prikazuje temo, V KATERO preklopiš
 // (sonce v temnem načinu, luna v svetlem), dosledno velik povsod, kjer je
-// uporabljen (glej klicna mesta: /, /register, /owner, /[slug]).
+// uporabljen (glej klicna mesta: /owner/login, /owner, /[slug]).
 export default function ThemeToggle({ className = "" }: { className?: string }) {
   const { theme, toggleTheme } = useTheme();
 

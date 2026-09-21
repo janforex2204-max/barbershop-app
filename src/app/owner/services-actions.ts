@@ -42,11 +42,34 @@ function invalidPriceMessage(price: number | null): string | null {
   return null;
 }
 
+// Isti vzorec kot parsePriceInput/invalidPriceMessage zgoraj - prazno polje
+// -> null ("trajanje ni nastavljeno"), sicer celo število minut.
+function parseDurationInput(raw: FormDataEntryValue | null): number | null {
+  const trimmed = String(raw ?? "").trim();
+  if (!trimmed) return null;
+  return Number(trimmed);
+}
+
+function invalidDurationMessage(duration: number | null): string | null {
+  if (duration !== null && (!Number.isInteger(duration) || duration <= 0)) {
+    return "Trajanje mora biti celo število minut, večje od 0 (ali prazno, če ga še nimaš).";
+  }
+  return null;
+}
+
+// Prosto besedilo, brez validacije - prazno polje -> null ("brez skupine").
+function parseCategoryInput(raw: FormDataEntryValue | null): string | null {
+  const trimmed = String(raw ?? "").trim();
+  return trimmed || null;
+}
+
 export async function updateService(serviceId: string, formData: FormData) {
   const supabase = await createClient();
 
   const name = String(formData.get("name") ?? "").trim();
   const price = parsePriceInput(formData.get("price"));
+  const durationMinutes = parseDurationInput(formData.get("duration_minutes"));
+  const category = parseCategoryInput(formData.get("category"));
   const active = formData.get("active") === "on";
 
   if (!name) {
@@ -56,15 +79,31 @@ export async function updateService(serviceId: string, formData: FormData) {
   if (priceError) {
     redirect(`/owner/services?error=${encodeURIComponent(priceError)}`);
   }
+  const durationError = invalidDurationMessage(durationMinutes);
+  if (durationError) {
+    redirect(`/owner/services?error=${encodeURIComponent(durationError)}`);
+  }
 
   // RLS (services_owner_manage: salon_id = my_salon_id()) že sama poskrbi,
   // da to lahko spremeni SAMO lastnik salona, ki mu storitev pripada -
   // eksplicitnega preverjanja tu ni treba dodajati (isti vzorec kot
   // cancelAppointment/markSmsSent v ./actions.ts).
-  const { error } = await supabase
+  let { error } = await supabase
     .from("services")
-    .update({ name, price, active })
+    .update({ name, price, duration_minutes: durationMinutes, category, active })
     .eq("id", serviceId);
+
+  // Prehodna varovalka: dokler services.category morda še ni v produkcijski
+  // bazi (isti vzorec kot price/duration_minutes prej, glej pogovor s
+  // Claude) - brez tega bi manjkajoč stolpec blokiral VSAKO urejanje
+  // storitve, ne samo kategorijo.
+  if (error?.code === "42703") {
+    const fallback = await supabase
+      .from("services")
+      .update({ name, price, duration_minutes: durationMinutes, active })
+      .eq("id", serviceId);
+    error = fallback.error;
+  }
 
   if (error) {
     redirect(`/owner/services?error=${encodeURIComponent(error.message)}`);
@@ -84,6 +123,8 @@ export async function addService(formData: FormData) {
 
   const name = String(formData.get("name") ?? "").trim();
   const price = parsePriceInput(formData.get("price"));
+  const durationMinutes = parseDurationInput(formData.get("duration_minutes"));
+  const category = parseCategoryInput(formData.get("category"));
 
   if (!name) {
     redirect(`/owner/services?error=${encodeURIComponent("Vnesi ime storitve.")}`);
@@ -92,18 +133,36 @@ export async function addService(formData: FormData) {
   if (priceError) {
     redirect(`/owner/services?error=${encodeURIComponent(priceError)}`);
   }
+  const durationError = invalidDurationMessage(durationMinutes);
+  if (durationError) {
+    redirect(`/owner/services?error=${encodeURIComponent(durationError)}`);
+  }
 
   const { count } = await supabase
     .from("services")
     .select("id", { count: "exact", head: true })
     .eq("salon_id", salonId);
 
-  const { error } = await supabase.from("services").insert({
+  let { error } = await supabase.from("services").insert({
     salon_id: salonId,
     name,
     price,
+    duration_minutes: durationMinutes,
+    category,
     sort_order: (count ?? 0) + 1,
   });
+
+  // Ista prehodna varovalka kot v updateService zgoraj.
+  if (error?.code === "42703") {
+    const fallback = await supabase.from("services").insert({
+      salon_id: salonId,
+      name,
+      price,
+      duration_minutes: durationMinutes,
+      sort_order: (count ?? 0) + 1,
+    });
+    error = fallback.error;
+  }
 
   if (error) {
     redirect(`/owner/services?error=${encodeURIComponent(error.message)}`);

@@ -14,11 +14,32 @@ export default async function SalonBookingPage({
   const { slug } = await params;
   const supabase = await createClient();
 
-  const { data: salon, error } = await supabase
+  let { data: salon, error } = await supabase
     .from("public_salons")
-    .select("id, salon_name, slug")
+    .select("id, salon_name, slug, hours, category")
     .eq("slug", slug)
     .maybeSingle();
+
+  // Prehodna varovalka: dokler public_salons view morda še ni osvežen z
+  // `hours`/`category` stolpcema (supabase/schema.sql migracija poslana, a
+  // morda še ni zagnana - isti dejansko že videni vzorec kot pri
+  // services.price, glej pogovor s Claude), NE sme celotna stran pasti v
+  // napako samo zato, ker manjkata delovni čas/tema - poskusi še enkrat
+  // brez njiju (resolveDayWindow hours=null uporabi privzet delovni čas,
+  // resolveSalonTheme category=null uporabi privzeto temo - oboje ne kot
+  // napako).
+  if (error?.code === "42703") {
+    console.error(
+      `[${slug}] public_salons.hours/category še ne obstajata (manjkajoča migracija) - nadaljujem s privzetim delovnim časom/temo.`
+    );
+    const fallback = await supabase
+      .from("public_salons")
+      .select("id, salon_name, slug")
+      .eq("slug", slug)
+      .maybeSingle();
+    salon = fallback.data ? { ...fallback.data, hours: null, category: null } : null;
+    error = fallback.error;
+  }
 
   // Ločimo "slug res ne obstaja" (notFound - prava 404) od "poizvedba je
   // spodletela" (napaka - npr. začasna PostgREST schema-cache napaka tik po
@@ -35,5 +56,13 @@ export default async function SalonBookingPage({
     notFound();
   }
 
-  return <BookingPage slug={slug} salonId={salon.id} salonName={salon.salon_name} />;
+  return (
+    <BookingPage
+      slug={slug}
+      salonId={salon.id}
+      salonName={salon.salon_name}
+      salonHours={salon.hours}
+      salonCategory={salon.category}
+    />
+  );
 }

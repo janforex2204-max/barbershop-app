@@ -10,6 +10,7 @@ import {
   monthRange,
   nextBusinessDayAfterToday,
   whatsAppLink,
+  resolveSalonTheme,
 } from "@/lib/constants";
 import AppointmentsHeader from "./appointments-header";
 import NotificationsPanel from "./notifications-panel";
@@ -55,13 +56,18 @@ export default async function OwnerDashboard({
   // (my_salon_id() v shemi) je neodvisen, strežniški backstop za isto mejo.
   const { data: ownerRow } = await supabase
     .from("salon_owners")
-    .select("id, salon_name, status, plan")
+    .select("id, salon_name, status, plan, hours, category")
     .eq("user_id", user.id)
     .maybeSingle();
 
+  const salonTheme = resolveSalonTheme(ownerRow?.category);
+
   if (!ownerRow || ownerRow.status !== "approved") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-ink font-sans px-4">
+      <div
+        data-theme={salonTheme}
+        className="min-h-screen flex items-center justify-center bg-ink font-sans px-4"
+      >
         <div className="w-full max-w-sm border border-border rounded-lg p-6 space-y-4 text-center">
           <PoweredBy />
           <p className="text-sm text-cream">
@@ -179,11 +185,13 @@ export default async function OwnerDashboard({
   }
 
   return (
-    <div className="min-h-screen bg-ink text-cream font-sans px-6 py-10">
+    <div data-theme={salonTheme} className="min-h-screen bg-ink text-cream font-sans px-6 py-10">
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center gap-3 mb-4">
           <PoweredBy size="lg" />
-          <ThemeToggle />
+          {/* Glej isto opombo v [slug]/booking-page.tsx - preklop nima
+              učinka, ko je tema salona vsiljena prek data-theme zgoraj. */}
+          {!salonTheme && <ThemeToggle />}
         </div>
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -277,6 +285,7 @@ export default async function OwnerDashboard({
           title={`Termini za ${isToday ? "danes" : dayLabel(selectedDate)}`}
           initialDate={selectedDate}
           salonId={salonId}
+          salonHours={ownerRow.hours}
         />
         <div className="border border-border rounded-lg divide-y divide-border-soft mb-10">
           {error && (
