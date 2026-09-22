@@ -67,7 +67,7 @@ export default function NotificationsPanel({
           Avtomatsko
           {!isPro && (
             <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gold text-ink font-semibold">
-              KMALU
+              FILLIO PRO
             </span>
           )}
         </button>
@@ -181,7 +181,7 @@ function AutoComingSoon() {
       <div className="flex items-center gap-2 mb-2">
         <Sparkles size={16} className="text-gold" />
         <span className="text-xs font-semibold tracking-wide text-gold uppercase">
-          Premium funkcija · Kmalu na voljo
+          Fillio Pro · Kmalu na voljo
         </span>
       </div>
       <h3 className="font-display text-lg text-cream mb-1.5">
