@@ -92,8 +92,8 @@ export default async function OwnerDashboard({
 
   const salonId = ownerRow.id;
   const salonName = ownerRow.salon_name;
-  // Za "Pošlji obvestilo" (glej WaitlistNotifyButton spodaj) - povezava, kjer
-  // lahko čakajoča stranka takoj vidi proste termine in rezervira.
+  // Za "Pošlji WhatsApp"/"Pošlji e-pošto" (glej WaitlistNotifyButton spodaj) -
+  // povezava, kjer lahko čakajoča stranka takoj vidi proste termine in rezervira.
   const bookingUrl = `${PLATFORM_URL}/${ownerRow.slug}`;
 
   // Ločena, izolirana poizvedba - dokler migracija (supabase/schema.sql) za

@@ -90,11 +90,10 @@ export async function markSmsSent(logId: string) {
   revalidatePath("/owner");
 }
 
-// Kliče se OB ISTEM kliku kot odprtje WhatsApp sporočila (glej
-// WaitlistNotifyButton na owner/page.tsx) - SAMO pošlje email, WhatsApp gre
-// neposredno prek wa.me linka na klientu, brez strežnika. Nefatalno vrne
-// napako namesto da vrže - WhatsApp se je že odprl, klicatelj napako samo
-// prikaže kot dodatno opozorilo, ne kot popoln neuspeh akcije.
+// Kliče se iz LOČENEGA gumba "Pošlji e-pošto" (glej WaitlistNotifyButton na
+// owner/page.tsx) - "Pošlji WhatsApp" je čisto klientski wa.me link, brez
+// strežnika, popolnoma neodvisen od tega. Nefatalno vrne napako namesto da
+// vrže - klicatelj jo prikaže neposredno ob gumbu.
 //
 // waitlistId (ne surovi email/ime/storitev) je NAMENOMA edini parameter -
 // isti razlog kot markSmsSent zgoraj: Server Action je dosegljiv z
