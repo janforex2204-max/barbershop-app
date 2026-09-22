@@ -183,12 +183,12 @@ update appointments set token = encode(gen_random_bytes(32), 'hex') where token 
 alter table appointments alter column token set not null;
 create unique index if not exists appointments_token_idx on appointments (token);
 
--- Neobvezen email, ki ga stranka lahko doda ŠELE PO rezervaciji, na sami
--- potrditveni strani (glej booking-page.tsx + addBookingConfirmationEmail v
--- [slug]/actions.ts) - obrazec za rezervacijo ga NE zbira. Ob vnosu se pošlje
--- ENKRATNA potrditvena e-pošta (glej sendBookingConfirmationEmail v
--- src/lib/email.ts) - ločeno od plačljivega Fillio Pro obveščanja lastnika
--- (notification_preference zgoraj), ki gre lastniku, ne stranki.
+-- Neobvezno polje v obrazcu za rezervacijo (pod telefonom, glej
+-- booking-page.tsx) - ob oddaji se, če je izpolnjeno, takoj pošlje ENKRATNA
+-- potrditvena e-pošta (glej notifyCustomerOfBooking v [slug]/actions.ts in
+-- sendBookingConfirmationEmail v src/lib/email.ts) - ločeno od plačljivega
+-- Fillio Pro obveščanja lastnika (notification_preference zgoraj), ki gre
+-- lastniku, ne stranki.
 alter table appointments add column if not exists customer_email text;
 
 -- Podpirata poizvedbi v src/lib/rate-limit.ts (štetje rezervacij po

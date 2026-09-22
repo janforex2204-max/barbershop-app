@@ -39,10 +39,15 @@ import type { SalonDayHours } from "@/types/database.types";
 async function resolveSalonId(
   supabase: Awaited<ReturnType<typeof createClient>>,
   slug: string
-): Promise<{ salonId: string | null; hours: SalonDayHours[] | null; error: string | null }> {
+): Promise<{
+  salonId: string | null;
+  hours: SalonDayHours[] | null;
+  salonName: string | null;
+  error: string | null;
+}> {
   let { data, error } = await supabase
     .from("public_salons")
-    .select("id, hours")
+    .select("id, hours, salon_name")
     .eq("slug", slug)
     .maybeSingle();
 
@@ -56,7 +61,7 @@ async function resolveSalonId(
     );
     const fallback = await supabase
       .from("public_salons")
-      .select("id")
+      .select("id, salon_name")
       .eq("slug", slug)
       .maybeSingle();
     data = fallback.data ? { ...fallback.data, hours: null } : null;
@@ -68,13 +73,14 @@ async function resolveSalonId(
     return {
       salonId: null,
       hours: null,
+      salonName: null,
       error: "Prišlo je do začasne napake. Poskusi znova čez trenutek.",
     };
   }
   if (!data) {
-    return { salonId: null, hours: null, error: "Salon ne obstaja." };
+    return { salonId: null, hours: null, salonName: null, error: "Salon ne obstaja." };
   }
-  return { salonId: data.id, hours: data.hours, error: null };
+  return { salonId: data.id, hours: data.hours, salonName: data.salon_name, error: null };
 }
 
 // Pošlje lastniku email TAKOJ ob novi rezervaciji, če ima to vklopljeno
@@ -124,9 +130,33 @@ async function notifyOwnerOfBooking(
   }
 }
 
+// Pošlje STRANKI enkratno potrditveno e-pošto TAKOJ ob uspešni rezervaciji,
+// če je v obrazcu vpisala email (neobvezno polje, glej booking-page.tsx pod
+// poljem za telefon) - NE kot ločen opt-in korak na potrditveni strani (to
+// je bil prejšnji pristop, glej pogovor s Claude - zdaj samo ena oddaja).
+// Nefatalno (try/catch), isti razlog kot notifyOwnerOfBooking zgoraj -
+// rezervacija mora uspeti tudi, če email pošiljanje odpove.
+async function notifyCustomerOfBooking(
+  email: string,
+  booking: { salonName: string; service: string; date: string; time: string; token: string }
+) {
+  try {
+    await sendBookingConfirmationEmail({
+      to: email,
+      salonName: booking.salonName,
+      service: booking.service,
+      dateLabel: dayLabel(booking.date),
+      time: booking.time,
+      manageUrl: bookingManageUrl(booking.token),
+    });
+  } catch (e) {
+    console.error(`Napaka pri pošiljanju potrditvene e-pošte (${email}):`, e);
+  }
+}
+
 export async function bookAppointment(
   slug: string,
-  input: { name: string; phone: string; service: string; date: string; time: string }
+  input: { name: string; phone: string; email?: string; service: string; date: string; time: string }
 ): Promise<{ error?: string; token?: string }> {
   // Server Action je dosegljiv z neposrednim POST-om mimo UI-ja, zato se ne
   // zanašamo samo na validacijo v booking-page.tsx (glej isValidCustomerName/
@@ -137,9 +167,15 @@ export async function bookAppointment(
   if (!isValidPhone(input.phone)) {
     return { error: "Vnesi veljavno telefonsko številko (npr. 040 123 456)." };
   }
+  // Neobvezno polje - prazno je v redu, NEPRAVILNO vneseno pa ne (raje
+  // zavrni takoj kot tiho izgubi možnost potrditve/upravljanja termina).
+  const email = input.email?.trim() || null;
+  if (email && !isValidEmail(email)) {
+    return { error: "Email naslov ni veljaven (ali pusti polje prazno)." };
+  }
 
   const supabase = await createClient();
-  const { salonId, hours, error: resolveError } = await resolveSalonId(supabase, slug);
+  const { salonId, hours, salonName, error: resolveError } = await resolveSalonId(supabase, slug);
 
   if (!salonId) {
     return { error: resolveError ?? "Salon ne obstaja." };
@@ -216,6 +252,7 @@ export async function bookAppointment(
     salon_id: salonId,
     customer_name: input.name,
     customer_phone: input.phone,
+    customer_email: email,
     service: input.service,
     appointment_date: input.date,
     appointment_time: input.time,
@@ -240,6 +277,7 @@ export async function bookAppointment(
       salon_id: salonId,
       customer_name: input.name,
       customer_phone: input.phone,
+      customer_email: email,
       service: input.service,
       appointment_date: input.date,
       appointment_time: input.time,
@@ -258,68 +296,17 @@ export async function bookAppointment(
   }
 
   await notifyOwnerOfBooking(salonId, input);
+  if (email) {
+    await notifyCustomerOfBooking(email, {
+      salonName: salonName ?? "Fillio",
+      service: input.service,
+      date: input.date,
+      time: input.time,
+      token,
+    });
+  }
 
   return { token };
-}
-
-// Klicano iz potrditvene strani (booking-page.tsx), NE iz obrazca za
-// rezervacijo - ta email ne zbira e-pošte (glej pogovor s Claude). Token JE
-// avtorizacija (isti vzorec kot resolveSalonId/notifyOwnerOfBooking zgoraj -
-// admin klient, ker anon nima UPDATE pravice na appointments), zato tu ni
-// dodatnega preverjanja "lastništva" - kdorkoli pozna svoj lasten,
-// neuganljiv token.
-export async function addBookingConfirmationEmail(
-  token: string,
-  email: string
-): Promise<{ error?: string }> {
-  const trimmedEmail = email.trim();
-  if (!isValidEmail(trimmedEmail)) {
-    return { error: "Vnesi veljaven email naslov." };
-  }
-
-  const admin = createAdminClient();
-  const { data: appt } = await admin
-    .from("appointments")
-    .select("salon_id, service, appointment_date, appointment_time")
-    .eq("token", token)
-    .maybeSingle();
-
-  if (!appt) {
-    return { error: "Rezervacija ne obstaja." };
-  }
-
-  const { error } = await admin
-    .from("appointments")
-    .update({ customer_email: trimmedEmail })
-    .eq("token", token);
-
-  if (error) {
-    return { error: error.message };
-  }
-
-  const { data: salon } = await admin
-    .from("salon_owners")
-    .select("salon_name")
-    .eq("id", appt.salon_id)
-    .maybeSingle();
-
-  // Nefatalno (try/catch) - email polje je bilo že uspešno shranjeno na
-  // termin, e-pošta pa je samo "prijetna dodatna" potrditev, isti razlog kot
-  // notifyOwnerOfBooking zgoraj.
-  try {
-    await sendBookingConfirmationEmail({
-      to: trimmedEmail,
-      salonName: salon?.salon_name ?? "Fillio",
-      service: appt.service,
-      dateLabel: dayLabel(appt.appointment_date),
-      time: appt.appointment_time,
-      manageUrl: bookingManageUrl(token),
-    });
-  } catch (e) {
-    console.error(`Napaka pri pošiljanju potrditvene e-pošte (token ${token}):`, e);
-  }
-
-  return {};
 }
 
 export async function joinWaitlist(

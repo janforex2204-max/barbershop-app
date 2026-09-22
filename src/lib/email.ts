@@ -210,11 +210,11 @@ export async function sendDailyDigest({
 }
 
 // Poslano STRANKI (ne lastniku, v nasprotju z vsemi zgornjimi funkcijami) -
-// ENKRATNA potrditvena e-pošta, ki jo stranka sama sproži na potrditveni
-// strani po rezervaciji (glej addBookingConfirmationEmail v
-// [slug]/actions.ts + opt-in polje v booking-page.tsx), če je vpisala svoj
-// email - obrazec za rezervacijo ga NE zbira. Ločeno od plačljivega Fillio
-// Pro obveščanja LASTNIKA (notification_preference, sendBookingNotification
+// ENKRATNA potrditvena e-pošta, sprožena TAKOJ ob uspešni rezervaciji (glej
+// notifyCustomerOfBooking v [slug]/actions.ts), če je stranka v obrazcu
+// vpisala email (neobvezno polje pod telefonom, glej booking-page.tsx) - ni
+// ločen opt-in korak po rezervaciji. Ločeno od plačljivega Fillio Pro
+// obveščanja LASTNIKA (notification_preference, sendBookingNotification
 // zgoraj) - to ni ponavljajoč opomnik, samo enkratna potrditev z
 // manageUrl-om do /rezervacija/[token].
 export async function sendBookingConfirmationEmail({
