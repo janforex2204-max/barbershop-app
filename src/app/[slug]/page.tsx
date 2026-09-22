@@ -16,28 +16,30 @@ export default async function SalonBookingPage({
 
   let { data: salon, error } = await supabase
     .from("public_salons")
-    .select("id, salon_name, slug, hours, category")
+    .select("id, salon_name, slug, hours, category, address")
     .eq("slug", slug)
     .maybeSingle();
 
   // Prehodna varovalka: dokler public_salons view morda še ni osvežen z
-  // `hours`/`category` stolpcema (supabase/schema.sql migracija poslana, a
-  // morda še ni zagnana - isti dejansko že videni vzorec kot pri
+  // `hours`/`category`/`address` stolpci (supabase/schema.sql migracija
+  // poslana, a morda še ni zagnana - isti dejansko že videni vzorec kot pri
   // services.price, glej pogovor s Claude), NE sme celotna stran pasti v
-  // napako samo zato, ker manjkata delovni čas/tema - poskusi še enkrat
-  // brez njiju (resolveDayWindow hours=null uporabi privzet delovni čas,
-  // resolveSalonTheme category=null uporabi privzeto temo - oboje ne kot
-  // napako).
+  // napako samo zato, ker manjkajo delovni čas/tema/naslov - poskusi še enkrat
+  // brez njih (resolveDayWindow hours=null uporabi privzet delovni čas,
+  // resolveSalonTheme category=null uporabi privzeto temo, address=null
+  // samo izpusti lokacijo iz "Dodaj v koledar" gumbov - oboje ne kot napako).
   if (error?.code === "42703") {
     console.error(
-      `[${slug}] public_salons.hours/category še ne obstajata (manjkajoča migracija) - nadaljujem s privzetim delovnim časom/temo.`
+      `[${slug}] public_salons.hours/category/address še ne obstajajo (manjkajoča migracija) - nadaljujem s privzetim delovnim časom/temo/brez naslova.`
     );
     const fallback = await supabase
       .from("public_salons")
       .select("id, salon_name, slug")
       .eq("slug", slug)
       .maybeSingle();
-    salon = fallback.data ? { ...fallback.data, hours: null, category: null } : null;
+    salon = fallback.data
+      ? { ...fallback.data, hours: null, category: null, address: null }
+      : null;
     error = fallback.error;
   }
 
@@ -63,6 +65,7 @@ export default async function SalonBookingPage({
       salonName={salon.salon_name}
       salonHours={salon.hours}
       salonCategory={salon.category}
+      salonAddress={salon.address}
     />
   );
 }

@@ -210,6 +210,7 @@ export type Database = {
           slug: string;
           hours: SalonDayHours[] | null;
           category: string | null;
+          address: string | null;
         };
         Relationships: [];
       };

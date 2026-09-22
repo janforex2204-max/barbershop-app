@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Scissors } from "lucide-react";
+import { CalendarPlus, Download, Scissors } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import ThemeToggle from "@/components/theme-toggle";
 import BarberPoleWatermark from "./barber-pole-watermark";
@@ -14,6 +14,9 @@ import {
   isValidCustomerName,
   isValidPhone,
   resolveSalonTheme,
+  buildGoogleCalendarUrl,
+  downloadIcsFile,
+  type CalendarEvent,
 } from "@/lib/constants";
 import {
   resolveDayWindow,
@@ -107,12 +110,14 @@ export default function BookingPage({
   salonName,
   salonHours,
   salonCategory,
+  salonAddress,
 }: {
   slug: string;
   salonId: string;
   salonName: string;
   salonHours: SalonDayHours[] | null;
   salonCategory: string | null;
+  salonAddress: string | null;
 }) {
   const salonTheme = resolveSalonTheme(salonCategory);
   // createClient() vrne NOV objekt ob vsakem klicu - če bi ga klicali direktno
@@ -163,6 +168,12 @@ export default function BookingPage({
   });
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  // Postavljeno po uspešni rezervaciji - prikaže potrditveno stran namesto
+  // rezervacijskega obrazca (glej spodaj), z gumboma "Dodaj v koledar".
+  // Shranimo podatke, ne samo bool, ker jih confirmedBooking prikaz/gumba
+  // potrebujeta tudi PO tem, ko selectedService/form.time zgoraj že
+  // resetiramo za morebitno naslednjo rezervacijo.
+  const [confirmedBooking, setConfirmedBooking] = useState<CalendarEvent | null>(null);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -488,6 +499,13 @@ export default function BookingPage({
     }
 
     showToast(`Termin potrjen: ${form.time} na ${dayLabel(selectedDate)}`);
+    setConfirmedBooking({
+      title: selectedService ? selectedService.name : form.service,
+      date: selectedDate,
+      time: form.time,
+      durationMinutes: selectedServiceDuration,
+      location: salonAddress ? `${salonName}, ${salonAddress}` : salonName,
+    });
     setForm((f) => ({ ...f, name: "", phone: "", time: "" }));
     loadAvailability(selectedDate);
   }
@@ -544,6 +562,41 @@ export default function BookingPage({
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-9 pb-20">
+        {confirmedBooking ? (
+          <div className="max-w-md mx-auto text-center border border-border rounded-lg p-8">
+            <h2 className="font-display text-xl font-semibold mb-1 text-cream">
+              Termin potrjen!
+            </h2>
+            <p className="text-sm text-cream-dim mb-1">{confirmedBooking.title}</p>
+            <p className="text-sm text-cream-dim mb-6">
+              {dayLabel(confirmedBooking.date)} ob {confirmedBooking.time}
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2.5">
+              <a
+                href={buildGoogleCalendarUrl(confirmedBooking)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-md border border-border text-cream text-sm font-medium cursor-pointer hover:bg-ink-soft"
+              >
+                <CalendarPlus size={16} /> Dodaj v Google koledar
+              </a>
+              <button
+                type="button"
+                onClick={() => downloadIcsFile(confirmedBooking)}
+                className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-md border border-border text-cream text-sm font-medium cursor-pointer hover:bg-ink-soft"
+              >
+                <Download size={16} /> Dodaj v Apple koledar
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setConfirmedBooking(null)}
+              className="mt-6 text-sm text-cream-faint hover:text-cream cursor-pointer underline"
+            >
+              Rezerviraj še en termin
+            </button>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-8 items-start">
           <div className="min-w-0">
             <h2 className="font-display text-xl font-semibold mb-1 text-cream">
@@ -774,6 +827,7 @@ export default function BookingPage({
             </div>
           </aside>
         </div>
+        )}
       </main>
 
       {toast && (

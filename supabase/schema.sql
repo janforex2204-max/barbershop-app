@@ -335,16 +335,17 @@ create or replace view public_availability
 
 grant select on public_availability to anon, authenticated;
 
--- Samo id/ime/slug/hours/category ODOBRENIH salonov - za razrešitev
+-- Samo id/ime/slug/hours/category/address ODOBRENIH salonov - za razrešitev
 -- /[slug] -> salon, prikaz imena na javni strani, izračun delovnega časa po
 -- dnevih (glej src/lib/availability.ts resolveDayWindow) IN izbiro barvne
 -- teme (category === "Kozmetični salon" -> spa, glej [slug]/page.tsx in
--- pogovor s Claude o data-theme="spa"). subtype/address NIKOLI izpostavljena
--- (lastnikovi interni registracijski podatki, ne za javnost) - category
--- je bila prej tudi tu, a je zdaj potrebna za temo.
+-- pogovor s Claude o data-theme="spa"). subtype OSTAJA neizpostavljen
+-- (lastnikov interni registracijski podatek, ne za javnost). address je bil
+-- prej tudi izločen, a ga stranka potrebuje za "Dodaj v koledar" gumbe na
+-- potrditveni strani (lokacija dogodka) - glej booking-page.tsx.
 create or replace view public_salons
   with (security_invoker = false) as
-  select id, salon_name, slug, hours, category
+  select id, salon_name, slug, hours, category, address
   from salon_owners
   where status = 'approved';
 

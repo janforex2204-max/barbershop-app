@@ -276,3 +276,95 @@ export function toWhatsAppPhone(phone: string): string {
 export function whatsAppLink(phone: string, message: string): string {
   return `https://wa.me/${toWhatsAppPhone(phone)}?text=${encodeURIComponent(message)}`;
 }
+
+// ---------------------------------------------------------------------------
+// "Dodaj v koledar" gumbi na potrditveni strani po uspešni rezervaciji (glej
+// booking-page.tsx) - brez zunanjega API-ja/stroška, oboje se generira samo
+// iz podatkov, ki jih rezervacija že ima (storitev/datum/ura/trajanje/naslov
+// salona). Datum+ura sta VEDNO v lokalnem času stranke, ki rezervira (isti
+// čas kot salon - gre za fizičen obisk) - spodaj ju pretvorimo v UTC "Z"
+// obliko, ki jo tako Google Calendar kot .ics razumeta ne glede na to, v
+// katerem času je odprt sam koledar.
+// ---------------------------------------------------------------------------
+export type CalendarEvent = {
+  title: string;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:MM
+  durationMinutes: number;
+  location: string | null;
+};
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+// "20260922T090000Z" - iz LOKALNIH komponent (isti vzorec kot toISODate
+// zgoraj), nato prebrano nazaj prek getUTC* - Date interno vedno hrani UTC
+// trenutek, zato to pravilno upošteva stranjkin lokalni odmik od UTC.
+function toUtcStamp(d: Date): string {
+  return (
+    `${d.getUTCFullYear()}${pad2(d.getUTCMonth() + 1)}${pad2(d.getUTCDate())}` +
+    `T${pad2(d.getUTCHours())}${pad2(d.getUTCMinutes())}${pad2(d.getUTCSeconds())}Z`
+  );
+}
+
+function eventRange(event: CalendarEvent): { start: Date; end: Date } {
+  const [hours, minutes] = event.time.split(":").map(Number);
+  const start = new Date(event.date + "T00:00:00");
+  start.setHours(hours, minutes, 0, 0);
+  const end = new Date(start.getTime() + event.durationMinutes * 60_000);
+  return { start, end };
+}
+
+export function buildGoogleCalendarUrl(event: CalendarEvent): string {
+  const { start, end } = eventRange(event);
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: event.title,
+    dates: `${toUtcStamp(start)}/${toUtcStamp(end)}`,
+  });
+  if (event.location) params.set("location", event.location);
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+// Uide vejico/podpičje/nazaj-poševnico/novo vrstico, kot zahteva iCalendar
+// (RFC 5545, 3.3.11) - brez tega bi npr. vejica v naslovu salona pretrgala
+// polje na napačnem mestu.
+function escapeIcsText(text: string): string {
+  return text.replace(/\\/g, "\\\\").replace(/[,;]/g, "\\$&").replace(/\n/g, "\\n");
+}
+
+export function buildIcsContent(event: CalendarEvent): string {
+  const { start, end } = eventRange(event);
+  const now = toUtcStamp(new Date());
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Fillio//Rezervacija//SL",
+    "CALSCALE:GREGORIAN",
+    "BEGIN:VEVENT",
+    `UID:${now}-${Math.random().toString(36).slice(2)}@fillio.si`,
+    `DTSTAMP:${now}`,
+    `DTSTART:${toUtcStamp(start)}`,
+    `DTEND:${toUtcStamp(end)}`,
+    `SUMMARY:${escapeIcsText(event.title)}`,
+    ...(event.location ? [`LOCATION:${escapeIcsText(event.location)}`] : []),
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ];
+  return lines.join("\r\n");
+}
+
+// Sproži prenos .ics datoteke - klicatelj (booking-page.tsx) to pokliče iz
+// onClick-a gumba "Dodaj v Apple koledar" (Apple/macOS/iOS nima svojega
+// spletnega "add event" URL-ja kot Google, samo odpre ponujeno .ics
+// datoteko).
+export function downloadIcsFile(event: CalendarEvent) {
+  const blob = new Blob([buildIcsContent(event)], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${event.title.replace(/[^\p{L}\p{N}]+/gu, "-")}.ics`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
