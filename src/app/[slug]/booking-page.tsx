@@ -545,17 +545,23 @@ export default function BookingPage({
     <div data-theme={salonTheme} className="relative min-h-screen bg-ink font-sans">
       {slug === BARBER_POLE_WATERMARK_SLUG && <BarberPoleWatermark />}
       <header className="relative border-b border-border px-6 py-7">
-        <div className="max-w-4xl mx-auto flex items-center">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Scissors size={22} className="text-gold" />
             <h1 className="font-display text-2xl font-semibold tracking-tight text-cream">
               {salonName}
             </h1>
-            {/* Osebni preklop svetlo/temno nima učinka, ko je tema salona
-                vsiljena prek data-theme zgoraj (nižje v drevesu vedno
-                zmaga) - gumb bi bil samo zavajajoč mrtev kontrolnik. */}
-            {!salonTheme && <ThemeToggle />}
           </div>
+          {/* Ločeno od naslova salona, v zgornjem desnem kotu - z lastnim
+              robom/ozadjem (namesto privzetega diskretnega videza drugod, glej
+              theme-toggle.tsx), da je na tej JAVNI strani na prvi pogled jasno
+              klikljiv gumb, ne le dekorativna ikona ob imenu. Osebni preklop
+              svetlo/temno nima učinka, ko je tema salona vsiljena prek
+              data-theme zgoraj (nižje v drevesu vedno zmaga) - gumb bi bil
+              samo zavajajoč mrtev kontrolnik. */}
+          {!salonTheme && (
+            <ThemeToggle className="border border-border bg-ink-field" />
+          )}
           {/* Povezava na /owner ("Nadzorna plošča") je bila tu odstranjena -
               ta stran je JAVNA, namenjena strankam, ne lastniku salona. */}
         </div>
