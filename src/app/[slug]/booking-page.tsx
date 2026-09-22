@@ -95,7 +95,7 @@ function groupServicesByCategory(
 }
 
 type BookingForm = { name: string; phone: string; email: string; service: string; time: string };
-type WaitForm = { name: string; phone: string; service: string };
+type WaitForm = { name: string; phone: string; email: string; service: string };
 
 // Vodni žig samo za ta konkreten salon (glej barber-pole-watermark.tsx) - ne
 // splošna platformska funkcija, zato preverjamo dobesedni slug, ne kake
@@ -171,6 +171,7 @@ export default function BookingPage({
   const [waitForm, setWaitForm] = useState<WaitForm>({
     name: "",
     phone: "",
+    email: "",
     service: "vseeno",
   });
   const [submitting, setSubmitting] = useState(false);
@@ -573,10 +574,15 @@ export default function BookingPage({
       showToast("Vnesi veljavno telefonsko številko (npr. 040 123 456).");
       return;
     }
+    if (waitForm.email && !isValidEmail(waitForm.email)) {
+      showToast("Email naslov ni veljaven (ali pusti polje prazno).");
+      return;
+    }
     setSubmitting(true);
     const { error } = await joinWaitlistAction(slug, {
       name: waitForm.name,
       phone: waitForm.phone,
+      email: waitForm.email || undefined,
       service: waitForm.service,
       date: selectedDate,
     });
@@ -587,7 +593,7 @@ export default function BookingPage({
       return;
     }
 
-    setWaitForm({ name: "", phone: "", service: "vseeno" });
+    setWaitForm({ name: "", phone: "", email: "", service: "vseeno" });
     showToast("Obvestili te bomo, če se kaj sprosti.");
   }
 
@@ -866,6 +872,16 @@ export default function BookingPage({
                   onChange={(e) => setWaitForm((f) => ({ ...f, phone: e.target.value }))}
                   className={inputClass}
                 />
+                <input
+                  type="email"
+                  placeholder="E-pošta (neobvezno)"
+                  value={waitForm.email}
+                  onChange={(e) => setWaitForm((f) => ({ ...f, email: e.target.value }))}
+                  className={inputClass}
+                />
+                <p className="text-xs text-cream-faint -mt-1.5 mb-2.5">
+                  Neobvezno — uporabimo jo za obvestilo, če ne uporabljate WhatsAppa.
+                </p>
                 <select
                   value={waitForm.service}
                   onChange={(e) => setWaitForm((f) => ({ ...f, service: e.target.value }))}

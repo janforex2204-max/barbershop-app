@@ -111,6 +111,9 @@ export type Database = {
           created_at: string;
           // Samo za rate limiting (glej src/lib/rate-limit.ts).
           ip_address: string | null;
+          // Neobvezno - dodatni kanal za "Pošlji obvestilo" na /owner (glej
+          // owner/actions.ts sendWaitlistNotification).
+          customer_email: string | null;
         };
         Insert: {
           id?: string;
@@ -122,6 +125,7 @@ export type Database = {
           barber_name?: string;
           created_at?: string;
           ip_address?: string | null;
+          customer_email?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["waitlist"]["Insert"]>;
         Relationships: [];

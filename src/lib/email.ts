@@ -256,3 +256,46 @@ export async function sendBookingConfirmationEmail({
     `
   );
 }
+
+// Poslano STRANKI na čakalni listi (glej waitlist.customer_email - neobvezno
+// polje v obrazcu "Obvestite me, ko se sprosti termin", booking-page.tsx),
+// ko lastnik na /owner ročno klikne "Pošlji obvestilo" (glej
+// sendWaitlistNotification v owner/actions.ts) - poleg WhatsApp sporočila
+// (isti klik odpre oboje). `service` je izpuščen, če je stranka izbrala
+// "vseeno katera storitev" (glej klicno mesto).
+export async function sendWaitlistNotificationEmail({
+  to,
+  salonName,
+  service,
+  bookingUrl,
+}: {
+  to: string;
+  salonName: string;
+  service: string | null;
+  bookingUrl: string;
+}) {
+  const safeSalon = escapeHtml(salonName);
+  const safeService = service ? escapeHtml(service) : null;
+  const serviceLine = safeService ? ` za ${safeService}` : "";
+
+  await sendPlatformEmail(
+    to,
+    `Sprostil se je termin - ${salonName}`,
+    `Morda se je sprostil termin${serviceLine} pri ${salonName}.\n\nPreveri proste termine in rezerviraj: ${bookingUrl}`,
+    `
+      <div style="font-family:system-ui,sans-serif;max-width:420px;margin:0 auto;">
+        <p style="font-size:15px;color:#1b1815;">
+          Morda se je sprostil termin${serviceLine} pri <b>${safeSalon}</b>.
+        </p>
+        <p style="font-size:14px;color:#1b1815;margin:0 0 20px;">
+          Preveri proste termine in rezerviraj, dokler je še na voljo.
+        </p>
+        <a href="${bookingUrl}"
+           style="display:inline-block;background:#8C2F2F;color:#EFE6D8;text-decoration:none;
+                  padding:12px 20px;border-radius:6px;font-size:14px;font-weight:600;">
+          Rezerviraj termin
+        </a>
+      </div>
+    `
+  );
+}

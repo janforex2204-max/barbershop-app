@@ -12,12 +12,14 @@ import {
   whatsAppLink,
   bookingManageUrl,
   resolveSalonTheme,
+  PLATFORM_URL,
 } from "@/lib/constants";
 import AppointmentsHeader from "./appointments-header";
 import NotificationsPanel from "./notifications-panel";
 import NotificationSettings from "./notification-settings";
 import MonthCalendar from "./month-calendar";
 import WaitlistOffer from "./waitlist-offer";
+import WaitlistNotifyButton from "./waitlist-notify-button";
 import PoweredBy from "@/components/powered-by";
 import ThemeToggle from "@/components/theme-toggle";
 import {
@@ -50,7 +52,7 @@ export default async function OwnerDashboard({
   // (my_salon_id() v shemi) je neodvisen, strežniški backstop za isto mejo.
   const { data: ownerRow } = await supabase
     .from("salon_owners")
-    .select("id, salon_name, status, plan, hours, category")
+    .select("id, salon_name, slug, status, plan, hours, category")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -90,6 +92,9 @@ export default async function OwnerDashboard({
 
   const salonId = ownerRow.id;
   const salonName = ownerRow.salon_name;
+  // Za "Pošlji obvestilo" (glej WaitlistNotifyButton spodaj) - povezava, kjer
+  // lahko čakajoča stranka takoj vidi proste termine in rezervira.
+  const bookingUrl = `${PLATFORM_URL}/${ownerRow.slug}`;
 
   // Ločena, izolirana poizvedba - dokler migracija (supabase/schema.sql) za
   // notification_preference morda še ni pognana v produkciji, ta stolpec
@@ -259,12 +264,13 @@ export default async function OwnerDashboard({
                       <span className="text-cream-faint ml-2">
                         {w.customer_phone}
                       </span>
+                      <div className="text-gold text-xs mt-0.5">
+                        {w.service_preference === "vseeno"
+                          ? "Vseeno katera storitev"
+                          : w.service_preference}
+                      </div>
                     </div>
-                    <div className="text-gold text-xs">
-                      {w.service_preference === "vseeno"
-                        ? "Vseeno katera storitev"
-                        : w.service_preference}
-                    </div>
+                    <WaitlistNotifyButton entry={w} bookingUrl={bookingUrl} />
                   </div>
                 ))}
               </div>

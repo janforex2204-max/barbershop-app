@@ -6,6 +6,8 @@ import { revalidatePath, updateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyAffectedCustomersOfCancellation } from "@/lib/cancellation";
+import { sendWaitlistNotificationEmail } from "@/lib/email";
+import { PLATFORM_URL } from "@/lib/constants";
 import { OWNER_CALENDAR_TAG } from "./cached-queries";
 import { translateAuthError } from "@/lib/auth-errors";
 import {
@@ -86,6 +88,57 @@ export async function markSmsSent(logId: string) {
 
   updateTag(OWNER_CALENDAR_TAG);
   revalidatePath("/owner");
+}
+
+// Kliče se OB ISTEM kliku kot odprtje WhatsApp sporočila (glej
+// WaitlistNotifyButton na owner/page.tsx) - SAMO pošlje email, WhatsApp gre
+// neposredno prek wa.me linka na klientu, brez strežnika. Nefatalno vrne
+// napako namesto da vrže - WhatsApp se je že odprl, klicatelj napako samo
+// prikaže kot dodatno opozorilo, ne kot popoln neuspeh akcije.
+//
+// waitlistId (ne surovi email/ime/storitev) je NAMENOMA edini parameter -
+// isti razlog kot markSmsSent zgoraj: Server Action je dosegljiv z
+// neposrednim POST-om mimo UI-ja, zato mora vsebino vedno sam prebrati iz
+// baze (RLS: waitlist_owner_full_access že omeji na klicateljev lasten
+// salon), ne zaupati temu, kar bi (ne glede na to od kod) poslal klient.
+export async function sendWaitlistNotification(
+  waitlistId: string
+): Promise<{ error?: string }> {
+  const supabase = await createClient();
+
+  const { data: entry } = await supabase
+    .from("waitlist")
+    .select("customer_email, service_preference, salon_id")
+    .eq("id", waitlistId)
+    .maybeSingle();
+
+  if (!entry?.customer_email) {
+    return {};
+  }
+
+  const { data: owner } = await supabase
+    .from("salon_owners")
+    .select("salon_name, slug")
+    .eq("id", entry.salon_id)
+    .maybeSingle();
+
+  if (!owner) {
+    return {};
+  }
+
+  try {
+    await sendWaitlistNotificationEmail({
+      to: entry.customer_email,
+      salonName: owner.salon_name,
+      service: entry.service_preference === "vseeno" ? null : entry.service_preference,
+      bookingUrl: `${PLATFORM_URL}/${owner.slug}`,
+    });
+  } catch (e) {
+    console.error(`Napaka pri pošiljanju obvestila o prostem terminu (${waitlistId}):`, e);
+    return { error: "E-pošta ni bila poslana - WhatsApp sporočilo je bilo odprto." };
+  }
+
+  return {};
 }
 
 export type ManualBookingState = {

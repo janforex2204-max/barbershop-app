@@ -364,13 +364,18 @@ export async function addBookingConfirmationEmail(
 
 export async function joinWaitlist(
   slug: string,
-  input: { name: string; phone: string; service: string; date: string }
+  input: { name: string; phone: string; email?: string; service: string; date: string }
 ): Promise<{ error?: string }> {
   if (!isValidCustomerName(input.name)) {
     return { error: "Vnesi ime in priimek (vsaj 3 znaki, npr. \"Jan Novak\")." };
   }
   if (!isValidPhone(input.phone)) {
     return { error: "Vnesi veljavno telefonsko številko (npr. 040 123 456)." };
+  }
+  // Neobvezno polje - isti vzorec kot email v bookAppointment zgoraj.
+  const email = input.email?.trim() || null;
+  if (email && !isValidEmail(email)) {
+    return { error: "Email naslov ni veljaven (ali pusti polje prazno)." };
   }
 
   const supabase = await createClient();
@@ -390,6 +395,7 @@ export async function joinWaitlist(
     salon_id: salonId,
     customer_name: input.name,
     customer_phone: input.phone,
+    customer_email: email,
     preferred_date: input.date,
     service_preference: input.service,
     ip_address: ip,

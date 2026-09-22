@@ -240,6 +240,14 @@ alter table waitlist add column if not exists ip_address inet;
 create index if not exists waitlist_phone_created_idx on waitlist (customer_phone, created_at);
 create index if not exists waitlist_ip_created_idx on waitlist (ip_address, created_at) where ip_address is not null;
 
+-- Neobvezno polje v obrazcu "Obvestite me, ko se sprosti termin" (glej
+-- booking-page.tsx) - dodatni kanal poleg WhatsAppa, ko lastnik na /owner
+-- klikne "Pošlji obvestilo" (glej WaitlistNotifyButton + sendWaitlistNotification
+-- v owner/actions.ts) - če je izpolnjeno, se poleg WhatsApp sporočila pošlje
+-- tudi kratka e-pošta prek Resend (sendWaitlistNotificationEmail v
+-- src/lib/email.ts).
+alter table waitlist add column if not exists customer_email text;
+
 -- ---------------------------------------------------------------------------
 -- SMS OBVESTILA (log tega, kar bo kasneje pošiljal Twilio)
 -- ---------------------------------------------------------------------------
