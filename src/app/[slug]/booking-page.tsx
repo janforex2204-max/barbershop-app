@@ -880,7 +880,7 @@ export default function BookingPage({
                   className={inputClass}
                 />
                 <p className="text-xs text-cream-faint -mt-1.5 mb-2.5">
-                  Neobvezno — uporabimo jo za obvestilo, če ne uporabljate WhatsAppa.
+                  Priporočeno — preko e-pošte vas obvestimo, če se termin sprosti.
                 </p>
                 <select
                   value={waitForm.service}
