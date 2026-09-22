@@ -787,12 +787,12 @@ export default function BookingPage({
               termin), da stranka vedno vidi, kaj je že izbrala. Na mobilnem
               (pod lg:) grid pade na eno kolono in se prikaže POD glavnim
               tokom (naraven DOM vrstni red), ne nad njim - gre za povzetek
-              PRED oddajo, ne za uvodno usmerjanje. top-16 namesto top-8, da
+              PRED oddajo, ne za uvodno usmerjanje. top-24 namesto top-8, da
               ne lepi tik ob robu zaslona (glej pogovor s Claude - poskus s
               samodejnim "odlepljanjem" ob dnu strani je delal opazen skok, ko
               je zmanjkalo prostora za sticky - raje preprost, ves čas
               prilepljen panel z malo več zgornjega odmika). */}
-          <aside className="border border-border rounded-lg p-5 lg:sticky lg:top-16">
+          <aside className="border border-border rounded-lg p-5 lg:sticky lg:top-24">
             <h2 className="font-display text-lg font-semibold mb-4 text-cream">
               Pregled termina
             </h2>
