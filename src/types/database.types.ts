@@ -74,6 +74,11 @@ export type Database = {
           // POSNETEK trajanja izbrane storitve ob rezervaciji (ne živa FK na
           // services.duration_minutes) - glej src/lib/availability.ts.
           duration_minutes: number | null;
+          // Kriptografsko naključen, neuganljiv - avtorizacija za
+          // /rezervacija/[token] (glej supabase/schema.sql).
+          token: string;
+          // Neobvezen, doda se ŠELE po rezervaciji (glej booking-page.tsx).
+          customer_email: string | null;
         };
         Insert: {
           id?: string;
@@ -88,6 +93,8 @@ export type Database = {
           created_at?: string;
           ip_address?: string | null;
           duration_minutes?: number | null;
+          token: string;
+          customer_email?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["appointments"]["Insert"]>;
         Relationships: [];

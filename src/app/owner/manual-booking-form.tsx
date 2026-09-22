@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { MessageCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { dayLabel, todayISO, whatsAppLink } from "@/lib/constants";
+import { dayLabel, todayISO, whatsAppLink, bookingManageUrl } from "@/lib/constants";
 import {
   resolveDayWindow,
   computeFreeSlots,
@@ -188,7 +188,8 @@ export default function ManualBookingForm({
               state.booked.phone,
               `Pozdravljen/a ${state.booked.name}, tvoja rezervacija je potrjena: ${dayLabel(
                 state.booked.date
-              )} ob ${state.booked.time}, ${state.booked.service} - ${state.booked.salonName}`
+              )} ob ${state.booked.time}, ${state.booked.service} - ${state.booked.salonName}. ` +
+                `Upravljaj svojo rezervacijo: ${bookingManageUrl(state.booked.token)}`
             )}
             target="_blank"
             rel="noopener noreferrer"

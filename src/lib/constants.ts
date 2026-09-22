@@ -308,10 +308,19 @@ function toUtcStamp(d: Date): string {
   );
 }
 
+// Lokalni Date iz ločenih "YYYY-MM-DD" + "HH:MM" polj (isti vzorec kot
+// toISODate/todayISO zgoraj - NIKOLI prek enotnega ISO stringa z "Z", da se
+// izognemo UTC-premiku). Skupna gradnja za eventRange spodaj IN
+// isPastCancellationDeadline (glej ta pogovor s Claude o /rezervacija/[token]).
+export function appointmentDateTime(date: string, time: string): Date {
+  const [hours, minutes] = time.split(":").map(Number);
+  const d = new Date(date + "T00:00:00");
+  d.setHours(hours, minutes, 0, 0);
+  return d;
+}
+
 function eventRange(event: CalendarEvent): { start: Date; end: Date } {
-  const [hours, minutes] = event.time.split(":").map(Number);
-  const start = new Date(event.date + "T00:00:00");
-  start.setHours(hours, minutes, 0, 0);
+  const start = appointmentDateTime(event.date, event.time);
   const end = new Date(start.getTime() + event.durationMinutes * 60_000);
   return { start, end };
 }
@@ -367,4 +376,38 @@ export function downloadIcsFile(event: CalendarEvent) {
   a.download = `${event.title.replace(/[^\p{L}\p{N}]+/gu, "-")}.ics`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// ---------------------------------------------------------------------------
+// Rok za odpoved/prenaročanje termina (glej /rezervacija/[token] in pogovor s
+// Claude) - trenutno FIKSEN in ENAK za vse salone, namenoma trdo kodiran (ni
+// UI nastavitve po salonu - glej ZNANE_OMEJITVE.md "Rok za odpoved/
+// prenaročanje"). Velja TAKO za stranko (rezervacija/[token]/actions.ts) KOT
+// za lastnikovo cancelAppointment (owner/actions.ts) - isti prag za oba.
+// ---------------------------------------------------------------------------
+export const CANCELLATION_NOTICE_HOURS = 3;
+
+// true, če je do začetka termina manj kot CANCELLATION_NOTICE_HOURS ur (ali
+// je termin že minil) - odpoved/prenaročanje takrat ni več mogoče.
+export function isPastCancellationDeadline(date: string, time: string): boolean {
+  const apptTime = appointmentDateTime(date, time).getTime();
+  const deadline = apptTime - CANCELLATION_NOTICE_HOURS * 60 * 60 * 1000;
+  return Date.now() >= deadline;
+}
+
+// Javna povezava, s katero stranka upravlja svoj termin (glej
+// src/app/rezervacija/[token]/) - uporabljena v WhatsApp sporočilih
+// (manual-booking-form.tsx, owner/page.tsx "Pošlji opomnik"), potrditveni
+// e-pošti (src/lib/email.ts) IN na sami potrditveni strani (booking-page.tsx,
+// gumb "Kopiraj povezavo").
+export function bookingManageUrl(token: string): string {
+  return `${PLATFORM_URL}/rezervacija/${token}`;
+}
+
+// Namenoma ohlapno (samo "nekaj@nekaj.nekaj") - dovolj za zavrnitev OČITNO
+// nepopolnega vnosa na opt-in polju za potrditveno e-pošto (glej
+// booking-page.tsx), ne polna RFC 5322 validacija (Resend bo tako ali tako
+// zavrnil dejansko neobstoječ naslov ob pošiljanju).
+export function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }

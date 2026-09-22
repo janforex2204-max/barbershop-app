@@ -1,10 +1,17 @@
 "use server";
 
+import { randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
-import { dayLabel, isValidCustomerName, isValidPhone } from "@/lib/constants";
-import { sendBookingNotification } from "@/lib/email";
+import {
+  dayLabel,
+  isValidCustomerName,
+  isValidPhone,
+  isValidEmail,
+  bookingManageUrl,
+} from "@/lib/constants";
+import { sendBookingNotification, sendBookingConfirmationEmail } from "@/lib/email";
 import {
   resolveDayWindow,
   isSlotAvailable,
@@ -120,7 +127,7 @@ async function notifyOwnerOfBooking(
 export async function bookAppointment(
   slug: string,
   input: { name: string; phone: string; service: string; date: string; time: string }
-): Promise<{ error?: string }> {
+): Promise<{ error?: string; token?: string }> {
   // Server Action je dosegljiv z neposrednim POST-om mimo UI-ja, zato se ne
   // zanašamo samo na validacijo v booking-page.tsx (glej isValidCustomerName/
   // isValidPhone v src/lib/constants.ts za pravili in razlago).
@@ -200,6 +207,11 @@ export async function bookAppointment(
     return { error: "Ta termin ni več na voljo za izbrano storitev. Izberi drugega." };
   }
 
+  // Isti vzorec kot salon_owners.approval_token (admin/approve/route.ts) -
+  // glej supabase/schema.sql za polno razlago. Avtorizacija za
+  // /rezervacija/[token] (glej ta pogovor s Claude).
+  const token = randomBytes(32).toString("hex");
+
   let { error } = await supabase.from("appointments").insert({
     salon_id: salonId,
     customer_name: input.name,
@@ -210,6 +222,7 @@ export async function bookAppointment(
     duration_minutes: durationMinutes,
     status: "booked",
     ip_address: ip,
+    token,
   });
 
   // KRITIČNA varovalka - če appointments.duration_minutes migracija še ni
@@ -232,6 +245,7 @@ export async function bookAppointment(
       appointment_time: input.time,
       status: "booked",
       ip_address: ip,
+      token,
     });
     error = fallback.error;
   }
@@ -244,6 +258,66 @@ export async function bookAppointment(
   }
 
   await notifyOwnerOfBooking(salonId, input);
+
+  return { token };
+}
+
+// Klicano iz potrditvene strani (booking-page.tsx), NE iz obrazca za
+// rezervacijo - ta email ne zbira e-pošte (glej pogovor s Claude). Token JE
+// avtorizacija (isti vzorec kot resolveSalonId/notifyOwnerOfBooking zgoraj -
+// admin klient, ker anon nima UPDATE pravice na appointments), zato tu ni
+// dodatnega preverjanja "lastništva" - kdorkoli pozna svoj lasten,
+// neuganljiv token.
+export async function addBookingConfirmationEmail(
+  token: string,
+  email: string
+): Promise<{ error?: string }> {
+  const trimmedEmail = email.trim();
+  if (!isValidEmail(trimmedEmail)) {
+    return { error: "Vnesi veljaven email naslov." };
+  }
+
+  const admin = createAdminClient();
+  const { data: appt } = await admin
+    .from("appointments")
+    .select("salon_id, service, appointment_date, appointment_time")
+    .eq("token", token)
+    .maybeSingle();
+
+  if (!appt) {
+    return { error: "Rezervacija ne obstaja." };
+  }
+
+  const { error } = await admin
+    .from("appointments")
+    .update({ customer_email: trimmedEmail })
+    .eq("token", token);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  const { data: salon } = await admin
+    .from("salon_owners")
+    .select("salon_name")
+    .eq("id", appt.salon_id)
+    .maybeSingle();
+
+  // Nefatalno (try/catch) - email polje je bilo že uspešno shranjeno na
+  // termin, e-pošta pa je samo "prijetna dodatna" potrditev, isti razlog kot
+  // notifyOwnerOfBooking zgoraj.
+  try {
+    await sendBookingConfirmationEmail({
+      to: trimmedEmail,
+      salonName: salon?.salon_name ?? "Fillio",
+      service: appt.service,
+      dateLabel: dayLabel(appt.appointment_date),
+      time: appt.appointment_time,
+      manageUrl: bookingManageUrl(token),
+    });
+  } catch (e) {
+    console.error(`Napaka pri pošiljanju potrditvene e-pošte (token ${token}):`, e);
+  }
 
   return {};
 }

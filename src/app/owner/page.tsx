@@ -10,6 +10,7 @@ import {
   monthRange,
   nextBusinessDayAfterToday,
   whatsAppLink,
+  bookingManageUrl,
   resolveSalonTheme,
 } from "@/lib/constants";
 import AppointmentsHeader from "./appointments-header";
@@ -350,7 +351,9 @@ export default async function OwnerDashboard({
           )}
           {tomorrowAppointments?.map((a) => {
             const intro = isLiterallyTomorrow ? "jutri" : dayLabel(nextBizDay);
-            const reminderMessage = `Opomnik: ${intro} ob ${a.appointment_time} imaš rezervacijo za ${a.service} - ${salonName}. Se vidimo!`;
+            const reminderMessage =
+              `Opomnik: ${intro} ob ${a.appointment_time} imaš rezervacijo za ${a.service} - ${salonName}. Se vidimo! ` +
+              `Upravljaj svojo rezervacijo: ${bookingManageUrl(a.token)}`;
             return (
               <div
                 key={a.id}

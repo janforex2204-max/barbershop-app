@@ -163,6 +163,34 @@ create index if not exists appointments_salon_date_idx on appointments (salon_id
 -- verjetno že obstaja.
 alter table appointments add column if not exists ip_address inet;
 
+-- Kriptografsko naključen, neuganljiv token za /rezervacija/[token] (glej
+-- src/app/rezervacija/[token]/ - stranka od tu naprej sama upravlja svoj
+-- termin: vidi podrobnosti, odpove, prenaroči). Generira ga bookAppointment
+-- ([slug]/actions.ts) in addManualAppointment (owner/actions.ts) prek
+-- crypto.randomBytes(32).toString("hex") - ISTI vzorec kot salon_owners.
+-- approval_token (glej pogovor s Claude o admin/approve/route.ts), samo
+-- ločena tabela. Token JE avtorizacija - stran ga bere prek admin
+-- (service_role) klienta, mimo RLS, saj anon nima SELECT/UPDATE pravice na
+-- appointments (glej "appointments: anon lahko samo doda" spodaj); varnost
+-- ni v RLS, ampak v tem, da tokena ni mogoče uganiti.
+-- pgcrypto za gen_random_bytes() spodaj (backfill obstoječih vrstic) -
+-- Supabase projekti ga skoraj vedno že imajo omogočenega, "if not exists" pa
+-- naredi to varno ponovljivo, če ga slučajno ni.
+create extension if not exists pgcrypto;
+
+alter table appointments add column if not exists token text;
+update appointments set token = encode(gen_random_bytes(32), 'hex') where token is null;
+alter table appointments alter column token set not null;
+create unique index if not exists appointments_token_idx on appointments (token);
+
+-- Neobvezen email, ki ga stranka lahko doda ŠELE PO rezervaciji, na sami
+-- potrditveni strani (glej booking-page.tsx + addBookingConfirmationEmail v
+-- [slug]/actions.ts) - obrazec za rezervacijo ga NE zbira. Ob vnosu se pošlje
+-- ENKRATNA potrditvena e-pošta (glej sendBookingConfirmationEmail v
+-- src/lib/email.ts) - ločeno od plačljivega Fillio Pro obveščanja lastnika
+-- (notification_preference zgoraj), ki gre lastniku, ne stranki.
+alter table appointments add column if not exists customer_email text;
+
 -- Podpirata poizvedbi v src/lib/rate-limit.ts (štetje rezervacij po
 -- telefonu/IP v zadnjem časovnem oknu) - namenoma GLOBALNA, čez vse salone,
 -- zato brez salon_id.

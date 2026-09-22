@@ -1,11 +1,11 @@
 "use server";
 
+import { randomBytes } from "crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath, updateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { toWhatsAppPhone } from "@/lib/constants";
-import { isTwilioConfigured, sendSms } from "@/lib/sms";
+import { notifyAffectedCustomersOfCancellation } from "@/lib/cancellation";
 import { OWNER_CALENDAR_TAG } from "./cached-queries";
 import { translateAuthError } from "@/lib/auth-errors";
 import {
@@ -37,17 +37,19 @@ export async function logout() {
   redirect("/owner/login");
 }
 
-// Odpove termin in poišče stranke, ki jih je smiselno obvestiti o sprostitvi,
-// v dveh ločenih skupinah (vsaka s svojim sporočilom):
-// 1. stranke, ki imajo isti dan že rezerviran kasnejši termin za ISTO
-//    storitev - lahko bi prišle prej;
-// 2. ljudje na seznamu "Obvesti me", ki so izbrali to storitev (ali "vseeno").
+// Odpove termin in poišče stranke, ki jih je smiselno obvestiti o sprostitvi
+// (glej notifyAffectedCustomersOfCancellation v src/lib/cancellation.ts - ISTA
+// funkcija, ki jo kliče tudi stranka sama prek /rezervacija/[token], da
+// obveščanje čakajočih deluje enako ne glede na to, KDO je odpovedal).
+//
+// CANCELLATION_NOTICE_HOURS prag (glej src/lib/constants.ts) NAMENOMA velja
+// SAMO za stranko (rezervacija/[token]/actions.ts) - lastnik tu ostaja BREZ
+// časovne omejitve, kot je bilo prej (eksplicitna zahteva, glej pogovor s
+// Claude - lastnik mora vedno lahko odpove, npr. bolezen tik pred terminom).
 //
 // Izolacija med saloni: appointments/waitlist RLS (salon_id = my_salon_id())
-// poskrbi, da VSE poizvedbe spodaj že same po sebi vidijo samo vrstice
-// klicateljevega lastnega salona - eksplicitnega filtra po salon_id tu ni
-// treba dodajati (edina izjema je INSERT v sms_notifications, kjer moramo
-// salon_id sami nastaviti - glej appt.salon_id spodaj).
+// poskrbi, da poizvedba spodaj že sama po sebi vidi samo vrstice
+// klicateljevega lastnega salona.
 export async function cancelAppointment(appointmentId: string) {
   const supabase = await createClient();
 
@@ -64,94 +66,7 @@ export async function cancelAppointment(appointmentId: string) {
     .update({ status: "cancelled" })
     .eq("id", appointmentId);
 
-  const { data: laterSameService } = await supabase
-    .from("appointments")
-    .select("customer_name, customer_phone")
-    .eq("appointment_date", appt.appointment_date)
-    .eq("service", appt.service)
-    .neq("id", appointmentId)
-    .neq("status", "cancelled")
-    .gt("appointment_time", appt.appointment_time);
-
-  const earlierSlotSeen = new Set<string>();
-  const earlierSlotMatches = (laterSameService ?? []).filter((a) => {
-    if (earlierSlotSeen.has(a.customer_phone)) return false;
-    earlierSlotSeen.add(a.customer_phone);
-    return true;
-  });
-
-  // Ordered po created_at (prvi prijavljen na čakalno listo je prvi v
-  // seznamu) - uporablja tudi owner/page.tsx za prikaz prioritete v gumbu
-  // "Ponudi ta termin", zato mora biti vrstni red tu deterministen.
-  const { data: waitMatches } = await supabase
-    .from("waitlist")
-    .select("*")
-    .eq("preferred_date", appt.appointment_date)
-    .in("service_preference", ["vseeno", appt.service])
-    .order("created_at", { ascending: true });
-
-  const waitlistSeen = new Set<string>();
-  const waitlistMatches = (waitMatches ?? []).filter((w) => {
-    if (waitlistSeen.has(w.customer_phone)) return false;
-    waitlistSeen.add(w.customer_phone);
-    return true;
-  });
-
-  const newLogs = [
-    ...earlierSlotMatches.map((a) => ({
-      salon_id: appt.salon_id,
-      recipient_name: a.customer_name,
-      recipient_phone: a.customer_phone,
-      message: `Sprostil se je zgodnejši termin ob ${appt.appointment_time} - bi rad prišel prej?`,
-      reason: "earlier_slot" as const,
-      appointment_id: appointmentId,
-      appointment_date: appt.appointment_date,
-    })),
-    ...waitlistMatches.map((w) => ({
-      salon_id: appt.salon_id,
-      recipient_name: w.customer_name,
-      recipient_phone: w.customer_phone,
-      message: `Sprostil se je termin za ${appt.service} ob ${appt.appointment_time} - se želiš rezervirati?`,
-      reason: "waitlist" as const,
-      appointment_id: appointmentId,
-      appointment_date: appt.appointment_date,
-    })),
-  ];
-
-  if (newLogs.length > 0) {
-    // Fillio Pro: če je salon na 'pro' planu IN je Twilio dejansko
-    // konfiguriran (glej src/lib/sms.ts), poskusi vsako obvestilo poslati
-    // TAKOJ prek SMS in ga zapiši že kot 'sent'/'failed' - lastniku ni treba
-    // ničesar ročno klikati. Free plan (ali 'pro' brez povezanega Twilia)
-    // ostane pri obstoječem toku: vrstica ostane 'pending', lastnik jo
-    // ročno pošlje prek WhatsApp gumba v zavihku "Ročno".
-    let autoSend = false;
-    if (isTwilioConfigured()) {
-      const { data: owner } = await supabase
-        .from("salon_owners")
-        .select("plan")
-        .eq("id", appt.salon_id)
-        .maybeSingle();
-      autoSend = owner?.plan === "pro";
-    }
-
-    if (autoSend) {
-      for (const log of newLogs) {
-        const to = "+" + toWhatsAppPhone(log.recipient_phone);
-        const { ok, error } = await sendSms(to, log.message);
-        if (!ok) {
-          console.error(`Samodejni SMS ni uspel (${log.recipient_phone}):`, error);
-        }
-        await supabase.from("sms_notifications").insert({
-          ...log,
-          status: ok ? "sent" : "failed",
-          auto_sent: true,
-        });
-      }
-    } else {
-      await supabase.from("sms_notifications").insert(newLogs);
-    }
-  }
+  await notifyAffectedCustomersOfCancellation(supabase, appt);
 
   updateTag(OWNER_CALENDAR_TAG);
   revalidatePath("/owner");
@@ -183,6 +98,7 @@ export type ManualBookingState = {
     time: string;
     service: string;
     salonName: string;
+    token: string;
   };
 };
 
@@ -281,6 +197,10 @@ export async function addManualAppointment(
     return { error: "Ta termin se prekriva z drugo rezervacijo. Izberi drugega." };
   }
 
+  // Isti vzorec kot bookAppointment v [slug]/actions.ts - glej
+  // supabase/schema.sql za razlago (avtorizacija za /rezervacija/[token]).
+  const token = randomBytes(32).toString("hex");
+
   let { error } = await supabase.from("appointments").insert({
     salon_id: ownerRow.id,
     customer_name,
@@ -290,6 +210,7 @@ export async function addManualAppointment(
     appointment_time,
     duration_minutes: durationMinutes,
     status: "booked",
+    token,
   });
 
   // Ista KRITIČNA varovalka kot v [slug]/actions.ts bookAppointment - brez
@@ -304,6 +225,7 @@ export async function addManualAppointment(
       appointment_date,
       appointment_time,
       status: "booked",
+      token,
     });
     error = fallback.error;
   }
@@ -326,6 +248,7 @@ export async function addManualAppointment(
       time: appointment_time,
       service,
       salonName: ownerRow.salon_name,
+      token,
     },
   };
 }

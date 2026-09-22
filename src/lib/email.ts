@@ -73,13 +73,13 @@ export async function notifyNewRegistration({
   }
 }
 
-// Skupna pomožna funkcija za spodnji dve - isti graceful-skip (manjkajoč
-// RESEND_API_KEY ne sme podreti rezervacije/crona) in isto obravnavo napak
-// kot notifyNewRegistration zgoraj.
-async function sendOwnerEmail(to: string, subject: string, text: string, html: string) {
+// Skupna pomožna funkcija za spodnje tri (lastniku IN stranki) - isti
+// graceful-skip (manjkajoč RESEND_API_KEY ne sme podreti rezervacije/crona)
+// in isto obravnavo napak kot notifyNewRegistration zgoraj.
+async function sendPlatformEmail(to: string, subject: string, text: string, html: string) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    console.warn("RESEND_API_KEY ni nastavljen - email lastniku preskočen.");
+    console.warn(`RESEND_API_KEY ni nastavljen - email (${to}) preskočen.`);
     return;
   }
 
@@ -132,7 +132,7 @@ export async function sendBookingNotification({
   const safeSalon = escapeHtml(salonName);
   const safeDate = escapeHtml(dateLabel);
 
-  await sendOwnerEmail(
+  await sendPlatformEmail(
     to,
     `Nova rezervacija - ${dateLabel} ob ${time}`,
     `Nova rezervacija za ${salonName}:\n\n${customerName} (${customerPhone})\n${service}\n${dateLabel} ob ${time}\n\nOglej si nadzorno ploščo: ${PLATFORM_URL}/owner`,
@@ -191,7 +191,7 @@ export async function sendDailyDigest({
             .join("")}
         </table>`;
 
-  await sendOwnerEmail(
+  await sendPlatformEmail(
     to,
     `Dnevni povzetek - ${salonName} - ${dateLabel}`,
     `Termini za ${salonName}, ${dateLabel}:\n\n${rowsText}\n\nOglej si nadzorno ploščo: ${PLATFORM_URL}/owner`,
@@ -203,6 +203,54 @@ export async function sendDailyDigest({
            style="display:inline-block;background:#8C2F2F;color:#EFE6D8;text-decoration:none;
                   padding:12px 20px;border-radius:6px;font-size:14px;font-weight:600;">
           Odpri nadzorno ploščo
+        </a>
+      </div>
+    `
+  );
+}
+
+// Poslano STRANKI (ne lastniku, v nasprotju z vsemi zgornjimi funkcijami) -
+// ENKRATNA potrditvena e-pošta, ki jo stranka sama sproži na potrditveni
+// strani po rezervaciji (glej addBookingConfirmationEmail v
+// [slug]/actions.ts + opt-in polje v booking-page.tsx), če je vpisala svoj
+// email - obrazec za rezervacijo ga NE zbira. Ločeno od plačljivega Fillio
+// Pro obveščanja LASTNIKA (notification_preference, sendBookingNotification
+// zgoraj) - to ni ponavljajoč opomnik, samo enkratna potrditev z
+// manageUrl-om do /rezervacija/[token].
+export async function sendBookingConfirmationEmail({
+  to,
+  salonName,
+  service,
+  dateLabel,
+  time,
+  manageUrl,
+}: {
+  to: string;
+  salonName: string;
+  service: string;
+  dateLabel: string;
+  time: string;
+  manageUrl: string;
+}) {
+  const safeSalon = escapeHtml(salonName);
+  const safeService = escapeHtml(service);
+  const safeDate = escapeHtml(dateLabel);
+
+  await sendPlatformEmail(
+    to,
+    `Potrditev rezervacije - ${salonName}`,
+    `Tvoja rezervacija je potrjena:\n\n${salonName}\n${service}\n${dateLabel} ob ${time}\n\nUpravljaj svojo rezervacijo (odpoved/prenaročanje): ${manageUrl}`,
+    `
+      <div style="font-family:system-ui,sans-serif;max-width:420px;margin:0 auto;">
+        <p style="font-size:15px;color:#1b1815;">Tvoja rezervacija pri <b>${safeSalon}</b> je potrjena:</p>
+        <p style="font-size:14px;color:#1b1815;margin:0 0 20px;">
+          ${safeService}<br>
+          ${safeDate} ob ${time}
+        </p>
+        <a href="${manageUrl}"
+           style="display:inline-block;background:#8C2F2F;color:#EFE6D8;text-decoration:none;
+                  padding:12px 20px;border-radius:6px;font-size:14px;font-weight:600;">
+          Upravljaj rezervacijo
         </a>
       </div>
     `
