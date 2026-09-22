@@ -176,49 +176,6 @@ export default function BookingPage({
   // resetiramo za morebitno naslednjo rezervacijo.
   const [confirmedBooking, setConfirmedBooking] = useState<CalendarEvent | null>(null);
 
-  // "Omejen sticky" za "Pregled termina" spodaj (glej <aside> pod
-  // "Pregled termina") - lg:sticky lg:top-8 sam poskrbi za lepljenje MED
-  // scrollanjem, to stanje pa poskrbi, da se ob KONCU strani "odlepi" in
-  // konča poravnan z dnom glavnega stolpca, namesto da ostane prilepljen na
-  // vrhu zaslona vse do samega konca. Čist CSS position:sticky tega SAM od
-  // sebe ne naredi zanesljivo: "odlepi" se šele, ko bi presegel spodnji rob
-  // svojega vsebnika (ki že natančno ustreza višini glavnega stolpca, glej
-  // items-start na mreži spodaj), to pa se pri strani BREZ velike količine
-  // vsebine POD mrežo (tu je pod njo samo malo odmika, ne noge/footer) praviloma
-  // sploh nikoli ne zgodi - stran preprosto zmanjka za scrollanje, preden
-  // sticky doseže tisti prag (geometrija, neodvisna od tega, kako visok je
-  // glavni stolpec - glej pogovor s Claude). Namesto umetnega dodajanja
-  // stotine pikslov praznega prostora na dno strani (grdo, poleg tega
-  // odvisno od višine zaslona), tole preprosto preklopi na "poravnano z
-  // dnom", ko uporabnik dejansko doseže dno STRANI - kar se tu ujema s
-  // koncem glavnega stolpca, ker za mrežo skoraj ni druge vsebine.
-  const [asideDocked, setAsideDocked] = useState(false);
-  useEffect(() => {
-    function updateAsideDocked() {
-      const atPageBottom =
-        window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
-      setAsideDocked(atPageBottom);
-    }
-    updateAsideDocked();
-    window.addEventListener("scroll", updateAsideDocked, { passive: true });
-    window.addEventListener("resize", updateAsideDocked);
-    // Stran ob prvem nalaganju še raste (storitve/termini se naložijo
-    // asinhrono, glej loadServices/loadAllAvailability zgoraj, pisave se
-    // "swapajo" - glej next/font) - brez tega bi zgornji enkratni klic
-    // updateAsideDocked() na zelo kratki ZAČETNI višini strani (preden ta
-    // vsebina pride) lahko napačno "zamrznil" asideDocked=true, ker se
-    // scroll/resize dogodka pozneje sploh ne sprožita (uporabnik je ves čas
-    // ostal na scrollY=0, okno se ni spremenilo) - ResizeObserver na <body>
-    // to ponovno preračuna ob VSAKI spremembi dejanske višine strani.
-    const resizeObserver = new ResizeObserver(updateAsideDocked);
-    resizeObserver.observe(document.body);
-    return () => {
-      window.removeEventListener("scroll", updateAsideDocked);
-      window.removeEventListener("resize", updateAsideDocked);
-      resizeObserver.disconnect();
-    };
-  }, []);
-
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3200);
@@ -830,66 +787,56 @@ export default function BookingPage({
               termin), da stranka vedno vidi, kaj je že izbrala. Na mobilnem
               (pod lg:) grid pade na eno kolono in se prikaže POD glavnim
               tokom (naraven DOM vrstni red), ne nad njim - gre za povzetek
-              PRED oddajo, ne za uvodno usmerjanje.
-
-              Ovojni div spodaj (lg:self-stretch lg:relative) NAMENOMA
-              preglasi items-start SAMO za to celico mreže - njegova višina
-              tako natančno ustreza višini glavnega stolpca (isti mehanizem
-              kot uporabnikova zahteva "ne uporabljaj min-h-screen", samo da
-              gre za to, kar mreža že naravno zagotavlja - height: 100% te
-              celice). To je vsebnik, znotraj katerega <aside> "leze" (sticky)
-              ali se "odlepi" (absolute, glej asideDocked zgoraj). */}
-          <div className="lg:self-stretch lg:relative">
-            <aside
-              className={`border border-border rounded-lg p-5 ${
-                asideDocked ? "lg:absolute lg:inset-x-0 lg:bottom-0" : "lg:sticky lg:top-8"
-              }`}
-            >
-              <h2 className="font-display text-lg font-semibold mb-4 text-cream">
-                Pregled termina
-              </h2>
-              <div className="space-y-3 text-sm">
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-cream-faint mb-0.5">
-                    Storitev
-                  </p>
-                  <p className={selectedService ? "text-cream" : "text-cream-faint"}>
-                    {selectedService ? serviceNameAndPrice(selectedService) : "Še ni izbrano"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-cream-faint mb-0.5">
-                    Trajanje
-                  </p>
-                  <p
-                    className={
-                      selectedService?.duration_minutes ? "text-cream" : "text-cream-faint"
-                    }
-                  >
-                    {!selectedService
-                      ? "Še ni izbrano"
-                      : selectedService.duration_minutes
-                        ? formatDuration(selectedService.duration_minutes)
-                        : "Ni določeno"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-cream-faint mb-0.5">
-                    Datum
-                  </p>
-                  <p className="text-cream">{dayLabel(selectedDate)}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-cream-faint mb-0.5">
-                    Ura rezervacije
-                  </p>
-                  <p className={form.time ? "text-cream" : "text-cream-faint"}>
-                    {form.time || "Še ni izbrano"}
-                  </p>
-                </div>
+              PRED oddajo, ne za uvodno usmerjanje. top-16 namesto top-8, da
+              ne lepi tik ob robu zaslona (glej pogovor s Claude - poskus s
+              samodejnim "odlepljanjem" ob dnu strani je delal opazen skok, ko
+              je zmanjkalo prostora za sticky - raje preprost, ves čas
+              prilepljen panel z malo več zgornjega odmika). */}
+          <aside className="border border-border rounded-lg p-5 lg:sticky lg:top-16">
+            <h2 className="font-display text-lg font-semibold mb-4 text-cream">
+              Pregled termina
+            </h2>
+            <div className="space-y-3 text-sm">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-cream-faint mb-0.5">
+                  Storitev
+                </p>
+                <p className={selectedService ? "text-cream" : "text-cream-faint"}>
+                  {selectedService ? serviceNameAndPrice(selectedService) : "Še ni izbrano"}
+                </p>
               </div>
-            </aside>
-          </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-cream-faint mb-0.5">
+                  Trajanje
+                </p>
+                <p
+                  className={
+                    selectedService?.duration_minutes ? "text-cream" : "text-cream-faint"
+                  }
+                >
+                  {!selectedService
+                    ? "Še ni izbrano"
+                    : selectedService.duration_minutes
+                      ? formatDuration(selectedService.duration_minutes)
+                      : "Ni določeno"}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-cream-faint mb-0.5">
+                  Datum
+                </p>
+                <p className="text-cream">{dayLabel(selectedDate)}</p>
+              </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-cream-faint mb-0.5">
+                  Ura rezervacije
+                </p>
+                <p className={form.time ? "text-cream" : "text-cream-faint"}>
+                  {form.time || "Še ni izbrano"}
+                </p>
+              </div>
+            </div>
+          </aside>
         </div>
         )}
       </main>
