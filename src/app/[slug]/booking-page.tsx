@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CalendarPlus, Download, Scissors } from "lucide-react";
+import { Scissors } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import ThemeToggle from "@/components/theme-toggle";
+import { GoogleIcon, AppleIcon } from "@/components/brand-icons";
 import BarberPoleWatermark from "./barber-pole-watermark";
 import {
   todayISO,
@@ -584,14 +585,14 @@ export default function BookingPage({
                 rel="noopener noreferrer"
                 className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-md border border-border text-cream text-sm font-medium cursor-pointer hover:bg-ink-soft"
               >
-                <CalendarPlus size={16} /> Dodaj v Google koledar
+                <GoogleIcon size={16} /> Dodaj v Google koledar
               </a>
               <button
                 type="button"
                 onClick={() => downloadIcsFile(confirmedBooking)}
                 className="flex-1 inline-flex items-center justify-center gap-2 py-2.5 rounded-md border border-border text-cream text-sm font-medium cursor-pointer hover:bg-ink-soft"
               >
-                <Download size={16} /> Dodaj v Apple koledar
+                <AppleIcon size={16} /> Dodaj v Apple koledar
               </button>
             </div>
             <button
