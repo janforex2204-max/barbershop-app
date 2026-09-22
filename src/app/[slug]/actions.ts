@@ -391,7 +391,7 @@ export async function joinWaitlist(
     return { error: message };
   }
 
-  const { error } = await supabase.from("waitlist").insert({
+  let { error } = await supabase.from("waitlist").insert({
     salon_id: salonId,
     customer_name: input.name,
     customer_phone: input.phone,
@@ -400,6 +400,26 @@ export async function joinWaitlist(
     service_preference: input.service,
     ip_address: ip,
   });
+
+  // Prehodna varovalka: dokler waitlist.customer_email migracija morda še ni
+  // zagnana (isti KRITIČEN vzorec kot appointments.token prej v tej datoteki
+  // - glej pogovor s Claude o produkcijski napaki, ko je manjkajoč stolpec
+  // blokiral VSAKO rezervacijo) - brez tega bi manjkajoč stolpec blokiral
+  // VSAK vpis na čakalno listo, ne samo shranjevanje e-pošte.
+  if (error?.code === "42703") {
+    console.error(
+      `[${slug}] waitlist.customer_email še ne obstaja (manjkajoča migracija) - vpisujem brez njega.`
+    );
+    const fallback = await supabase.from("waitlist").insert({
+      salon_id: salonId,
+      customer_name: input.name,
+      customer_phone: input.phone,
+      preferred_date: input.date,
+      service_preference: input.service,
+      ip_address: ip,
+    });
+    error = fallback.error;
+  }
 
   if (error) {
     return { error: error.message };
