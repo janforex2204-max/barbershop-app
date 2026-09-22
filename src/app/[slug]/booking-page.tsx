@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Scissors, Copy, Check } from "lucide-react";
+import { Scissors, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import ThemeToggle from "@/components/theme-toggle";
 import { GoogleIcon, AppleIcon } from "@/components/brand-icons";
@@ -18,7 +18,6 @@ import {
   resolveSalonTheme,
   buildGoogleCalendarUrl,
   downloadIcsFile,
-  bookingManageUrl,
   type CalendarEvent,
 } from "@/lib/constants";
 import {
@@ -32,6 +31,7 @@ import DatePicker from "./date-picker";
 import {
   bookAppointment as bookAppointmentAction,
   joinWaitlist as joinWaitlistAction,
+  addBookingConfirmationEmail,
 } from "./actions";
 
 type Service = {
@@ -186,7 +186,15 @@ export default function BookingPage({
   // svoj termin (odpove/prenaroči). Ločeno stanje od confirmedBooking (ki ga
   // uporabljajo tudi Google/Apple koledar gumba in NE potrebuje tokena).
   const [confirmedToken, setConfirmedToken] = useState<string | null>(null);
-  const [linkCopied, setLinkCopied] = useState(false);
+  // Email, ki je bil UPORABLJEN za TO rezervacijo - ali vpisan že v obrazcu
+  // (glej form.email spodaj), ali naknadno dodan prek opt-in polja na tej
+  // strani (glej sendConfirmationEmail spodaj). Prazen niz = stranka (še)
+  // nima e-pošte na tem terminu - prikaže opt-in polje namesto potrditve.
+  // Namenoma NE prikazujemo surovega /rezervacija/[token] linka na strani
+  // (glej pogovor s Claude) - edina pot do njega je e-pošta.
+  const [confirmedEmail, setConfirmedEmail] = useState("");
+  const [emailInput, setEmailInput] = useState("");
+  const [emailStatus, setEmailStatus] = useState<"idle" | "sending" | string>("idle");
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -525,20 +533,31 @@ export default function BookingPage({
       location: salonAddress ? `${salonName}, ${salonAddress}` : salonName,
     });
     setConfirmedToken(token ?? null);
-    setLinkCopied(false);
+    setConfirmedEmail(form.email.trim());
+    setEmailInput("");
+    setEmailStatus("idle");
     setForm((f) => ({ ...f, name: "", phone: "", email: "", time: "" }));
     loadAvailability(selectedDate);
   }
 
-  async function copyManageLink() {
+  // Samo za primer, ko stranka e-pošte NI vpisala že v obrazec za
+  // rezervacijo (glej opt-in polje spodaj v JSX) - shrani jo naknadno na
+  // isti termin in pošlje potrditveno e-pošto (addBookingConfirmationEmail v
+  // ./actions.ts).
+  async function sendConfirmationEmail() {
     if (!confirmedToken) return;
-    try {
-      await navigator.clipboard.writeText(bookingManageUrl(confirmedToken));
-      setLinkCopied(true);
-      setTimeout(() => setLinkCopied(false), 2000);
-    } catch {
-      showToast("Kopiranje ni uspelo - povezavo označi in kopiraj ročno.");
+    if (!isValidEmail(emailInput)) {
+      setEmailStatus("Vnesi veljaven email naslov.");
+      return;
     }
+    setEmailStatus("sending");
+    const { error } = await addBookingConfirmationEmail(confirmedToken, emailInput);
+    if (error) {
+      setEmailStatus(error);
+      return;
+    }
+    setConfirmedEmail(emailInput.trim());
+    setEmailStatus("idle");
   }
 
   async function joinWaitlist() {
@@ -626,31 +645,49 @@ export default function BookingPage({
               </button>
             </div>
 
-            {/* Povezava za samostojno upravljanje termina (odpoved/
-                prenaročanje, glej /rezervacija/[token]/) - token pride iz
-                bookAppointment (./actions.ts), zato ga tu samo prikažemo/
-                kopiramo, ne generiramo. */}
-            {confirmedToken && (
-              <div className="mt-6 pt-6 border-t border-border-soft">
+            {/* Namenoma NIKOLI ne prikažemo surovega /rezervacija/[token]
+                linka ali gumba "Kopiraj povezavo" na TEJ strani (glej
+                pogovor s Claude) - edina pot do povezave je e-pošta, bodisi
+                poslana takoj (email že vpisan v obrazcu) bodisi prek
+                opt-in polja spodaj (stranka ga ob rezervaciji ni vpisala).
+                Če stranka niti tega ne izpolni, edina preostala pot je
+                neposreden kontakt s salonom (isto besedilo že na
+                /rezervacija/[token] strani, glej manage-booking-page.tsx). */}
+            {confirmedToken && confirmedEmail && (
+              <p className="mt-6 pt-6 border-t border-border-soft text-xs text-cream-faint">
+                Informacije o rezervaciji smo poslali na {confirmedEmail}. Prek
+                povezave v e-pošti lahko kadarkoli odpoveš ali prenaročiš termin.
+              </p>
+            )}
+            {confirmedToken && !confirmedEmail && (
+              <div className="mt-6 pt-6 border-t border-border-soft text-left">
                 <p className="text-xs text-cream-faint mb-2">
-                  S to povezavo lahko kadarkoli odpoveš ali prenaročiš termin:
+                  Vpiši e-pošto in prejmi vse podatke o rezervaciji ter možnost
+                  odpovedi/prenaročanja:
                 </p>
                 <div className="flex items-center gap-2">
                   <input
-                    readOnly
-                    value={bookingManageUrl(confirmedToken)}
-                    onFocus={(e) => e.currentTarget.select()}
-                    className="flex-1 min-w-0 px-3 py-2 rounded-md border border-border bg-ink-field text-cream-dim text-xs truncate"
+                    type="email"
+                    placeholder="tvoj@email.si"
+                    value={emailInput}
+                    onChange={(e) => {
+                      setEmailInput(e.target.value);
+                      if (emailStatus !== "idle" && emailStatus !== "sending") setEmailStatus("idle");
+                    }}
+                    className="flex-1 min-w-0 px-3 py-2 rounded-md border border-border bg-ink-field text-cream text-xs"
                   />
                   <button
                     type="button"
-                    onClick={copyManageLink}
-                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-border text-cream text-xs font-medium cursor-pointer hover:bg-ink-soft"
+                    onClick={sendConfirmationEmail}
+                    disabled={emailStatus === "sending"}
+                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-border text-cream text-xs font-medium cursor-pointer hover:bg-ink-soft disabled:opacity-60"
                   >
-                    {linkCopied ? <Check size={14} /> : <Copy size={14} />}
-                    {linkCopied ? "Kopirano" : "Kopiraj povezavo"}
+                    <Mail size={14} /> Pošlji
                   </button>
                 </div>
+                {emailStatus !== "idle" && emailStatus !== "sending" && (
+                  <p className="text-xs text-rose mt-1.5">{emailStatus}</p>
+                )}
               </div>
             )}
 

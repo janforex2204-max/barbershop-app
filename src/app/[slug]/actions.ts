@@ -130,12 +130,13 @@ async function notifyOwnerOfBooking(
   }
 }
 
-// Pošlje STRANKI enkratno potrditveno e-pošto TAKOJ ob uspešni rezervaciji,
-// če je v obrazcu vpisala email (neobvezno polje, glej booking-page.tsx pod
-// poljem za telefon) - NE kot ločen opt-in korak na potrditveni strani (to
-// je bil prejšnji pristop, glej pogovor s Claude - zdaj samo ena oddaja).
-// Nefatalno (try/catch), isti razlog kot notifyOwnerOfBooking zgoraj -
-// rezervacija mora uspeti tudi, če email pošiljanje odpove.
+// Pošlje STRANKI enkratno potrditveno e-pošto - skupna pomožna funkcija za
+// OBA primera: (1) email je bil vpisan že v obrazcu za rezervacijo, pošlje
+// se TAKOJ ob uspešni rezervaciji (glej bookAppointment spodaj), ali (2)
+// stranka ga doda naknadno na potrditveni strani, ko ga ob rezervaciji ni
+// vpisala (glej addBookingConfirmationEmail spodaj). Nefatalno (try/catch),
+// isti razlog kot notifyOwnerOfBooking zgoraj - rezervacija/shranjevanje
+// e-pošte mora uspeti tudi, če email pošiljanje odpove.
 async function notifyCustomerOfBooking(
   email: string,
   booking: { salonName: string; service: string; date: string; time: string; token: string }
@@ -307,6 +308,58 @@ export async function bookAppointment(
   }
 
   return { token };
+}
+
+// Klicano iz potrditvene strani (booking-page.tsx), SAMO če stranka e-pošte
+// ni vpisala že v sam obrazec za rezervacijo (glej bookAppointment/
+// notifyCustomerOfBooking zgoraj - to je privzeta pot). Token JE
+// avtorizacija (admin klient, ker anon nima UPDATE pravice na appointments,
+// glej supabase/schema.sql) - ni dodatnega preverjanja "lastništva", kdorkoli
+// pozna svoj lasten, neuganljiv token.
+export async function addBookingConfirmationEmail(
+  token: string,
+  email: string
+): Promise<{ error?: string }> {
+  const trimmedEmail = email.trim();
+  if (!isValidEmail(trimmedEmail)) {
+    return { error: "Vnesi veljaven email naslov." };
+  }
+
+  const admin = createAdminClient();
+  const { data: appt } = await admin
+    .from("appointments")
+    .select("salon_id, service, appointment_date, appointment_time")
+    .eq("token", token)
+    .maybeSingle();
+
+  if (!appt) {
+    return { error: "Rezervacija ne obstaja." };
+  }
+
+  const { error } = await admin
+    .from("appointments")
+    .update({ customer_email: trimmedEmail })
+    .eq("token", token);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  const { data: salon } = await admin
+    .from("salon_owners")
+    .select("salon_name")
+    .eq("id", appt.salon_id)
+    .maybeSingle();
+
+  await notifyCustomerOfBooking(trimmedEmail, {
+    salonName: salon?.salon_name ?? "Fillio",
+    service: appt.service,
+    date: appt.appointment_date,
+    time: appt.appointment_time,
+    token,
+  });
+
+  return {};
 }
 
 export async function joinWaitlist(
