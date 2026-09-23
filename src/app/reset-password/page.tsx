@@ -8,20 +8,40 @@ import { translateAuthError } from "@/lib/auth-errors";
 
 type Status = "checking" | "ready" | "invalid" | "done";
 
+const DEFAULT_INVALID_MESSAGE =
+  "Povezava za ponastavitev gesla je neveljavna ali je potekla. Zahtevaj novo na prijavni strani.";
+
+// Prebrano SAMO ob prvem renderju (glej useState spodaj, ne useEffect) - ta
+// stran je "use client", zato je window na voljo že takrat. Sinhroni
+// setState znotraj useEffect-a je namerno prepovedan (react-hooks lint) -
+// zato ?error= preberemo tu, ne v spodnjem efektu.
+function initialErrorFromUrl(): string | null {
+  if (typeof window === "undefined") return null;
+  return new URLSearchParams(window.location.search).get("error");
+}
+
 export default function ResetPasswordPage() {
   const supabase = createClient();
+  const [initialError] = useState(initialErrorFromUrl);
 
-  const [status, setStatus] = useState<Status>("checking");
+  const [status, setStatus] = useState<Status>(initialError ? "invalid" : "checking");
+  const invalidMessage = initialError ?? DEFAULT_INVALID_MESSAGE;
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Supabase klient ob nalaganju strani sam prebere access_token (ali PKCE
-  // "code") iz URL-ja in vzpostavi začasno sejo za ponastavitev gesla - takrat
-  // sproži dogodek "PASSWORD_RECOVERY". Če seja že obstaja (dogodek je ušel
-  // pred prijavo na listener), to preverimo tudi z getSession().
+  // Izmenjava kode/tokena za sejo se od zdaj naprej zgodi STREŽNIŠKO, v
+  // /auth/confirm (glej route.ts + redirectTo v forgot-password.tsx), PREDEN
+  // uporabnik sploh pristane tu - seja je torej praviloma že vzpostavljena.
+  // Napaka pri tisti izmenjavi pride nazaj kot ?error= na TEJ isti povezavi
+  // (glej auth/confirm/route.ts, initialErrorFromUrl zgoraj jo že prebere).
+  // getSession() spodaj je zato primarna pot; poslušanje na PASSWORD_RECOVERY
+  // ostaja kot varovalka za starejšo, že poslano povezavo (izpred te
+  // spremembe), ki bi še vedno kazala naravnost na /reset-password.
   useEffect(() => {
+    if (initialError) return;
+
     let settled = false;
 
     const {
@@ -94,8 +114,7 @@ export default function ResetPasswordPage() {
         {status === "invalid" && (
           <div className="space-y-3">
             <p className="text-sm text-rose bg-danger-bg border border-danger-border rounded-md px-3 py-2">
-              Povezava za ponastavitev gesla je neveljavna ali je potekla.
-              Zahtevaj novo na prijavni strani.
+              {invalidMessage}
             </p>
             <Link
               href="/"

@@ -24,8 +24,12 @@ export default function ForgotPassword() {
       window.location.origin.startsWith("http://localhost") ||
       window.location.origin.startsWith("http://127.0.0.1");
     const redirectOrigin = isLocalOrigin ? window.location.origin : PLATFORM_URL;
+    // Gre prek /auth/confirm (isti route handler kot potrditev e-pošte ob
+    // registraciji), ne naravnost na /reset-password - glej pogovor s
+    // Claude: izmenjava kode/tokena za sejo se mora zgoditi strežniško (kjer
+    // se cookie dejansko lahko trajno nastavi), ne s klienta.
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${redirectOrigin}/reset-password`,
+      redirectTo: `${redirectOrigin}/auth/confirm?next=${encodeURIComponent("/reset-password")}`,
     });
     setSubmitting(false);
     if (error) console.error("[forgot-password] resetPasswordForEmail:", error.message);
