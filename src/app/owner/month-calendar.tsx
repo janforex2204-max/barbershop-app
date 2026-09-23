@@ -20,7 +20,7 @@ export default function MonthCalendar({
   const weeks = monthGrid(monthStr);
 
   return (
-    <div className="border border-border rounded-lg p-4 mb-8">
+    <div className="month-calendar-container border border-border rounded-lg p-4 mb-8 bg-calendar-panel">
       <div className="flex items-center justify-between mb-3">
         <Link
           href={`/owner?date=${selectedDate}&month=${shiftMonth(monthStr, -1)}`}
@@ -87,8 +87,13 @@ function DayCell({
   const closed = !isBusinessDay(iso);
 
   if (closed) {
+    // Prej "text-cream-ghost opacity-40" - DVOJNO zbledelo (ghost je že
+    // najbolj bled nivo besedila), na svetlem spa ozadju je to dalo skoraj
+    // nevidno besedilo (glej pogovor s Claude) - cream-ghost sam po sebi že
+    // dovolj jasno loči "zaprt dan" od aktivnih, dodaten opacity ni potreben
+    // v NOBENI temi.
     return (
-      <div className="aspect-square flex items-center justify-center rounded-md text-cream-ghost opacity-40 text-xs">
+      <div className="aspect-square flex items-center justify-center rounded-md text-cream-ghost text-xs">
         {dayNum}
       </div>
     );
@@ -100,7 +105,7 @@ function DayCell({
   return (
     <Link
       href={`/owner?date=${iso}&month=${monthStr}`}
-      className={`aspect-square flex flex-col items-center justify-center gap-0.5 rounded-md border text-xs transition-colors ${
+      className={`month-calendar-cell aspect-square flex flex-col items-center justify-center gap-0.5 rounded-md border text-xs transition-colors ${
         isSelected
           ? "border-gold bg-selected text-cream"
           : isToday
@@ -108,7 +113,7 @@ function DayCell({
             : "border-transparent text-cream hover:border-border"
       }`}
     >
-      <span>{dayNum}</span>
+      <span className="month-calendar-day-num">{dayNum}</span>
       <span className="flex items-center gap-1 h-3">
         {count > 0 && (
           <span className="text-[9px] px-1 rounded-full bg-gold/80 text-ink leading-none">

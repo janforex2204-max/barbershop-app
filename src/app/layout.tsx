@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Fraunces, Inter, Manrope } from "next/font/google";
+import { Fraunces, Inter, Manrope, Cormorant_Garamond, Nunito_Sans } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
@@ -40,6 +40,21 @@ const manrope = Manrope({
   weight: ["400", "500", "600", "700", "800"],
 });
 
+// SAMO za spa temo (glej [data-theme="spa"] v globals.css, ki --font-fraunces/
+// --font-inter LOKALNO prepiše na te dve - barber/privzeta temna tema
+// ostane pri Fraunces/Inter zgoraj nedotaknjena, glej pogovor s Claude).
+const cormorantGaramond = Cormorant_Garamond({
+  variable: "--font-cormorant",
+  subsets: ["latin"],
+  weight: ["400", "600", "700"],
+});
+
+const nunitoSans = Nunito_Sans({
+  variable: "--font-nunito-sans",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+});
+
 export const metadata: Metadata = {
   title: "Fillio — rezervacije",
   description: "Rezervacijski sistem za frizerske salone",
@@ -50,7 +65,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="sl"
       suppressHydrationWarning
-      className={`${fraunces.variable} ${inter.variable} ${manrope.variable} h-full antialiased`}
+      className={`${fraunces.variable} ${inter.variable} ${manrope.variable} ${cormorantGaramond.variable} ${nunitoSans.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />

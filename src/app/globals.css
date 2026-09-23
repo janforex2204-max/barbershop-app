@@ -57,6 +57,11 @@
   --watermark-red: #d16b64;
   --watermark-neutral: #efe6d8;
   --watermark-blue: #6f8fc2;
+
+  /* Ozadje koledarske plošče (MonthCalendar, owner/month-calendar.tsx) -
+     privzeto transparent (brez vidne spremembe v temni/svetli temi, glej
+     pogovor s Claude), spa tema spodaj ga prepiše v opazen rožnat odtenek. */
+  --color-calendar-panel: transparent;
 }
 
 /*
@@ -138,13 +143,21 @@ body {
   --color-ink-soft: #f3e9dc;
   --color-ink-elevated: #eee0ce;
   --color-ink-field: #ffffff;
-  --color-border: #e3d1ba;
-  --color-border-soft: #eddfce;
+  /* border/border-soft in cream-faint/cream-ghost POTEMNJENI glede na
+     prvotni izračun (glej pogovor s Claude) - izmerjeni WCAG kontrast
+     prvotnih vrednosti proti --color-ink (#faf6f1) je bil 1.4:1 (border) in
+     1.97-2.69:1 (faint/ghost), daleč pod berljivim pragom - v praksi
+     "belo/skoraj nevidno besedilo na presvetlem ozadju". Novi toni ciljajo
+     na približno ISTO relativno bledost, kot jo že ima :root[data-theme="light"]
+     zgoraj (tam sprejeto, ne prijavljeno kot težava), samo dovolj temnejšo,
+     da je dejansko berljivo/vidno na spa svetlejšem ozadju.*/
+  --color-border: #c8b8a3;
+  --color-border-soft: #d0c3b5;
   --color-cream: #3a332e;
   --color-cream-muted: #63574e;
   --color-cream-dim: #827871;
-  --color-cream-faint: #9c9793;
-  --color-cream-ghost: #b8b1ac;
+  --color-cream-faint: #898581;
+  --color-cream-ghost: #a09995;
   --color-gold: #a85a44;
   --color-gold-soft: #c15d41;
   --color-rose: #a83f3f;
@@ -159,4 +172,43 @@ body {
      teme, ker je ravno "svoj CTA poudarek" bistvo spa teme. */
   --color-burgundy: #c98b7a;
   --color-on-accent: #3a332e;
+
+  /* Opazen rožnat panel za MonthCalendar (glej --color-calendar-panel v
+     osnovnem @theme bloku zgoraj in owner/month-calendar.tsx). */
+  --color-calendar-panel: #f6e0da;
+
+  /* SAMO spa tema zamenja pisave - glej src/app/layout.tsx za nalaganje
+     Cormorant Garamond/Nunito Sans. Prepiše --font-fraunces/--font-inter
+     (NE --font-display/--font-sans!) - Tailwindov "@theme inline" zgoraj v
+     generirane .font-display/.font-sans razrede DOBESEDNO vpiše
+     "var(--font-fraunces)"/"var(--font-inter)" (preverjeno v zgrajenem CSS-ju),
+     zato prepis --font-display/--font-sans tu NE bi imel nobenega učinka -
+     prepisati je treba spremenljivki, na kateri se generirana pravila
+     dejansko sklicujejo. */
+  --font-fraunces: var(--font-cormorant);
+  --font-inter: var(--font-nunito-sans);
+}
+
+/*
+  MonthCalendar (owner/month-calendar.tsx) v spa temi - poudarjene številke
+  dni in mrežne črte (glej pogovor s Claude, "prenova koledarja"). Ločeno od
+  zgornjih @theme/[data-theme] blokov, ker gre za dejanska CSS pravila
+  (font-weight/border-width), ne barvne žetone - Tailwind teh nima kot
+  spremenljivke, zato cilja NEPOSREDNO na stabilna imena razredov, ki jih
+  komponenta doda POLEG svojih običajnih utility razredov.
+*/
+[data-theme="spa"] .month-calendar-container {
+  border-width: 2px;
+}
+[data-theme="spa"] .month-calendar-day-num {
+  font-weight: 600;
+}
+[data-theme="spa"] .month-calendar-cell {
+  border-width: 2px;
+}
+/* Nezaznamovani (ne izbrani/danes) dnevi imajo privzeto border-transparent
+   (samo za enotno velikost) - v spa temi jim dodamo dejansko vidno mejo, da
+   koledar deluje kot prava mreža, ne le kot plavajoča števila. */
+[data-theme="spa"] .month-calendar-cell.border-transparent {
+  border-color: var(--color-border);
 }
