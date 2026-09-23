@@ -16,21 +16,22 @@ export default async function SalonBookingPage({
 
   let { data: salon, error } = await supabase
     .from("public_salons")
-    .select("id, salon_name, slug, hours, category, address")
+    .select("id, salon_name, slug, hours, category, address, logo_url")
     .eq("slug", slug)
     .maybeSingle();
 
   // Prehodna varovalka: dokler public_salons view morda še ni osvežen z
-  // `hours`/`category`/`address` stolpci (supabase/schema.sql migracija
-  // poslana, a morda še ni zagnana - isti dejansko že videni vzorec kot pri
-  // services.price, glej pogovor s Claude), NE sme celotna stran pasti v
-  // napako samo zato, ker manjkajo delovni čas/tema/naslov - poskusi še enkrat
-  // brez njih (resolveDayWindow hours=null uporabi privzet delovni čas,
-  // resolveSalonTheme category=null uporabi privzeto temo, address=null
-  // samo izpusti lokacijo iz "Dodaj v koledar" gumbov - oboje ne kot napako).
+  // `hours`/`category`/`address`/`logo_url` stolpci (supabase/schema.sql
+  // migracija poslana, a morda še ni zagnana - isti dejansko že videni
+  // vzorec kot pri services.price, glej pogovor s Claude), NE sme celotna
+  // stran pasti v napako samo zato, ker manjkajo delovni čas/tema/naslov/
+  // logotip - poskusi še enkrat brez njih (resolveDayWindow hours=null
+  // uporabi privzet delovni čas, resolveSalonTheme category=null uporabi
+  // privzeto temo, address=null samo izpusti lokacijo iz "Dodaj v koledar"
+  // gumbov, logo_url=null pusti privzeto škarjasto ikono - vse ne kot napako).
   if (error?.code === "42703") {
     console.error(
-      `[${slug}] public_salons.hours/category/address še ne obstajajo (manjkajoča migracija) - nadaljujem s privzetim delovnim časom/temo/brez naslova.`
+      `[${slug}] public_salons.hours/category/address/logo_url še ne obstajajo (manjkajoča migracija) - nadaljujem s privzetim delovnim časom/temo/brez naslova/logotipa.`
     );
     const fallback = await supabase
       .from("public_salons")
@@ -38,7 +39,7 @@ export default async function SalonBookingPage({
       .eq("slug", slug)
       .maybeSingle();
     salon = fallback.data
-      ? { ...fallback.data, hours: null, category: null, address: null }
+      ? { ...fallback.data, hours: null, category: null, address: null, logo_url: null }
       : null;
     error = fallback.error;
   }
@@ -66,6 +67,7 @@ export default async function SalonBookingPage({
       salonHours={salon.hours}
       salonCategory={salon.category}
       salonAddress={salon.address}
+      salonLogoUrl={salon.logo_url}
     />
   );
 }

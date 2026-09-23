@@ -20,6 +20,7 @@ import NotificationSettings from "./notification-settings";
 import MonthCalendar from "./month-calendar";
 import WaitlistOffer from "./waitlist-offer";
 import WaitlistNotifyButton from "./waitlist-notify-button";
+import LogoUpload from "./logo-upload";
 import PoweredBy from "@/components/powered-by";
 import ThemeToggle from "@/components/theme-toggle";
 import {
@@ -52,7 +53,7 @@ export default async function OwnerDashboard({
   // (my_salon_id() v shemi) je neodvisen, strežniški backstop za isto mejo.
   const { data: ownerRow } = await supabase
     .from("salon_owners")
-    .select("id, salon_name, slug, status, plan, hours, category")
+    .select("id, salon_name, slug, status, plan, hours, category, logo_url")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -220,6 +221,11 @@ export default async function OwnerDashboard({
               </button>
             </form>
           </div>
+        </div>
+
+        <div className="border border-border rounded-lg p-4 mb-8">
+          <h2 className="text-sm font-medium text-cream-dim mb-3">Logotip salona</h2>
+          <LogoUpload salonId={salonId} initialLogoUrl={ownerRow.logo_url} />
         </div>
 
         <NotificationSettings current={notificationPreference} plan={ownerRow.plan} />

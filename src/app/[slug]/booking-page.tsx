@@ -118,6 +118,7 @@ export default function BookingPage({
   salonHours,
   salonCategory,
   salonAddress,
+  salonLogoUrl,
 }: {
   slug: string;
   salonId: string;
@@ -125,6 +126,7 @@ export default function BookingPage({
   salonHours: SalonDayHours[] | null;
   salonCategory: string | null;
   salonAddress: string | null;
+  salonLogoUrl: string | null;
 }) {
   const salonTheme = resolveSalonTheme(salonCategory);
   // createClient() vrne NOV objekt ob vsakem klicu - če bi ga klicali direktno
@@ -608,7 +610,16 @@ export default function BookingPage({
       <header className="relative border-b border-border px-6 py-7">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Scissors size={22} className="text-gold" />
+            {salonLogoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- zunanja, dinamična Storage URL (ni lokalna slika), next/image bi zahteval remotePatterns za Supabase domeno
+              <img
+                src={salonLogoUrl}
+                alt={salonName}
+                className="w-9 h-9 rounded-md object-cover"
+              />
+            ) : (
+              <Scissors size={22} className="text-gold" />
+            )}
             <h1 className="font-display text-2xl font-semibold tracking-tight text-cream">
               {salonName}
             </h1>

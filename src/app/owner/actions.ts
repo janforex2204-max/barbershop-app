@@ -406,3 +406,44 @@ export async function updateSalonHours(hours: SalonDayHours[]): Promise<{ error?
   revalidatePath("/owner");
   return {};
 }
+
+// Klicano PO uspešnem nalaganju v Storage (glej owner/logo-upload.tsx) - ta
+// akcija samo zapiše že naloženo javno URL na salon_owners.logo_url, isti
+// razlog za admin klienta kot zgoraj (ni self-update RLS police). Samo
+// nalaganje datoteke v sam "salon-logos" bucket gre NEPOSREDNO s klienta
+// (session-scoped, Storage RLS v supabase/schema.sql že sama omeji na
+// klicateljevo lastno "mapo") - to tu samo poveže naloženo datoteko s
+// salonom, ki jo bo prikazoval na /[slug].
+export async function updateSalonLogo(logoUrl: string | null): Promise<{ error?: string }> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Seja je potekla. Prijavi se znova." };
+  }
+
+  const { data: ownerRow } = await supabase
+    .from("salon_owners")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("status", "approved")
+    .maybeSingle();
+  if (!ownerRow) {
+    return { error: "Račun ni povezan z odobrenim salonom." };
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("salon_owners")
+    .update({ logo_url: logoUrl })
+    .eq("id", ownerRow.id);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/owner");
+  return {};
+}

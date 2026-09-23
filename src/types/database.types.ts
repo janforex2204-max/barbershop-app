@@ -185,6 +185,7 @@ export type Database = {
           subtype: string | null;
           address: string | null;
           hours: SalonDayHours[] | null;
+          logo_url: string | null;
         };
         Insert: {
           id?: string;
@@ -204,6 +205,7 @@ export type Database = {
           subtype?: string | null;
           address?: string | null;
           hours?: SalonDayHours[] | null;
+          logo_url?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["salon_owners"]["Insert"]>;
         Relationships: [];
@@ -228,6 +230,7 @@ export type Database = {
           hours: SalonDayHours[] | null;
           category: string | null;
           address: string | null;
+          logo_url: string | null;
         };
         Relationships: [];
       };
