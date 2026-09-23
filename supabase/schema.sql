@@ -63,6 +63,12 @@ alter table salon_owners add column if not exists subtype text;
 alter table salon_owners add column if not exists address text;
 alter table salon_owners add column if not exists hours text;
 
+-- Javna URL logotipa salona (glej src/app/owner/ - nalaganje) v Storage
+-- bucket "salon-logos" spodaj, prikazana na /[slug] namesto privzete
+-- škarjaste ikone (glej booking-page.tsx). NULL = salon logotipa (še) ni
+-- naložil, stran takrat obdrži privzeto ikono.
+alter table salon_owners add column if not exists logo_url text;
+
 -- hours je bil sprva prost tekst (glej "add column ... text" zgoraj), zdaj
 -- pa je wizard prešel na po-dnevni urnik (glej SalonDayHours v
 -- database.types.ts) - array objektov {day, closed, from, to}, zato mora
@@ -379,19 +385,74 @@ grant select on public_availability to anon, authenticated;
 -- (lastnikov interni registracijski podatek, ne za javnost). address je bil
 -- prej tudi izločen, a ga stranka potrebuje za "Dodaj v koledar" gumbe na
 -- potrditveni strani (lokacija dogodka) - glej booking-page.tsx.
--- POZOR: `category` je NAMENOMA zadnji v seznamu (za `address`, ne pred
--- njim) - "create or replace view" v Postgresu lahko obstoječemu view-u
--- SAMO doda nove stolpce NA KONEC, ne pa jih vrine na sredino/preimenuje
--- (glej pogovor s Claude - napaka 42P16, ko je bil `category` prej naveden
--- pred `address`, ki je na produkciji že obstajal na tej poziciji). Vrstni
--- red tu ne vpliva na aplikacijo (Supabase izbira po imenu, ne po poziciji).
+-- POZOR: vsak nov stolpec MORA iti na KONEC seznama, nikoli vmes/prej -
+-- "create or replace view" v Postgresu lahko obstoječemu view-u samo doda
+-- stolpce na konec, ne pa jih vrine na sredino/preimenuje (glej pogovor s
+-- Claude - napaka 42P16, ko je bil `category` prej naveden pred `address`,
+-- ki je na produkciji že obstajal na tej poziciji). Vrstni red tu ne vpliva
+-- na aplikacijo (Supabase izbira po imenu, ne po poziciji). logo_url je
+-- zato dodan ZADNJI.
 create or replace view public_salons
   with (security_invoker = false) as
-  select id, salon_name, slug, hours, address, category
+  select id, salon_name, slug, hours, address, category, logo_url
   from salon_owners
   where status = 'approved';
 
 grant select on public_salons to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- STORAGE - logotip salona (glej salon_owners.logo_url zgoraj), naložen na
+-- /owner in prikazan na /[slug] namesto privzete škarjaste ikone. Bucket je
+-- JAVEN (public = true) - to je edini razlog, da /[slug] logotip sploh lahko
+-- prikaže brez prijave, in pomeni, da branje datotek NE gre skozi spodnji
+-- RLS (Storage javne bucket-e servira mimo RLS na /storage/v1/object/public/...
+-- endpointu) - RLS spodaj velja SAMO za pisanje (insert/update/delete).
+-- Pot vsake datoteke je "{salon_id}/logo.<ext>" (glej owner upload kodo) -
+-- politike spodaj preverijo, da lahko lastnik piše SAMO v svojo lastno
+-- "mapo" (prvi del poti), enak vzorec izolacije kot povsod drugod v tej
+-- shemi (salon_id = my_salon_id()).
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'salon-logos',
+  'salon-logos',
+  true,
+  2097152, -- 2 MB
+  array['image/png', 'image/jpeg', 'image/webp']
+)
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "salon_logos_owner_insert" on storage.objects;
+create policy "salon_logos_owner_insert" on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'salon-logos'
+    and (storage.foldername(name))[1] = (
+      select id::text from salon_owners where user_id = auth.uid()
+    )
+  );
+
+drop policy if exists "salon_logos_owner_update" on storage.objects;
+create policy "salon_logos_owner_update" on storage.objects
+  for update to authenticated
+  using (
+    bucket_id = 'salon-logos'
+    and (storage.foldername(name))[1] = (
+      select id::text from salon_owners where user_id = auth.uid()
+    )
+  );
+
+drop policy if exists "salon_logos_owner_delete" on storage.objects;
+create policy "salon_logos_owner_delete" on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'salon-logos'
+    and (storage.foldername(name))[1] = (
+      select id::text from salon_owners where user_id = auth.uid()
+    )
+  );
 
 -- Enako kot notify po services zgoraj - vrne PostgREST-ov schema cache po
 -- ZGORNJIH ALTER/VIEW spremembah (novi stolpci/view-i so sicer dostopni šele
