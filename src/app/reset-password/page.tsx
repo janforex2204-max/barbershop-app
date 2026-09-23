@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import PoweredBy from "@/components/powered-by";
 import { translateAuthError } from "@/lib/auth-errors";
@@ -28,6 +29,8 @@ export default function ResetPasswordPage() {
   const invalidMessage = initialError ?? DEFAULT_INVALID_MESSAGE;
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -151,28 +154,48 @@ export default function ResetPasswordPage() {
               <label htmlFor="password" className="text-sm text-cream-dim">
                 Novo geslo
               </label>
-              <input
-                id="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-md border border-border bg-ink-field px-3 py-2 text-cream text-sm"
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full rounded-md border border-border bg-ink-field px-3 py-2 pr-16 text-cream text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-cream-faint hover:text-cream cursor-pointer"
+                >
+                  {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                  {showPassword ? "Skrij" : "Pokaži"}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-1">
               <label htmlFor="confirm" className="text-sm text-cream-dim">
                 Ponovi geslo
               </label>
-              <input
-                id="confirm"
-                type="password"
-                required
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                className="w-full rounded-md border border-border bg-ink-field px-3 py-2 text-cream text-sm"
-              />
+              <div className="relative">
+                <input
+                  id="confirm"
+                  type={showConfirm ? "text" : "password"}
+                  required
+                  value={confirm}
+                  onChange={(e) => setConfirm(e.target.value)}
+                  className="w-full rounded-md border border-border bg-ink-field px-3 py-2 pr-16 text-cream text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm((v) => !v)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-cream-faint hover:text-cream cursor-pointer"
+                >
+                  {showConfirm ? <EyeOff size={14} /> : <Eye size={14} />}
+                  {showConfirm ? "Skrij" : "Pokaži"}
+                </button>
+              </div>
             </div>
 
             <button
