@@ -379,9 +379,15 @@ grant select on public_availability to anon, authenticated;
 -- (lastnikov interni registracijski podatek, ne za javnost). address je bil
 -- prej tudi izločen, a ga stranka potrebuje za "Dodaj v koledar" gumbe na
 -- potrditveni strani (lokacija dogodka) - glej booking-page.tsx.
+-- POZOR: `category` je NAMENOMA zadnji v seznamu (za `address`, ne pred
+-- njim) - "create or replace view" v Postgresu lahko obstoječemu view-u
+-- SAMO doda nove stolpce NA KONEC, ne pa jih vrine na sredino/preimenuje
+-- (glej pogovor s Claude - napaka 42P16, ko je bil `category` prej naveden
+-- pred `address`, ki je na produkciji že obstajal na tej poziciji). Vrstni
+-- red tu ne vpliva na aplikacijo (Supabase izbira po imenu, ne po poziciji).
 create or replace view public_salons
   with (security_invoker = false) as
-  select id, salon_name, slug, hours, category, address
+  select id, salon_name, slug, hours, address, category
   from salon_owners
   where status = 'approved';
 
