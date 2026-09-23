@@ -12,11 +12,12 @@ import { OWNER_CALENDAR_TAG } from "./cached-queries";
 import { translateAuthError } from "@/lib/auth-errors";
 import {
   resolveDayWindow,
+  resolveDayBreak,
   isSlotAvailable,
   DEFAULT_SERVICE_DURATION_MINUTES,
   type BusyInterval,
 } from "@/lib/availability";
-import type { NotificationPreference } from "@/types/database.types";
+import type { NotificationPreference, SalonDayHours } from "@/types/database.types";
 
 export async function login(formData: FormData) {
   const supabase = await createClient();
@@ -244,6 +245,8 @@ export async function addManualAppointment(
     time: r.appointment_time,
     durationMinutes: r.duration_minutes ?? 60,
   }));
+  const dayBreak = resolveDayBreak(ownerRow.hours, appointment_date);
+  if (dayBreak) busy.push(dayBreak);
 
   if (!isSlotAvailable(window, busy, durationMinutes, appointment_time)) {
     return { error: "Ta termin se prekriva z drugo rezervacijo. Izberi drugega." };
@@ -351,4 +354,55 @@ export async function updateNotificationPreference(formData: FormData) {
     .eq("id", ownerRow.id);
 
   revalidatePath("/owner");
+}
+
+// Ista utemeljitev/vzorec kot updateNotificationPreference tik zgoraj -
+// salon_owners NIMA "self update" RLS police (namenoma), zato salonId
+// razrešimo prek KLICATELJEVE (RLS-zaščitene) seje, sam update pa gre prek
+// admin (service_role) klienta. Klicano NEPOSREDNO iz klienta (ne prek
+// FormData), glej owner/hours/hours-editor-page.tsx.
+export async function updateSalonHours(hours: SalonDayHours[]): Promise<{ error?: string }> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "Seja je potekla. Prijavi se znova." };
+  }
+
+  const { data: ownerRow } = await supabase
+    .from("salon_owners")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("status", "approved")
+    .maybeSingle();
+  if (!ownerRow) {
+    return { error: "Račun ni povezan z odobrenim salonom." };
+  }
+
+  // Server Action je dosegljiv z neposrednim POST-om mimo UI-ja, zato se ne
+  // zanašamo samo na obliko, ki jo DayHoursEditor sicer vedno pošlje.
+  if (!Array.isArray(hours) || hours.length === 0) {
+    return { error: "Neveljaven urnik." };
+  }
+  for (const day of hours) {
+    if (typeof day?.day !== "string" || typeof day?.closed !== "boolean") {
+      return { error: "Neveljaven urnik." };
+    }
+  }
+
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("salon_owners")
+    .update({ hours })
+    .eq("id", ownerRow.id);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/owner/hours");
+  revalidatePath("/owner");
+  return {};
 }

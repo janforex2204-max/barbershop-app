@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { dayLabel, todayISO, whatsAppLink, bookingManageUrl } from "@/lib/constants";
 import {
   resolveDayWindow,
+  resolveDayBreak,
   computeFreeSlots,
   DEFAULT_SERVICE_DURATION_MINUTES,
   type BusyInterval,
@@ -160,7 +161,9 @@ export default function ManualBookingForm({
     selectedService?.duration_minutes ?? DEFAULT_SERVICE_DURATION_MINUTES;
 
   const dayWindow = resolveDayWindow(salonHours, date);
-  const freeTimes = computeFreeSlots(dayWindow, busy, selectedServiceDuration);
+  const dayBreak = resolveDayBreak(salonHours, date);
+  const busyWithBreak = dayBreak ? [...busy, dayBreak] : busy;
+  const freeTimes = computeFreeSlots(dayWindow, busyWithBreak, selectedServiceDuration);
   const validDay = dayWindow !== null;
 
   return (

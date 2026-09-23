@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Eye, EyeOff } from "lucide-react";
 import { registerOwner } from "./actions";
+import DayHoursEditor, { defaultHours } from "@/components/day-hours-editor";
 import type { SalonDayHours } from "@/types/database.types";
 
 type Category = "frizerski" | "kozmeticni" | "other" | null;
@@ -13,26 +14,6 @@ const SUBTYPES: Record<"frizerski" | "kozmeticni", string[]> = {
   frizerski: ["Barbershop", "Ženski frizerski salon", "Univerzalni salon"],
   kozmeticni: ["Nohtni studio", "Ličenje", "Nega obraza in telesa"],
 };
-
-const DAYS = [
-  "Ponedeljek",
-  "Torek",
-  "Sreda",
-  "Četrtek",
-  "Petek",
-  "Sobota",
-  "Nedelja",
-];
-
-// Privzet urnik, prikazan ob prvem obisku koraka 3 - lastnik ga lahko
-// spremeni za vsak dan posebej (glej DaySchedule spodaj).
-function defaultHours(): SalonDayHours[] {
-  return DAYS.map((day) => {
-    if (day === "Nedelja") return { day, closed: true, from: "09:00", to: "19:00" };
-    if (day === "Sobota") return { day, closed: false, from: "09:00", to: "13:00" };
-    return { day, closed: false, from: "09:00", to: "19:00" };
-  });
-}
 
 export default function RegisterPage() {
   const [step, setStep] = useState(1);
@@ -86,17 +67,6 @@ export default function RegisterPage() {
     setCustomCategory("");
   }
 
-  function toggleDayClosed(index: number) {
-    setHours((prev) =>
-      prev.map((d, i) => (i === index ? { ...d, closed: !d.closed } : d))
-    );
-  }
-
-  function updateDayTime(index: number, field: "from" | "to", value: string) {
-    setHours((prev) =>
-      prev.map((d, i) => (i === index ? { ...d, [field]: value } : d))
-    );
-  }
 
   const categoryDisplay =
     category === "frizerski"
@@ -411,39 +381,7 @@ export default function RegisterPage() {
 
           <div className="mb-[34px] max-w-[720px]">
             <p className="mb-3.5 text-[13px] font-bold text-white/60">Delovni čas</p>
-            <div className="flex flex-col gap-2 rounded-md border border-white/[0.08] bg-[#17181B] p-4">
-              {hours.map((d, i) => (
-                <div key={d.day} className="grid grid-cols-[120px_90px_1fr_auto_1fr] items-center gap-3">
-                  <span className="text-sm font-semibold text-white/80">{d.day}</span>
-                  <button
-                    type="button"
-                    onClick={() => toggleDayClosed(i)}
-                    className={`cursor-pointer rounded-[3px] px-2.5 py-1.5 text-xs font-bold uppercase tracking-wide ${
-                      d.closed
-                        ? "bg-white/10 text-white/50"
-                        : "bg-fillio-tealLight text-fillio-dark"
-                    }`}
-                  >
-                    {d.closed ? "Zaprto" : "Odprto"}
-                  </button>
-                  <input
-                    type="time"
-                    value={d.from}
-                    disabled={d.closed}
-                    onChange={(e) => updateDayTime(i, "from", e.target.value)}
-                    className="w-full rounded-[3px] border border-white/15 bg-fillio-dark px-2.5 py-1.5 text-sm text-white disabled:opacity-30"
-                  />
-                  <span className="text-center text-xs text-white/40">–</span>
-                  <input
-                    type="time"
-                    value={d.to}
-                    disabled={d.closed}
-                    onChange={(e) => updateDayTime(i, "to", e.target.value)}
-                    className="w-full rounded-[3px] border border-white/15 bg-fillio-dark px-2.5 py-1.5 text-sm text-white disabled:opacity-30"
-                  />
-                </div>
-              ))}
-            </div>
+            <DayHoursEditor hours={hours} onChange={setHours} variant="marketing" />
           </div>
 
           <div className="mb-[34px] grid max-w-[720px] grid-cols-2 gap-5">

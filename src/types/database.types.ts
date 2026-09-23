@@ -10,14 +10,20 @@ export type OwnerPlan = "free" | "pro";
 export type NotificationPreference = "off" | "daily" | "per_booking";
 
 // salon_owners.hours (jsonb) - po-dnevni urnik, zbran na registracijskem
-// wizardu (glej src/app/owner/register/page.tsx). "day" je slovensko ime dne
-// (Ponedeljek..Nedelja), "from"/"to" sta "HH:MM" in se ignorirata, ko je
-// closed = true.
+// wizardu IN urejan kasneje na /owner/hours (glej src/components/day-hours-editor.tsx,
+// uporabljen na obeh mestih). "day" je slovensko ime dne (Ponedeljek..Nedelja),
+// "from"/"to" sta "HH:MM" in se ignorirata, ko je closed = true.
+// breakFrom/breakTo (neobvezna, oba prisotna ali oba odsotna) - premor (npr.
+// malica) znotraj sicer odprtega dne, glej resolveDayBreak v
+// src/lib/availability.ts. Brez migracije - hours je že jsonb, nova polja se
+// preprosto pojavijo v obstoječih objektih.
 export type SalonDayHours = {
   day: string;
   closed: boolean;
   from: string;
   to: string;
+  breakFrom?: string;
+  breakTo?: string;
 };
 
 export type Database = {

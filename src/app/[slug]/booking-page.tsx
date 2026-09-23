@@ -22,6 +22,7 @@ import {
 } from "@/lib/constants";
 import {
   resolveDayWindow,
+  resolveDayBreak,
   computeFreeSlots,
   DEFAULT_SERVICE_DURATION_MINUTES,
   type BusyInterval,
@@ -454,7 +455,9 @@ export default function BookingPage({
     selectedService?.duration_minutes ?? DEFAULT_SERVICE_DURATION_MINUTES;
 
   const dayWindow = resolveDayWindow(salonHours, selectedDate);
-  const freeTimes = computeFreeSlots(dayWindow, busy, selectedServiceDuration);
+  const dayBreak = resolveDayBreak(salonHours, selectedDate);
+  const busyWithBreak = dayBreak ? [...busy, dayBreak] : busy;
+  const freeTimes = computeFreeSlots(dayWindow, busyWithBreak, selectedServiceDuration);
 
   // Poišče prvi PRIHODNJI dan (znotraj že prikazanega koledarja) z vsaj enim
   // prostim terminom za TRENUTNO izbrano storitev - bere iz že napolnjenega
@@ -467,7 +470,9 @@ export default function BookingPage({
       const date = ALL_DATES[i];
       const cachedBusy = availabilityCacheRef.current.get(date) ?? [];
       const window = resolveDayWindow(salonHours, date);
-      if (computeFreeSlots(window, cachedBusy, selectedServiceDuration).length > 0) {
+      const brk = resolveDayBreak(salonHours, date);
+      const busyForDay = brk ? [...cachedBusy, brk] : cachedBusy;
+      if (computeFreeSlots(window, busyForDay, selectedServiceDuration).length > 0) {
         return date;
       }
     }

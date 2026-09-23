@@ -6,6 +6,7 @@ import { CANCELLATION_NOTICE_HOURS, isPastCancellationDeadline } from "@/lib/con
 import { notifyAffectedCustomersOfCancellation } from "@/lib/cancellation";
 import {
   resolveDayWindow,
+  resolveDayBreak,
   isSlotAvailable,
   type BusyInterval,
 } from "@/lib/availability";
@@ -108,6 +109,8 @@ export async function rescheduleBookingByToken(
     time: r.appointment_time,
     durationMinutes: r.duration_minutes ?? 60,
   }));
+  const dayBreak = resolveDayBreak(salon?.hours ?? null, input.date);
+  if (dayBreak) busy.push(dayBreak);
 
   const durationMinutes = appt.duration_minutes ?? 30;
 

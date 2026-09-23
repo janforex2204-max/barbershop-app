@@ -205,6 +205,12 @@ export default async function OwnerDashboard({
             >
               Storitve in cenik
             </Link>
+            <Link
+              href="/owner/hours"
+              className="text-sm border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft"
+            >
+              Delovni čas
+            </Link>
             <form action={logout}>
               <button
                 type="submit"

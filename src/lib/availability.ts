@@ -76,6 +76,34 @@ export function resolveDayWindow(
   return { start: day.from, end: day.to };
 }
 
+// Neobvezen premor (npr. malica) znotraj sicer odprtega dne - glej
+// breakFrom/breakTo v SalonDayHours (database.types.ts). null, če dan nima
+// premora nastavljenega (ali sploh ni odprt - resolveDayWindow za TA primer
+// itak že vrne null, klicatelju v tem primeru premor ni pomemben). Vrnjen
+// kot BusyInterval, da ga klicatelj lahko preprosto doda v `busy` seznam
+// PRED klicem computeFreeSlots/isSlotAvailable - overlaps() spodaj ne loči
+// med "resnično zasedenim" in premorom, zato ni potrebna nobena sprememba v
+// sami logiki izračuna, samo en dodaten vnos v seznamu (glej klicna mesta v
+// [slug]/actions.ts, [slug]/booking-page.tsx, owner/actions.ts,
+// owner/manual-booking-form.tsx, rezervacija/[token]/actions.ts,
+// rezervacija/[token]/manage-booking-page.tsx).
+export function resolveDayBreak(
+  hours: SalonDayHours[] | null | undefined,
+  dateISO: string
+): BusyInterval | null {
+  if (!hours || hours.length === 0) return null;
+
+  const weekday = WEEKDAY_NAMES[new Date(dateISO + "T00:00:00").getDay()];
+  const day = hours.find((h) => h.day === weekday);
+  if (!day || day.closed || !day.breakFrom || !day.breakTo) return null;
+
+  const start = toMinutes(day.breakFrom);
+  const end = toMinutes(day.breakTo);
+  if (end <= start) return null;
+
+  return { time: day.breakFrom, durationMinutes: end - start };
+}
+
 function overlaps(
   candidateStart: number,
   candidateEnd: number,

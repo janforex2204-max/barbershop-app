@@ -14,6 +14,7 @@ import {
 import { sendBookingNotification, sendBookingConfirmationEmail } from "@/lib/email";
 import {
   resolveDayWindow,
+  resolveDayBreak,
   isSlotAvailable,
   DEFAULT_SERVICE_DURATION_MINUTES,
   type BusyInterval,
@@ -238,6 +239,8 @@ export async function bookAppointment(
     time: r.appointment_time,
     durationMinutes: r.duration_minutes ?? 60,
   }));
+  const dayBreak = resolveDayBreak(hours, input.date);
+  if (dayBreak) busy.push(dayBreak);
   const window = resolveDayWindow(hours, input.date);
 
   if (!isSlotAvailable(window, busy, durationMinutes, input.time)) {

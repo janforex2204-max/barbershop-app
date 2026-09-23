@@ -13,7 +13,12 @@ import {
   isPastCancellationDeadline,
   CANCELLATION_NOTICE_HOURS,
 } from "@/lib/constants";
-import { resolveDayWindow, computeFreeSlots, type BusyInterval } from "@/lib/availability";
+import {
+  resolveDayWindow,
+  resolveDayBreak,
+  computeFreeSlots,
+  type BusyInterval,
+} from "@/lib/availability";
 import type { SalonDayHours, AppointmentStatus } from "@/types/database.types";
 import { cancelBookingByToken, rescheduleBookingByToken } from "./actions";
 
@@ -128,7 +133,9 @@ export default function ManageBookingPage({
   }
 
   const dayWindow = resolveDayWindow(salonHours, selectedDate);
-  const freeTimes = computeFreeSlots(dayWindow, busy, appointment.durationMinutes);
+  const dayBreak = resolveDayBreak(salonHours, selectedDate);
+  const busyWithBreak = dayBreak ? [...busy, dayBreak] : busy;
+  const freeTimes = computeFreeSlots(dayWindow, busyWithBreak, appointment.durationMinutes);
 
   async function submitReschedule() {
     if (!selectedTime) return;
