@@ -21,7 +21,7 @@ export default function NotificationSettings({
   const isPro = plan === "pro";
 
   return (
-    <div className="border border-border rounded-lg p-4 mb-8">
+    <div className="border border-border rounded-lg bg-panel p-4 mb-8">
       <h2 className="text-sm font-medium text-cream-dim mb-3">Email obveščanje</h2>
       <form action={updateNotificationPreference} className="space-y-2">
         {OPTIONS.map((opt) => {

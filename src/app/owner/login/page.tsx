@@ -20,7 +20,7 @@ export default async function LoginPage({
         <PoweredBy size="lg" href="/" />
         <ThemeToggle />
       </div>
-      <div className="w-full max-w-sm border border-border rounded-lg p-6 space-y-4">
+      <div className="w-full max-w-sm border border-border rounded-lg bg-panel p-6 space-y-4">
         <div>
           <h1 className="text-xl font-semibold text-cream">
             Prijava za lastnika

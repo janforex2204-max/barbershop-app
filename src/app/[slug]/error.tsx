@@ -19,7 +19,7 @@ export default function SalonPageError({
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-ink font-sans px-6">
-      <div className="w-full max-w-sm border border-border rounded-lg p-6 space-y-4 text-center">
+      <div className="w-full max-w-sm border border-border rounded-lg bg-panel p-6 space-y-4 text-center">
         <p className="text-sm text-cream">
           Prišlo je do začasne napake pri nalaganju strani.
         </p>

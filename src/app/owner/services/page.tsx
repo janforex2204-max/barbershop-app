@@ -80,7 +80,7 @@ export default async function ServicesPage({
             Napaka pri branju storitev: {servicesError.message}
           </p>
         ) : (
-          <div className="border border-border rounded-lg divide-y divide-border-soft mb-8">
+          <div className="border border-border rounded-lg bg-panel divide-y divide-border-soft mb-8">
             {services?.length === 0 && (
               <p className="p-4 text-sm text-cream-dim">Še nimaš nobene storitve.</p>
             )}
@@ -172,7 +172,7 @@ export default async function ServicesPage({
           </div>
         )}
 
-        <div className="border border-gold/40 rounded-lg p-4">
+        <div className="border border-gold/40 rounded-lg bg-panel p-4">
           <h2 className="text-sm font-medium text-cream-dim mb-3">Dodaj novo storitev</h2>
           <form action={addService} className="flex flex-wrap items-end gap-3">
             <div className="flex-1 min-w-[160px] space-y-1">

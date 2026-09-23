@@ -641,7 +641,7 @@ export default function BookingPage({
 
       <main className="max-w-4xl mx-auto px-6 py-9 pb-20">
         {confirmedBooking ? (
-          <div className="max-w-md mx-auto text-center border border-border rounded-lg p-8">
+          <div className="max-w-md mx-auto text-center border border-border rounded-lg bg-panel p-8">
             <h2 className="font-display text-xl font-semibold mb-1 text-cream">
               Termin potrjen!
             </h2>
@@ -778,7 +778,7 @@ export default function BookingPage({
             )}
 
             {slotsError || servicesError ? (
-              <div className="border border-border rounded-lg p-5">
+              <div className="border border-border rounded-lg bg-panel p-5">
                 <p className="text-sm text-cream-muted mb-3">
                   Prišlo je do začasne napake pri nalaganju prostih terminov.
                   Poskusi znova.
@@ -825,7 +825,7 @@ export default function BookingPage({
                   ))}
                 </div>
 
-                <div className="border border-border rounded-lg p-5">
+                <div className="border border-border rounded-lg bg-panel p-5">
                   <input
                     placeholder="Ime in priimek"
                     value={form.name}
@@ -859,7 +859,7 @@ export default function BookingPage({
                 </div>
               </>
             ) : (
-              <div className="border border-border rounded-lg p-5">
+              <div className="border border-border rounded-lg bg-panel p-5">
                 <p className="text-sm text-cream-muted mb-4">
                   {/* Isto sporočilo za "popolnoma zaseden", "salon ta dan ne
                       dela" IN "izbrana storitev nikamor ne gre zraven" -
@@ -930,7 +930,7 @@ export default function BookingPage({
               samodejnim "odlepljanjem" ob dnu strani je delal opazen skok, ko
               je zmanjkalo prostora za sticky - raje preprost, ves čas
               prilepljen panel z malo več zgornjega odmika). */}
-          <aside className="border border-border rounded-lg p-5 lg:sticky lg:top-24">
+          <aside className="border border-border rounded-lg bg-panel p-5 lg:sticky lg:top-24">
             <h2 className="font-display text-lg font-semibold mb-4 text-cream">
               Pregled termina
             </h2>

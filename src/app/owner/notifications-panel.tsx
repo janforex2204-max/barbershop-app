@@ -79,7 +79,7 @@ export default function NotificationsPanel({
             Za vsako stranko pripravimo WhatsApp sporočilo - klikni, da ga
             odpreš in pošlješ.
           </p>
-          <div className="border border-border rounded-lg divide-y divide-border-soft">
+          <div className="border border-border rounded-lg bg-panel divide-y divide-border-soft">
             {smsLog.length === 0 && (
               <p className="p-4 text-sm text-cream-dim">
                 Ni aktivnih obvestil za ta dan.
@@ -135,7 +135,7 @@ function AutoPanel({ log }: { log: AutoSmsLog[] }) {
         Ob sprostitvi termina sistem SAM pošlje SMS ustreznim strankam -
         spodaj je dnevnik za ta dan.
       </p>
-      <div className="border border-border rounded-lg divide-y divide-border-soft">
+      <div className="border border-border rounded-lg bg-panel divide-y divide-border-soft">
         {log.length === 0 && (
           <p className="p-4 text-sm text-cream-dim">
             Ni samodejno poslanih obvestil za ta dan.

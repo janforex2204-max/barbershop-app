@@ -167,7 +167,7 @@ export default function ManualBookingForm({
   const validDay = dayWindow !== null;
 
   return (
-    <div className="border border-border rounded-lg p-5 mb-4">
+    <div className="border border-border rounded-lg bg-panel p-5 mb-4">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-medium text-cream-dim">
           Ročni vnos termina (telefonska rezervacija)

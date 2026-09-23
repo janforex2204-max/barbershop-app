@@ -65,7 +65,7 @@ export default async function OwnerDashboard({
         data-theme={salonTheme}
         className="min-h-screen flex items-center justify-center bg-ink font-sans px-4"
       >
-        <div className="w-full max-w-sm border border-border rounded-lg p-6 space-y-4 text-center">
+        <div className="w-full max-w-sm border border-border rounded-lg bg-panel p-6 space-y-4 text-center">
           <PoweredBy />
           <p className="text-sm text-cream">
             {!ownerRow
@@ -223,7 +223,7 @@ export default async function OwnerDashboard({
           </div>
         </div>
 
-        <div className="border border-border rounded-lg p-4 mb-8">
+        <div className="border border-border rounded-lg bg-panel p-4 mb-8">
           <h2 className="text-sm font-medium text-cream-dim mb-3">Logotip salona</h2>
           <LogoUpload salonId={salonId} initialLogoUrl={ownerRow.logo_url} />
         </div>
@@ -301,7 +301,7 @@ export default async function OwnerDashboard({
           salonId={salonId}
           salonHours={ownerRow.hours}
         />
-        <div className="border border-border rounded-lg divide-y divide-border-soft mb-10">
+        <div className="border border-border rounded-lg bg-panel divide-y divide-border-soft mb-10">
           {error && (
             <p className="p-4 text-sm text-rose">
               Napaka pri branju terminov: {error}
@@ -358,7 +358,7 @@ export default async function OwnerDashboard({
           {isLiterallyTomorrow ? "Termini za jutri" : `Termini za ${dayLabel(nextBizDay)}`}
         </h2>
         <p className="text-xs text-cream-faint mb-3 capitalize">{dayLabel(nextBizDay)}</p>
-        <div className="border border-border rounded-lg divide-y divide-border-soft mb-10">
+        <div className="border border-border rounded-lg bg-panel divide-y divide-border-soft mb-10">
           {tomorrowError && (
             <p className="p-4 text-sm text-rose">
               Napaka pri branju terminov: {tomorrowError}

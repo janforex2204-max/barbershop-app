@@ -62,6 +62,15 @@
      privzeto transparent (brez vidne spremembe v temni/svetli temi, glej
      pogovor s Claude), spa tema spodaj ga prepiše v opazen rožnat odtenek. */
   --color-calendar-panel: transparent;
+
+  /* Ozadje "kartic"/panelov (border border-border rounded-lg ... divi po
+     celotni /owner in /[slug]) - NOBEDEN trenutno nima lastnega ozadja
+     (samo border na navadnem ozadju strani), zato je privzeto transparent
+     (brez vidne spremembe v temni/svetli temi). Spa tema spodaj ga prepiše
+     v rahlo SVETLEJŠI odtenek glavnega spa ozadja (globina namesto
+     enolično ploščatega videza) - ločeno od --color-calendar-panel zgoraj,
+     ki ostane bolj nasičen/opazen "poseben" naglas samo za koledar. */
+  --color-panel: transparent;
 }
 
 /*
@@ -127,22 +136,29 @@ body {
   na svetlo/temno nastavitev na <html> (isti "unlayered premaga @theme
   layer" trik kot :root[data-theme="light"] zgoraj).
 
-  Izpeljano iz 4 sidrnih barv (ozadje #FAF6F1, besedilo #3A332E, glavni
-  poudarek #C98B7A, sekundarni poudarek #A3B18A) - isti sorazmerni HSL
-  premiki med vlogami kot pri svetli temi zgoraj (glej pogovor s Claude za
-  natančen izračun). En odklon: --color-gold/--color-sage sta ZATEMNJENA
-  glede na sidrne poudarke (uporabljata se kot BESEDILO - naslovi/sporočila o
-  uspehu - surova #C98B7A/#A3B18A na tem ozadju dasta ~2.6:1/2.1:1 kontrast,
-  daleč pod WCAG AA 4.5:1). --color-burgundy (CTA gumb OZADJE) obdrži
-  natančno #C98B7A - za UI-komponente velja manj strog 3:1 prag, temno
-  besedilo nanj doseže 4.41:1. --color-rose (napaka) ni bila podana -
-  obdržana nevtralna rdeča iz svetle teme zgoraj.
+  Izpeljano iz 4 sidrnih barv (ozadje - PRVOTNO #FAF6F1, OD pogovora s
+  Claude "nežna pudrasto-rožnata ozadja" DALJE #F7EBEA, glej --color-ink
+  spodaj - besedilo #3A332E, glavni poudarek #C98B7A, sekundarni poudarek
+  #A3B18A) - isti sorazmerni HSL premiki med vlogami kot pri svetli temi
+  zgoraj (glej pogovor s Claude za natančen izračun). En odklon:
+  --color-gold/--color-sage sta ZATEMNJENA glede na sidrne poudarke
+  (uporabljata se kot BESEDILO - naslovi/sporočila o uspehu - surova
+  #C98B7A/#A3B18A na tem ozadju dasta ~2.6:1/2.1:1 kontrast, daleč pod WCAG
+  AA 4.5:1). --color-burgundy (CTA gumb OZADJE) obdrži natančno #C98B7A -
+  za UI-komponente velja manj strog 3:1 prag, temno besedilo nanj doseže
+  4.41:1. --color-rose (napaka) ni bila podana - obdržana nevtralna rdeča
+  iz svetle teme zgoraj.
 */
 [data-theme="spa"] {
-  --color-ink: #faf6f1;
+  --color-ink: #f7ebea;
   --color-ink-soft: #f3e9dc;
   --color-ink-elevated: #eee0ce;
   --color-ink-field: #ffffff;
+  /* Svetlejši odtenek --color-ink zgoraj (~35% proti belini) - kartice/paneli
+     (glej --color-panel v osnovnem @theme bloku) dobijo globino namesto
+     enolično ploščatega videza, glej pogovor s Claude "pudrasto-rožnata
+     ozadja". */
+  --color-panel: #faf2f1;
   /* border/border-soft in cream-faint/cream-ghost POTEMNJENI glede na
      prvotni izračun (glej pogovor s Claude) - izmerjeni WCAG kontrast
      prvotnih vrednosti proti --color-ink (#faf6f1) je bil 1.4:1 (border) in
