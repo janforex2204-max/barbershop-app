@@ -17,8 +17,8 @@ import {
   resolveDayBreak,
   isSlotAvailable,
   DEFAULT_SERVICE_DURATION_MINUTES,
-  type BusyInterval,
 } from "@/lib/availability";
+import { busyForEmployee, type EmployeeBusyRow } from "@/lib/employee-availability";
 import type { SalonDayHours } from "@/types/database.types";
 
 // KRITIČNO: salon_id se za VSAK klic izpelje TUKAJ, na strežniku, iz `slug`
@@ -158,7 +158,15 @@ async function notifyCustomerOfBooking(
 
 export async function bookAppointment(
   slug: string,
-  input: { name: string; phone: string; email?: string; service: string; date: string; time: string }
+  input: {
+    name: string;
+    phone: string;
+    email?: string;
+    service: string;
+    date: string;
+    time: string;
+    employeeId?: string | null;
+  }
 ): Promise<{ error?: string; token?: string }> {
   // Server Action je dosegljiv z neposrednim POST-om mimo UI-ja, zato se ne
   // zanašamo samo na validacijo v booking-page.tsx (glej isValidCustomerName/
@@ -203,6 +211,28 @@ export async function bookAppointment(
     .maybeSingle();
   const durationMinutes = serviceRow?.duration_minutes ?? DEFAULT_SERVICE_DURATION_MINUTES;
 
+  // Nikoli ne zaupamo employeeId, ki bi ga poslal klient - preveri, da
+  // pripada TEMU salonu in je aktiven (isti razlog kot storitev zgoraj).
+  // salonHasActiveEmployees odloča o dvonivojskem busy filtru spodaj (glej
+  // src/lib/employee-availability.ts) NE GLEDE na to, ali je bil employeeId
+  // sploh poslan.
+  const { data: activeEmployees } = await supabase
+    .from("employees")
+    .select("id, hours")
+    .eq("salon_id", salonId)
+    .eq("active", true);
+
+  const salonHasActiveEmployees = (activeEmployees?.length ?? 0) > 0;
+  const employeeId = input.employeeId ?? null;
+  let effectiveHours = hours;
+  if (employeeId) {
+    const matchedEmployee = activeEmployees?.find((e) => e.id === employeeId);
+    if (!matchedEmployee) {
+      return { error: "Izbrani izvajalec ni veljaven. Izberi drugega." };
+    }
+    effectiveHours = matchedEmployee.hours;
+  }
+
   // Ponovna preverba prekrivanja NA STREŽNIKU tik pred vpisom - klientov
   // seznam prostih terminov (booking-page.tsx) je lahko zastarel (druga
   // stranka je medtem rezervirala) ali klient preprosto POŠLJE poljuben čas
@@ -211,7 +241,7 @@ export async function bookAppointment(
   // PREKRIVAJOČE se, a različne čase, ki jih index ne bi zaznal.
   let { data: busyRows, error: busyError } = await supabase
     .from("public_availability")
-    .select("appointment_time, duration_minutes")
+    .select("appointment_time, duration_minutes, employee_id")
     .eq("salon_id", salonId)
     .eq("appointment_date", input.date);
 
@@ -226,7 +256,8 @@ export async function bookAppointment(
       .select("appointment_time")
       .eq("salon_id", salonId)
       .eq("appointment_date", input.date);
-    busyRows = fallback.data?.map((r) => ({ ...r, duration_minutes: null })) ?? null;
+    busyRows =
+      fallback.data?.map((r) => ({ ...r, duration_minutes: null, employee_id: null })) ?? null;
     busyError = fallback.error;
   }
 
@@ -235,13 +266,15 @@ export async function bookAppointment(
     return { error: "Prišlo je do začasne napake. Poskusi znova čez trenutek." };
   }
 
-  const busy: BusyInterval[] = (busyRows ?? []).map((r) => ({
+  const rawBusy: EmployeeBusyRow[] = (busyRows ?? []).map((r) => ({
     time: r.appointment_time,
     durationMinutes: r.duration_minutes ?? 60,
+    employeeId: r.employee_id ?? null,
   }));
-  const dayBreak = resolveDayBreak(hours, input.date);
+  const busy = busyForEmployee(rawBusy, employeeId, salonHasActiveEmployees);
+  const dayBreak = resolveDayBreak(effectiveHours, input.date);
   if (dayBreak) busy.push(dayBreak);
-  const window = resolveDayWindow(hours, input.date);
+  const window = resolveDayWindow(effectiveHours, input.date);
 
   if (!isSlotAvailable(window, busy, durationMinutes, input.time)) {
     return { error: "Ta termin ni več na voljo za izbrano storitev. Izberi drugega." };
@@ -261,6 +294,7 @@ export async function bookAppointment(
     appointment_date: input.date,
     appointment_time: input.time,
     duration_minutes: durationMinutes,
+    employee_id: employeeId,
     status: "booked",
     ip_address: ip,
     token,
@@ -285,6 +319,7 @@ export async function bookAppointment(
       service: input.service,
       appointment_date: input.date,
       appointment_time: input.time,
+      employee_id: employeeId,
       status: "booked",
       ip_address: ip,
       token,
@@ -367,7 +402,14 @@ export async function addBookingConfirmationEmail(
 
 export async function joinWaitlist(
   slug: string,
-  input: { name: string; phone: string; email?: string; service: string; date: string }
+  input: {
+    name: string;
+    phone: string;
+    email?: string;
+    service: string;
+    date: string;
+    employeeId?: string | null;
+  }
 ): Promise<{ error?: string }> {
   if (!isValidCustomerName(input.name)) {
     return { error: "Vnesi ime in priimek (vsaj 3 znaki, npr. \"Jan Novak\")." };
@@ -394,6 +436,24 @@ export async function joinWaitlist(
     return { error: message };
   }
 
+  // Nikoli ne zaupamo employeeId, ki bi ga poslal klient - preveri, da
+  // pripada TEMU salonu in je aktiven (isti razlog kot v bookAppointment
+  // zgoraj). NULL = "vseeno kateri zaposleni" (isti pomen kot
+  // service_preference = "vseeno").
+  const employeeId = input.employeeId ?? null;
+  if (employeeId) {
+    const { data: matchedEmployee } = await supabase
+      .from("employees")
+      .select("id")
+      .eq("id", employeeId)
+      .eq("salon_id", salonId)
+      .eq("active", true)
+      .maybeSingle();
+    if (!matchedEmployee) {
+      return { error: "Izbrani izvajalec ni veljaven." };
+    }
+  }
+
   let { error } = await supabase.from("waitlist").insert({
     salon_id: salonId,
     customer_name: input.name,
@@ -401,6 +461,7 @@ export async function joinWaitlist(
     customer_email: email,
     preferred_date: input.date,
     service_preference: input.service,
+    employee_id: employeeId,
     ip_address: ip,
   });
 
@@ -419,6 +480,7 @@ export async function joinWaitlist(
       customer_phone: input.phone,
       preferred_date: input.date,
       service_preference: input.service,
+      employee_id: employeeId,
       ip_address: ip,
     });
     error = fallback.error;

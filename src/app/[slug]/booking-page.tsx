@@ -25,8 +25,8 @@ import {
   resolveDayBreak,
   computeFreeSlots,
   DEFAULT_SERVICE_DURATION_MINUTES,
-  type BusyInterval,
 } from "@/lib/availability";
+import { busyForEmployee, type EmployeeBusyRow } from "@/lib/employee-availability";
 import type { SalonDayHours } from "@/types/database.types";
 import DatePicker from "./date-picker";
 import {
@@ -42,6 +42,8 @@ type Service = {
   duration_minutes: number | null;
   category: string | null;
 };
+
+type Employee = { id: string; name: string; hours: SalonDayHours[] };
 
 // Samo "15,00 €, 30 min" del (brez imena) - za grupiran seznam spodaj, kjer
 // je ime storitve že prikazano ločeno. Vsak del izpisan SAMO, če je lastnik
@@ -96,7 +98,9 @@ function groupServicesByCategory(
 }
 
 type BookingForm = { name: string; phone: string; email: string; service: string; time: string };
-type WaitForm = { name: string; phone: string; email: string; service: string };
+// employeeId "" = "vseeno kdo" (pretvorjeno v null pred pošiljanjem, glej
+// joinWaitlist spodaj) - isti UI vzorec kot service = "vseeno".
+type WaitForm = { name: string; phone: string; email: string; service: string; employeeId: string };
 
 // Vodni žig samo za ta konkreten salon (glej barber-pole-watermark.tsx) - ne
 // splošna platformska funkcija, zato preverjamo dobesedni slug, ne kake
@@ -140,11 +144,16 @@ export default function BookingPage({
   const [servicesLoading, setServicesLoading] = useState(true);
   const [servicesError, setServicesError] = useState(false);
 
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employeesLoading, setEmployeesLoading] = useState(true);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
+
   const [selectedDate, setSelectedDate] = useState(INITIAL_DATE);
-  // Zasedeni intervali (čas + trajanje), NE samo množica zasedenih TOČNIH
-  // časov - potrebno za izračun prekrivanja glede na trajanje IZBRANE
-  // storitve (glej computeFreeSlots spodaj).
-  const [busy, setBusy] = useState<BusyInterval[]>([]);
+  // Zasedeni intervali (čas + trajanje + kateremu zaposlenemu pripadajo), NE
+  // samo množica zasedenih TOČNIH časov - potrebno za izračun prekrivanja
+  // glede na trajanje IZBRANE storitve (glej computeFreeSlots spodaj) IN
+  // glede na izbranega izvajalca (glej src/lib/employee-availability.ts).
+  const [busy, setBusy] = useState<EmployeeBusyRow[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(true);
   const [slotsError, setSlotsError] = useState(false);
   // Vedno kaže na TRENUTNO izbrani datum - uporabljeno za zavrnitev
@@ -158,7 +167,7 @@ export default function BookingPage({
   // "Nalagam..."), v ozadju pa se ta datum vseeno tiho osveži
   // (stale-while-revalidate), ker se zasedenost lahko medtem spremeni (druga
   // stranka je rezervirala termin).
-  const availabilityCacheRef = useRef<Map<string, BusyInterval[]>>(new Map());
+  const availabilityCacheRef = useRef<Map<string, EmployeeBusyRow[]>>(new Map());
   // Poveča se ob kliku na "Poskusi znova" - v deps spodnjega useEffect-a, da
   // gumb lahko ponovno sproži nalaganje storitev (loadAvailability za
   // termine kliče uporabnik neposredno, ker je to že samostojna funkcija).
@@ -176,6 +185,7 @@ export default function BookingPage({
     phone: "",
     email: "",
     service: "vseeno",
+    employeeId: "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -276,6 +286,38 @@ export default function BookingPage({
     };
   }, [salonId, supabase, servicesRetryTick]);
 
+  // Aktivni zaposleni TEGA salona - ista zaščita kot loadServices zgoraj. 0
+  // zaposlenih -> spodnji blok "Izberi izvajalca" se sploh ne prikaže
+  // (vedenje identično kot pred to funkcionalnostjo). Točno 1 aktiven ->
+  // tiho samodejno izbran, brez vidnega izbirnika (lastnik mora dodati
+  // SEBE kot zaposlenega, če tudi sam streže stranke, glej pogovor s Claude
+  // - arhitekturni načrt).
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadEmployees() {
+      const { data, error } = await Promise.resolve(
+        supabase
+          .from("employees")
+          .select("id, name, hours")
+          .eq("salon_id", salonId)
+          .eq("active", true)
+          .order("sort_order", { ascending: true })
+      ).catch((err) => ({ data: null, error: err }));
+
+      if (cancelled) return;
+      if (!error && data) {
+        setEmployees(data);
+        if (data.length === 1) setSelectedEmployeeId(data[0].id);
+      }
+      setEmployeesLoading(false);
+    }
+    loadEmployees();
+    return () => {
+      cancelled = true;
+    };
+  }, [salonId, supabase]);
+
   // Ista zaščita (Promise.resolve + .catch + "cancelled"/zastarel-odgovor
   // preverba) uporabljena za nalaganje zasedenosti EN datum naenkrat -
   // uporabljeno za tiho osvežitev TRENUTNO gledanega dne (stale-while-
@@ -293,7 +335,7 @@ export default function BookingPage({
       let { data, error } = await Promise.resolve(
         supabase
           .from("public_availability")
-          .select("appointment_time, duration_minutes")
+          .select("appointment_time, duration_minutes, employee_id")
           .eq("salon_id", salonId)
           .eq("appointment_date", date)
       ).catch((err) => ({ data: null, error: err }));
@@ -308,7 +350,9 @@ export default function BookingPage({
             .eq("salon_id", salonId)
             .eq("appointment_date", date)
         ).catch((err) => ({ data: null, error: err }));
-        data = fallback.data?.map((r) => ({ ...r, duration_minutes: null })) ?? null;
+        data =
+          fallback.data?.map((r) => ({ ...r, duration_minutes: null, employee_id: null })) ??
+          null;
         error = fallback.error;
       }
 
@@ -324,9 +368,10 @@ export default function BookingPage({
       // duration_minutes je lahko null pri obstoječih vrsticah, dokler
       // migracija ne požene backfilla - 60 min privzetek ujema prejšnjo
       // implicitno urno mrežo (glej supabase/schema.sql).
-      const takenIntervals: BusyInterval[] = data.map((r) => ({
+      const takenIntervals: EmployeeBusyRow[] = data.map((r) => ({
         time: r.appointment_time,
         durationMinutes: r.duration_minutes ?? 60,
+        employeeId: r.employee_id ?? null,
       }));
       availabilityCacheRef.current.set(date, takenIntervals);
 
@@ -366,7 +411,7 @@ export default function BookingPage({
     let { data, error } = await Promise.resolve(
       supabase
         .from("public_availability")
-        .select("appointment_date, appointment_time, duration_minutes")
+        .select("appointment_date, appointment_time, duration_minutes, employee_id")
         .eq("salon_id", salonId)
         .gte("appointment_date", from)
         .lte("appointment_date", to)
@@ -382,7 +427,8 @@ export default function BookingPage({
           .gte("appointment_date", from)
           .lte("appointment_date", to)
       ).catch((err) => ({ data: null, error: err }));
-      data = fallback.data?.map((r) => ({ ...r, duration_minutes: null })) ?? null;
+      data =
+        fallback.data?.map((r) => ({ ...r, duration_minutes: null, employee_id: null })) ?? null;
       error = fallback.error;
     }
 
@@ -398,6 +444,7 @@ export default function BookingPage({
       availabilityCacheRef.current.get(row.appointment_date)?.push({
         time: row.appointment_time,
         durationMinutes: row.duration_minutes ?? 60,
+        employeeId: row.employee_id ?? null,
       });
     }
 
@@ -456,9 +503,22 @@ export default function BookingPage({
   const selectedServiceDuration =
     selectedService?.duration_minutes ?? DEFAULT_SERVICE_DURATION_MINUTES;
 
-  const dayWindow = resolveDayWindow(salonHours, selectedDate);
-  const dayBreak = resolveDayBreak(salonHours, selectedDate);
-  const busyWithBreak = dayBreak ? [...busy, dayBreak] : busy;
+  // Efektivni urnik - IZBRANEGA (ali samodejno edinega) zaposlenega, ne
+  // salonovega, brž ko je kdo konkreten v igri (glej pogovor s Claude,
+  // arhitekturni načrt). salonHasActiveEmployees odloča o dvonivojskem busy
+  // filtru spodaj (glej src/lib/employee-availability.ts).
+  const selectedEmployee = employees.find((e) => e.id === selectedEmployeeId);
+  const effectiveHours = selectedEmployee ? selectedEmployee.hours : salonHours;
+  const salonHasActiveEmployees = employees.length > 0;
+
+  const dayWindow = resolveDayWindow(effectiveHours, selectedDate);
+  const dayBreak = resolveDayBreak(effectiveHours, selectedDate);
+  const busyForSelection = busyForEmployee(
+    busy,
+    selectedEmployeeId || null,
+    salonHasActiveEmployees
+  );
+  const busyWithBreak = dayBreak ? [...busyForSelection, dayBreak] : busyForSelection;
   const freeTimes = computeFreeSlots(dayWindow, busyWithBreak, selectedServiceDuration);
 
   // Poišče prvi PRIHODNJI dan (znotraj že prikazanega koledarja) z vsaj enim
@@ -471,10 +531,15 @@ export default function BookingPage({
     for (let i = idx + 1; i < ALL_DATES.length; i++) {
       const date = ALL_DATES[i];
       const cachedBusy = availabilityCacheRef.current.get(date) ?? [];
-      const window = resolveDayWindow(salonHours, date);
-      const brk = resolveDayBreak(salonHours, date);
-      const busyForDay = brk ? [...cachedBusy, brk] : cachedBusy;
-      if (computeFreeSlots(window, busyForDay, selectedServiceDuration).length > 0) {
+      const window = resolveDayWindow(effectiveHours, date);
+      const brk = resolveDayBreak(effectiveHours, date);
+      const busyForDay = busyForEmployee(
+        cachedBusy,
+        selectedEmployeeId || null,
+        salonHasActiveEmployees
+      );
+      const busyForDayWithBreak = brk ? [...busyForDay, brk] : busyForDay;
+      if (computeFreeSlots(window, busyForDayWithBreak, selectedServiceDuration).length > 0) {
         return date;
       }
     }
@@ -521,6 +586,7 @@ export default function BookingPage({
       service: form.service,
       date: selectedDate,
       time: form.time,
+      employeeId: selectedEmployeeId || null,
     });
     setSubmitting(false);
 
@@ -592,6 +658,7 @@ export default function BookingPage({
       email: waitForm.email || undefined,
       service: waitForm.service,
       date: selectedDate,
+      employeeId: waitForm.employeeId || null,
     });
     setSubmitting(false);
 
@@ -600,7 +667,7 @@ export default function BookingPage({
       return;
     }
 
-    setWaitForm({ name: "", phone: "", email: "", service: "vseeno" });
+    setWaitForm({ name: "", phone: "", email: "", service: "vseeno", employeeId: "" });
     showToast("Obvestili te bomo, če se kaj sprosti.");
   }
 
@@ -777,6 +844,37 @@ export default function BookingPage({
               </div>
             )}
 
+            {/* Prikaže se SAMO pri 2+ aktivnih zaposlenih - pri 0 koncept
+                zaposlenega sploh ne obstaja, pri 1 je tiho samodejno izbran
+                (glej efekt zgoraj). Ista vizualna oblika kot seznam storitev
+                zgoraj. */}
+            {employees.length > 1 && (
+              <div className="mb-6">
+                <h2 className="font-display text-xl font-semibold mb-3 text-cream">
+                  Izberi izvajalca
+                </h2>
+                <div className="flex flex-col gap-2">
+                  {employees.map((e) => (
+                    <button
+                      key={e.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedEmployeeId(e.id);
+                        setForm((f) => ({ ...f, time: "" }));
+                      }}
+                      className={`w-full text-left rounded-md border px-3.5 py-2.5 text-sm font-medium cursor-pointer transition-colors ${
+                        selectedEmployeeId === e.id
+                          ? "border-gold bg-selected text-cream"
+                          : "border-border text-cream bg-transparent hover:bg-ink-soft"
+                      }`}
+                    >
+                      {e.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {slotsError || servicesError ? (
               <div className="border border-border rounded-lg bg-panel p-5">
                 <p className="text-sm text-cream-muted mb-3">
@@ -790,7 +888,7 @@ export default function BookingPage({
                   Poskusi znova
                 </button>
               </div>
-            ) : slotsLoading || servicesLoading ? (
+            ) : slotsLoading || servicesLoading || employeesLoading ? (
               <>
                 <h2 className="font-display text-xl font-semibold mb-3 text-cream">
                   Prosti termini
@@ -910,6 +1008,24 @@ export default function BookingPage({
                     </option>
                   ))}
                 </select>
+                {/* Ista 0/1/2+ vidnost kot glavni izbirnik izvajalca zgoraj -
+                    "" = vseeno kdo (glej WaitForm tip in joinWaitlist). */}
+                {employees.length > 1 && (
+                  <select
+                    value={waitForm.employeeId}
+                    onChange={(e) =>
+                      setWaitForm((f) => ({ ...f, employeeId: e.target.value }))
+                    }
+                    className={inputClass}
+                  >
+                    <option value="">Vseeno kdo</option>
+                    {employees.map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <button
                   onClick={joinWaitlist}
                   disabled={submitting}
@@ -959,6 +1075,18 @@ export default function BookingPage({
                       : "Ni določeno"}
                 </p>
               </div>
+              {/* Samo pri 2+ zaposlenih (glej izbirnik zgoraj) - pri 0/1 ni
+                  vidne izbire, ki bi jo bilo treba povzeti. */}
+              {employees.length > 1 && (
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-cream-faint mb-0.5">
+                    Izvajalec
+                  </p>
+                  <p className={selectedEmployee ? "text-cream" : "text-cream-faint"}>
+                    {selectedEmployee ? selectedEmployee.name : "Še ni izbrano"}
+                  </p>
+                </div>
+              )}
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wide text-cream-faint mb-0.5">
                   Datum
