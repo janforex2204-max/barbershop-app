@@ -212,6 +212,12 @@ export default async function OwnerDashboard({
             >
               Delovni čas
             </Link>
+            <Link
+              href="/owner/employees"
+              className="text-sm border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft"
+            >
+              Zaposleni
+            </Link>
             <form action={logout}>
               <button
                 type="submit"

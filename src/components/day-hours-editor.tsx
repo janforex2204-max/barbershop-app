@@ -2,26 +2,10 @@
 
 import type { SalonDayHours } from "@/types/database.types";
 
-export const DAYS = [
-  "Ponedeljek",
-  "Torek",
-  "Sreda",
-  "Četrtek",
-  "Petek",
-  "Sobota",
-  "Nedelja",
-];
-
-// Privzet urnik za nov salon (registracijski wizard) - torek-sobota odprto,
-// nedelja/ponedeljek zaprto, brez premora. Klicano SAMO tam - /owner/hours
-// (urejanje OBSTOJEČEGA urnika) vedno izhaja iz že shranjenega hours.
-export function defaultHours(): SalonDayHours[] {
-  return DAYS.map((day) => {
-    if (day === "Nedelja") return { day, closed: true, from: "09:00", to: "19:00" };
-    if (day === "Sobota") return { day, closed: false, from: "09:00", to: "13:00" };
-    return { day, closed: false, from: "09:00", to: "19:00" };
-  });
-}
+// DAYS/defaultHours so zdaj definirani v src/lib/default-hours.ts (brez
+// "use client", da jih lahko kliče tudi server koda) - tu samo re-export
+// za nazaj združljivost obstoječih uvozov iz te poti.
+export { DAYS, defaultHours } from "@/lib/default-hours";
 
 // Dve vizualni različici, isto vedenje/stanje (glej DayHoursEditor spodaj) -
 // "marketing" ohranja obstoječi temni "fillio" videz registracijskega
