@@ -223,10 +223,7 @@ export default async function OwnerDashboard({
           </div>
         </div>
 
-        <div className="border border-border rounded-lg bg-panel p-4 mb-8">
-          <h2 className="text-sm font-medium text-cream-dim mb-3">Logotip salona</h2>
-          <LogoUpload salonId={salonId} initialLogoUrl={ownerRow.logo_url} />
-        </div>
+        <LogoUpload salonId={salonId} initialLogoUrl={ownerRow.logo_url} />
 
         <NotificationSettings current={notificationPreference} plan={ownerRow.plan} />
 

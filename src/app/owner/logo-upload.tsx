@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Scissors } from "lucide-react";
+import { ChevronDown, ChevronUp, Scissors } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { updateSalonLogo } from "./actions";
 
@@ -28,6 +28,11 @@ export default function LogoUpload({
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Privzeto strnjen SAMO če salon ob nalaganju strani že ima logotip (nič
+  // dodatnega za urediti) - brez logotipa ostane razprt, da nalagalnik takoj
+  // vidna. Samo ZAČETNA vrednost - kasnejši klik na puščico vedno preklopi,
+  // ne glede na to, od kod je stanje izhajalo.
+  const [expanded, setExpanded] = useState(!initialLogoUrl);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -83,34 +88,61 @@ export default function LogoUpload({
   }
 
   return (
-    <div className="flex items-center gap-4">
-      <div className="w-16 h-16 rounded-md border border-border bg-ink-field flex items-center justify-center overflow-hidden shrink-0">
-        {logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- zunanja, dinamična Storage URL (ni lokalna slika), next/image bi zahteval remotePatterns za Supabase domeno
-          <img src={logoUrl} alt="Logotip salona" className="w-full h-full object-cover" />
+    <div className="border border-border rounded-lg bg-panel p-4 mb-8">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center justify-between gap-3 cursor-pointer"
+      >
+        <span className="flex items-center gap-2.5">
+          <h2 className="text-sm font-medium text-cream-dim">Logotip salona</h2>
+          {!expanded && logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element -- zunanja, dinamična Storage URL (ni lokalna slika), next/image bi zahteval remotePatterns za Supabase domeno
+            <img
+              src={logoUrl}
+              alt="Logotip salona"
+              className="w-6 h-6 rounded object-cover border border-border"
+            />
+          )}
+        </span>
+        {expanded ? (
+          <ChevronUp size={16} className="text-cream-faint shrink-0" />
         ) : (
-          <Scissors size={24} className="text-cream-faint" />
+          <ChevronDown size={16} className="text-cream-faint shrink-0" />
         )}
-      </div>
-      <div>
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          disabled={uploading}
-          className="text-sm px-3 py-1.5 rounded-md border border-border text-cream hover:bg-ink-soft cursor-pointer disabled:opacity-60"
-        >
-          {uploading ? "Nalagam..." : logoUrl ? "Zamenjaj logotip" : "Naloži logotip"}
-        </button>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          onChange={handleFile}
-          className="hidden"
-        />
-        <p className="text-xs text-cream-faint mt-1.5">PNG, JPEG ali WebP, do 2 MB.</p>
-        {error && <p className="text-xs text-rose mt-1">{error}</p>}
-      </div>
+      </button>
+
+      {expanded && (
+        <div className="flex items-center gap-4 mt-3">
+          <div className="w-16 h-16 rounded-md border border-border bg-ink-field flex items-center justify-center overflow-hidden shrink-0">
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- zunanja, dinamična Storage URL (ni lokalna slika), next/image bi zahteval remotePatterns za Supabase domeno
+              <img src={logoUrl} alt="Logotip salona" className="w-full h-full object-cover" />
+            ) : (
+              <Scissors size={24} className="text-cream-faint" />
+            )}
+          </div>
+          <div>
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              disabled={uploading}
+              className="text-sm px-3 py-1.5 rounded-md border border-border text-cream hover:bg-ink-soft cursor-pointer disabled:opacity-60"
+            >
+              {uploading ? "Nalagam..." : logoUrl ? "Zamenjaj logotip" : "Naloži logotip"}
+            </button>
+            <input
+              ref={inputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={handleFile}
+              className="hidden"
+            />
+            <p className="text-xs text-cream-faint mt-1.5">PNG, JPEG ali WebP, do 2 MB.</p>
+            {error && <p className="text-xs text-rose mt-1">{error}</p>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
