@@ -67,7 +67,8 @@ export default function LogoUpload({
 
     if (uploadError) {
       setUploading(false);
-      setError("Nalaganje ni uspelo. Poskusi znova.");
+      console.error("salon-logos upload error:", uploadError);
+      setError(`Nalaganje ni uspelo: ${uploadError.message}`);
       return;
     }
 
