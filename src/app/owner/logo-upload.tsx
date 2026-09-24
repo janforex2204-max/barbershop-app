@@ -2,8 +2,7 @@
 
 import { useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Scissors } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { updateSalonLogo } from "./actions";
+import { uploadSalonLogo } from "./actions";
 
 // Ista omejitev kot bucket (glej "salon-logos" v supabase/schema.sql) - tu
 // preverjena PREJ, na klientu, da stranka dobi takojšen odgovor namesto
@@ -18,13 +17,10 @@ const EXT_BY_TYPE: Record<string, string> = {
 };
 
 export default function LogoUpload({
-  salonId,
   initialLogoUrl,
 }: {
-  salonId: string;
   initialLogoUrl: string | null;
 }) {
-  const [supabase] = useState(() => createClient());
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,36 +52,17 @@ export default function LogoUpload({
 
     setUploading(true);
 
-    // "logo.<ext>" (ne izvirno ime datoteke) + upsert - vedno ISTA pot za
-    // TA salon, zato nova nalaganja preprosto prepišejo prejšnjo (ni
-    // osirotelih starih datotek). Storage RLS (glej schema.sql) dovoli
-    // pisanje SAMO v mapo, ki se ujema s klicateljevim lastnim salon_id.
-    const path = `${salonId}/logo.${ext}`;
-    const { error: uploadError } = await supabase.storage
-      .from("salon-logos")
-      .upload(path, file, { upsert: true, contentType: file.type });
-
-    if (uploadError) {
-      setUploading(false);
-      console.error("salon-logos upload error:", uploadError);
-      setError(`Nalaganje ni uspelo: ${uploadError.message}`);
-      return;
-    }
-
-    const { data } = supabase.storage.from("salon-logos").getPublicUrl(path);
-    // Cache-bust - pot je zaradi upsert vedno ista, brez tega bi brskalnik
-    // (ali CDN) po zamenjavi logotipa lahko še vedno prikazoval STAREGA.
-    const publicUrl = `${data.publicUrl}?v=${Date.now()}`;
-
-    const { error: saveError } = await updateSalonLogo(publicUrl);
+    const formData = new FormData();
+    formData.set("file", file);
+    const { url, error: uploadError } = await uploadSalonLogo(formData);
     setUploading(false);
 
-    if (saveError) {
-      setError(saveError);
+    if (uploadError) {
+      setError(`Nalaganje ni uspelo: ${uploadError}`);
       return;
     }
 
-    setLogoUrl(publicUrl);
+    setLogoUrl(url ?? null);
   }
 
   return (

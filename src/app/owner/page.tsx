@@ -223,7 +223,7 @@ export default async function OwnerDashboard({
           </div>
         </div>
 
-        <LogoUpload salonId={salonId} initialLogoUrl={ownerRow.logo_url} />
+        <LogoUpload initialLogoUrl={ownerRow.logo_url} />
 
         <NotificationSettings current={notificationPreference} plan={ownerRow.plan} />
 

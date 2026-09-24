@@ -407,14 +407,23 @@ export async function updateSalonHours(hours: SalonDayHours[]): Promise<{ error?
   return {};
 }
 
-// Klicano PO uspešnem nalaganju v Storage (glej owner/logo-upload.tsx) - ta
-// akcija samo zapiše že naloženo javno URL na salon_owners.logo_url, isti
-// razlog za admin klienta kot zgoraj (ni self-update RLS police). Samo
-// nalaganje datoteke v sam "salon-logos" bucket gre NEPOSREDNO s klienta
-// (session-scoped, Storage RLS v supabase/schema.sql že sama omeji na
-// klicateljevo lastno "mapo") - to tu samo poveže naloženo datoteko s
-// salonom, ki jo bo prikazoval na /[slug].
-export async function updateSalonLogo(logoUrl: string | null): Promise<{ error?: string }> {
+const MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024;
+const LOGO_EXT_BY_TYPE: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+};
+
+// Nalaganje logotipa gre NEPOSREDNO skozi admin klienta (ne s session-scoped
+// browser klienta prek Storage RLS, kot je bilo prvotno) - v praksi je
+// "salon_logos_owner_insert" politika v supabase/schema.sql pri realnem
+// nalaganju vrgla "new row violates row-level security policy" (glej
+// pogovor s Claude), verjetno zaradi neusklajene seje med SSR stranjo in
+// browser Storage klicem. Isti razlog kot povsod drugod v tej datoteki -
+// lastništvo/status preverimo TUKAJ (meja zaupanja) prek cookie-scoped
+// klienta, dejanski zapis (Storage + salon_owners.logo_url) pa naredi
+// admin klient, ki RLS v celoti obide.
+export async function uploadSalonLogo(formData: FormData): Promise<{ url?: string; error?: string }> {
   const supabase = await createClient();
 
   const {
@@ -434,16 +443,43 @@ export async function updateSalonLogo(logoUrl: string | null): Promise<{ error?:
     return { error: "Račun ni povezan z odobrenim salonom." };
   }
 
-  const admin = createAdminClient();
-  const { error } = await admin
-    .from("salon_owners")
-    .update({ logo_url: logoUrl })
-    .eq("id", ownerRow.id);
+  const file = formData.get("file");
+  if (!(file instanceof File)) {
+    return { error: "Datoteka manjka." };
+  }
 
-  if (error) {
-    return { error: error.message };
+  const ext = LOGO_EXT_BY_TYPE[file.type];
+  if (!ext) {
+    return { error: "Dovoljeni formati: PNG, JPEG ali WebP." };
+  }
+  if (file.size > MAX_LOGO_SIZE_BYTES) {
+    return { error: "Datoteka je prevelika (največ 2 MB)." };
+  }
+
+  const admin = createAdminClient();
+  // "logo.<ext>" (ne izvirno ime datoteke) + upsert - vedno ISTA pot za TA
+  // salon, zato nova nalaganja preprosto prepišejo prejšnjo.
+  const path = `${ownerRow.id}/logo.${ext}`;
+  const { error: uploadError } = await admin.storage
+    .from("salon-logos")
+    .upload(path, file, { upsert: true, contentType: file.type });
+  if (uploadError) {
+    return { error: uploadError.message };
+  }
+
+  const { data } = admin.storage.from("salon-logos").getPublicUrl(path);
+  // Cache-bust - pot je zaradi upsert vedno ista, brez tega bi brskalnik
+  // (ali CDN) po zamenjavi logotipa lahko še vedno prikazoval STAREGA.
+  const publicUrl = `${data.publicUrl}?v=${Date.now()}`;
+
+  const { error: dbError } = await admin
+    .from("salon_owners")
+    .update({ logo_url: publicUrl })
+    .eq("id", ownerRow.id);
+  if (dbError) {
+    return { error: dbError.message };
   }
 
   revalidatePath("/owner");
-  return {};
+  return { url: publicUrl };
 }

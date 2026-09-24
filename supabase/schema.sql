@@ -411,6 +411,14 @@ grant select on public_salons to anon, authenticated;
 -- politike spodaj preverijo, da lahko lastnik piše SAMO v svojo lastno
 -- "mapo" (prvi del poti), enak vzorec izolacije kot povsod drugod v tej
 -- shemi (salon_id = my_salon_id()).
+--
+-- OPOMBA (glej pogovor s Claude): nalaganje s session-scoped browser
+-- klienta prek TE politike je v praksi vrglo "new row violates row-level
+-- security policy" (verjetno neusklajena seja med SSR stranjo in browser
+-- Storage klicem). Zato owner/actions.ts uploadSalonLogo zdaj piše prek
+-- ADMIN klienta (service role, obide RLS v celoti) - politike spodaj so
+-- pustili nedotaknjene (neškodljive, RLS ne velja za service role), a jih
+-- dejansko NIHČE več ne uporablja za pisanje.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'salon-logos',
