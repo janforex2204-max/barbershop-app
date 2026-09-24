@@ -138,6 +138,35 @@ alter table services add column if not exists category text;
 notify pgrst, 'reload schema';
 
 -- ---------------------------------------------------------------------------
+-- ZAPOSLENI (employees) - salon lahko ima več zaposlenih, vsak s svojim
+-- imenom in lastnim tedenskim urnikom (ista oblika kot salon_owners.hours,
+-- glej SalonDayHours v database.types.ts - DayHoursEditor je zato brez
+-- sprememb uporaben tudi tu). Definirano PRED appointments, ker
+-- appointments.employee_id spodaj nanj kaže (isti razlog kot services
+-- zgoraj). Na voljo VSEM planom (free + pro) - noben stolpec/politika tu se
+-- NE sklicuje na salon_owners.plan.
+-- ---------------------------------------------------------------------------
+create table if not exists employees (
+  id uuid primary key default gen_random_uuid(),
+  salon_id uuid not null references salon_owners(id) on delete cascade,
+  name text not null,
+  -- SalonDayHours[] - ob ustvarjanju ga owner/employees-actions.ts addEmployee
+  -- seed-a s TRENUTNO vrednostjo salon_owners.hours (ali defaultHours(), če ta
+  -- ni veljaven neprazen array), NE živo povezavo - kasnejša sprememba
+  -- salonovega urnika ne spremeni že ustvarjenih zaposlenih.
+  hours jsonb not null,
+  -- Kot services.active - DEAKTIVACIJA, ne izbris. Deaktiviran zaposleni
+  -- izgine SAMO iz izbire pri NOVI rezervaciji (/[slug], manual-booking-
+  -- form.tsx) - že rezervirani PRIHODNJI termini zanj ostanejo v veljavi
+  -- (appointments.employee_id se ob deaktivaciji NE spremeni).
+  active boolean not null default true,
+  sort_order int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists employees_salon_idx on employees (salon_id);
+
+-- ---------------------------------------------------------------------------
 -- TERMINI (appointments)
 -- ---------------------------------------------------------------------------
 create table if not exists appointments (
@@ -150,15 +179,42 @@ create table if not exists appointments (
   appointment_time text not null check (appointment_time ~ '^[0-2][0-9]:[0-5][0-9]$'),
   status text not null default 'booked' check (status in ('booked', 'cancelled', 'filled')),
   -- Priprava na več frizerjev znotraj enega salona (funkcionalnost še ne
-  -- obstaja v UI).
+  -- obstaja v UI) - nedotaknjeno, neškodljivo mrtvo polje. Prava
+  -- funkcionalnost je spodnji employee_id (glej employees zgoraj).
   barber_name text not null default '',
   created_at timestamptz not null default now()
 );
 
+-- Kateremu zaposlenemu je termin dodeljen (glej employees zgoraj) - NULL za
+-- salone brez (aktivnih) zaposlenih (nazaj združljivo - en sam skupen
+-- koledar kot doslej) IN za vse termine, rezervirane PRED to funkcionalnostjo.
+-- "on delete set null", NE cascade - izbris zaposlenega (ni izpostavljen v
+-- UI, samo Table Editor escape hatch) ne sme uničiti zgodovine termina.
+alter table appointments add column if not exists employee_id uuid references employees(id) on delete set null;
+
 -- Prepreči dvojno rezervacijo istega termina PRI ISTEM SALONU (dva različna
--- salona lahko oba prosto uporabljata npr. 10:00 isti dan).
-create unique index if not exists appointments_salon_date_time_active_idx
-  on appointments (salon_id, appointment_date, appointment_time)
+-- salona lahko oba prosto uporabljata npr. 10:00 isti dan). KRITIČNO:
+-- employee_id spodaj NI preprosto dodan kot četrti stolpec obstoječega
+-- indexa - Postgres unique index obravnava NULL kot RAZLIČEN od vsakega
+-- drugega NULL-a, zato bi dva termina BREZ zaposlenega (= vsak salon, ki te
+-- funkcionalnosti ne uporablja, in ves obstoječi backlog pred to migracijo)
+-- drug drugega tiho NEHALA blokirati na istem salonu/datumu/uri - prava
+-- dvojna rezervacija bi šla skozi neopaženo. coalesce(...) spodaj vse NULL
+-- vrednosti preslika na EN skupen sentinel UUID (dobeseden literal, brez
+-- razširitve, gen_random_uuid() ga praktično nikoli ne more ustvariti),
+-- zato: (a) dva termina BREZ zaposlenega še vedno trčita (isto vedenje kot
+-- danes), (b) dva termina z RAZLIČNIM zaposlenim lahko držita isti termin
+-- (vzporedna kapaciteta), (c) dva termina z ISTIM zaposlenim še vedno
+-- trčita. Glej pogovor s Claude za izpeljavo.
+drop index if exists appointments_salon_date_time_active_idx;
+
+create unique index if not exists appointments_salon_date_time_employee_active_idx
+  on appointments (
+    salon_id,
+    appointment_date,
+    appointment_time,
+    coalesce(employee_id, '00000000-0000-0000-0000-000000000000'::uuid)
+  )
   where status <> 'cancelled';
 
 create index if not exists appointments_salon_date_idx on appointments (salon_id, appointment_date);
@@ -230,11 +286,20 @@ create table if not exists waitlist (
   preferred_date date not null,
   -- Katero storitev stranka čaka, ali 'vseeno' za katerokoli.
   service_preference text not null default 'vseeno',
+  -- Priprava na več frizerjev - nedotaknjeno, neškodljivo mrtvo polje (glej
+  -- isti komentar na appointments.barber_name zgoraj). Prava funkcionalnost
+  -- je spodnji employee_id.
   barber_name text not null default '',
   created_at timestamptz not null default now()
 );
 
 create index if not exists waitlist_salon_date_idx on waitlist (salon_id, preferred_date);
+
+-- Katerega zaposlenega si stranka želi na čakalni listi, ali NULL = "vseeno"
+-- - isti null-pomeni-katerikoli vzorec kot service_preference = 'vseeno'
+-- zgoraj, tu pa kot pravo nullable FK namesto besedilnega sentinela (glej
+-- notifyAffectedCustomersOfCancellation v src/lib/cancellation.ts).
+alter table waitlist add column if not exists employee_id uuid references employees(id) on delete set null;
 
 -- IP odjemalca ob prijavi v čakalno vrsto, SAMO za rate limiting (glej
 -- src/lib/rate-limit.ts) - nikoli prikazano lastniku salona.
@@ -291,6 +356,7 @@ create index if not exists sms_notifications_salon_date_idx on sms_notifications
 --   - ustvarijo nov termin (booking) in se pridružijo čakalni vrsti.
 -- ---------------------------------------------------------------------------
 alter table services enable row level security;
+alter table employees enable row level security;
 alter table appointments enable row level security;
 alter table waitlist enable row level security;
 alter table sms_notifications enable row level security;
@@ -336,6 +402,17 @@ drop policy if exists "services_owner_manage" on services;
 create policy "services_owner_manage" on services
   for all using (salon_id = my_salon_id()) with check (salon_id = my_salon_id());
 
+-- employees: vsi vidijo aktivne zaposlene (aplikacija SAMA filtrira po
+-- salon_id - isti vzorec kot services_public_read zgoraj), lastnik ureja
+-- SAMO svoje.
+drop policy if exists "employees_public_read" on employees;
+create policy "employees_public_read" on employees
+  for select using (active = true);
+
+drop policy if exists "employees_owner_manage" on employees;
+create policy "employees_owner_manage" on employees
+  for all using (salon_id = my_salon_id()) with check (salon_id = my_salon_id());
+
 -- appointments: anon lahko samo doda (rezervira), lastnik vidi/ureja SAMO
 -- svoje. Anon NIMA select pravice na tabeli (imena/telefoni ostanejo
 -- zasebni) - za prikaz prostih terminov strankam uporabi spodnji view.
@@ -369,9 +446,12 @@ create policy "sms_notifications_owner_full_access" on sms_notifications
 -- ---------------------------------------------------------------------------
 -- duration_minutes dodan, da lahko /[slug] izračuna PRAVO prekrivanje
 -- (ne samo enak appointment_time) - glej src/lib/availability.ts.
+-- employee_id dodan ZADNJI (glej opozorilo pri public_salons spodaj o
+-- napaki 42P16, ista omejitev velja tu) - uporabljen za razpoložljivost po
+-- zaposlenem, glej pogovor s Claude o več-zaposlenih funkcionalnosti.
 create or replace view public_availability
   with (security_invoker = false) as
-  select appointment_date, appointment_time, duration_minutes, status, salon_id
+  select appointment_date, appointment_time, duration_minutes, status, salon_id, employee_id
   from appointments
   where status <> 'cancelled';
 

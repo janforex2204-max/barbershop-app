@@ -62,6 +62,30 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["services"]["Insert"]>;
         Relationships: [];
       };
+      employees: {
+        Row: {
+          id: string;
+          salon_id: string;
+          name: string;
+          // SalonDayHours[] - ista oblika kot salon_owners.hours, seed-ana
+          // ob ustvarjanju (glej owner/employees-actions.ts addEmployee).
+          hours: SalonDayHours[];
+          active: boolean;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          salon_id: string;
+          name: string;
+          hours: SalonDayHours[];
+          active?: boolean;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["employees"]["Insert"]>;
+        Relationships: [];
+      };
       appointments: {
         Row: {
           id: string;
@@ -85,6 +109,10 @@ export type Database = {
           token: string;
           // Neobvezen, doda se ŠELE po rezervaciji (glej booking-page.tsx).
           customer_email: string | null;
+          // Kateremu zaposlenemu je termin dodeljen - null za salone brez
+          // (aktivnih) zaposlenih in za vse termine pred to funkcionalnostjo
+          // (glej employees zgoraj in pogovor s Claude).
+          employee_id: string | null;
         };
         Insert: {
           id?: string;
@@ -101,6 +129,7 @@ export type Database = {
           duration_minutes?: number | null;
           token: string;
           customer_email?: string | null;
+          employee_id?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["appointments"]["Insert"]>;
         Relationships: [];
@@ -120,6 +149,9 @@ export type Database = {
           // Neobvezno - dodatni kanal za "Pošlji obvestilo" na /owner (glej
           // owner/actions.ts sendWaitlistNotification).
           customer_email: string | null;
+          // Katerega zaposlenega si stranka želi, ali null = "vseeno" (isti
+          // pomen kot service_preference = "vseeno", glej employees zgoraj).
+          employee_id: string | null;
         };
         Insert: {
           id?: string;
@@ -132,6 +164,7 @@ export type Database = {
           created_at?: string;
           ip_address?: string | null;
           customer_email?: string | null;
+          employee_id?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["waitlist"]["Insert"]>;
         Relationships: [];
@@ -219,6 +252,7 @@ export type Database = {
           appointment_time: string;
           duration_minutes: number | null;
           status: AppointmentStatus;
+          employee_id: string | null;
         };
         Relationships: [];
       };
