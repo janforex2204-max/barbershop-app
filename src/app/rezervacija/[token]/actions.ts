@@ -8,8 +8,8 @@ import {
   resolveDayWindow,
   resolveDayBreak,
   isSlotAvailable,
-  type BusyInterval,
 } from "@/lib/availability";
+import { busyForEmployee, type EmployeeBusyRow } from "@/lib/employee-availability";
 
 // Token JE avtorizacija (glej supabase/schema.sql - kriptografsko naključen,
 // neuganljiv) - zato tu VEDNO admin (service_role) klient, mimo RLS (anon
@@ -92,24 +92,43 @@ export async function rescheduleBookingByToken(
     .eq("id", appt.salon_id)
     .maybeSingle();
 
-  const window = resolveDayWindow(salon?.hours ?? null, input.date);
+  // Zaposleni se pri prenaročanju NIKOLI ne izbira znova, samo prenese
+  // (glej pogovor s Claude, arhitekturni načrt) - appt.employee_id je že
+  // fiksen iz izvirne rezervacije, tudi če je bil ta zaposleni medtem
+  // deaktiviran (deaktivacija ne sme orositi že obstoječih terminov).
+  let effectiveHours = salon?.hours ?? null;
+  if (appt.employee_id) {
+    const { data: employee } = await admin
+      .from("employees")
+      .select("hours")
+      .eq("id", appt.employee_id)
+      .maybeSingle();
+    if (employee) effectiveHours = employee.hours;
+  }
+
+  const window = resolveDayWindow(effectiveHours, input.date);
 
   // Neposredno iz appointments (admin klient, mimo public_availability) -
   // izključi TRENUTNI termin (appt.id), da ne "blokira" sam sebe pri
   // ponovni izbiri istega/bližnjega časa.
   const { data: busyRows } = await admin
     .from("appointments")
-    .select("appointment_time, duration_minutes")
+    .select("appointment_time, duration_minutes, employee_id")
     .eq("salon_id", appt.salon_id)
     .eq("appointment_date", input.date)
     .neq("id", appt.id)
     .neq("status", "cancelled");
 
-  const busy: BusyInterval[] = (busyRows ?? []).map((r) => ({
+  const rawBusy: EmployeeBusyRow[] = (busyRows ?? []).map((r) => ({
     time: r.appointment_time,
     durationMinutes: r.duration_minutes ?? 60,
+    employeeId: r.employee_id ?? null,
   }));
-  const dayBreak = resolveDayBreak(salon?.hours ?? null, input.date);
+  // Fiksen zaposleni (glej zgoraj) - dvonivojski filter (src/lib/employee-
+  // availability.ts) uporabi appt.employee_id neposredno, brez ponovnega
+  // poizvedovanja "ali ima salon aktivne zaposlene".
+  const busy = busyForEmployee(rawBusy, appt.employee_id, appt.employee_id !== null);
+  const dayBreak = resolveDayBreak(effectiveHours, input.date);
   if (dayBreak) busy.push(dayBreak);
 
   const durationMinutes = appt.duration_minutes ?? 30;

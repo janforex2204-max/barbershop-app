@@ -19,6 +19,7 @@ import {
   computeFreeSlots,
   type BusyInterval,
 } from "@/lib/availability";
+import { busyForEmployee, type EmployeeBusyRow } from "@/lib/employee-availability";
 import type { SalonDayHours, AppointmentStatus } from "@/types/database.types";
 import { cancelBookingByToken, rescheduleBookingByToken } from "./actions";
 
@@ -29,6 +30,7 @@ type Appointment = {
   durationMinutes: number;
   status: AppointmentStatus;
   customerName: string;
+  employeeId: string | null;
 };
 
 export default function ManageBookingPage({
@@ -38,6 +40,8 @@ export default function ManageBookingPage({
   salonName,
   salonHours,
   salonCategory,
+  employeeName,
+  employeeHours,
 }: {
   token: string;
   appointment: Appointment;
@@ -45,6 +49,11 @@ export default function ManageBookingPage({
   salonName: string;
   salonHours: SalonDayHours[] | null;
   salonCategory: string | null;
+  // Zaposleni se pri prenaročanju NIKOLI ne izbira znova, samo prenese
+  // (glej rezervacija/[token]/page.tsx) - null, če termin nima dodeljenega
+  // zaposlenega.
+  employeeName: string | null;
+  employeeHours: SalonDayHours[] | null;
 }) {
   const salonTheme = resolveSalonTheme(salonCategory);
   const router = useRouter();
@@ -79,7 +88,7 @@ export default function ManageBookingPage({
     let { data, error } = await Promise.resolve(
       supabase
         .from("public_availability")
-        .select("appointment_time, duration_minutes")
+        .select("appointment_time, duration_minutes, employee_id")
         .eq("salon_id", salonId)
         .eq("appointment_date", date)
     ).catch((err) => ({ data: null, error: err }));
@@ -92,7 +101,8 @@ export default function ManageBookingPage({
           .eq("salon_id", salonId)
           .eq("appointment_date", date)
       ).catch((err) => ({ data: null, error: err }));
-      data = fallback.data?.map((r) => ({ ...r, duration_minutes: null })) ?? null;
+      data =
+        fallback.data?.map((r) => ({ ...r, duration_minutes: null, employee_id: null })) ?? null;
       error = fallback.error;
     }
 
@@ -109,12 +119,16 @@ export default function ManageBookingPage({
       (r) => !(date === appointment.date && r.appointment_time === appointment.time)
     );
 
-    setBusy(
-      filtered.map((r) => ({
-        time: r.appointment_time,
-        durationMinutes: r.duration_minutes ?? 60,
-      }))
-    );
+    const rawBusy: EmployeeBusyRow[] = filtered.map((r) => ({
+      time: r.appointment_time,
+      durationMinutes: r.duration_minutes ?? 60,
+      employeeId: r.employee_id ?? null,
+    }));
+    // Zaposleni je FIKSEN (appointment.employeeId, glej page.tsx) - ne
+    // izbira se na novo, zato dvonivojski filter (src/lib/employee-
+    // availability.ts) uporabi kar to vrednost neposredno namesto ponovnega
+    // poizvedovanja "ali ima salon aktivne zaposlene".
+    setBusy(busyForEmployee(rawBusy, appointment.employeeId, appointment.employeeId !== null));
     setSlotsLoading(false);
   }
 
@@ -132,8 +146,11 @@ export default function ManageBookingPage({
     loadSlotsForDate(date);
   }
 
-  const dayWindow = resolveDayWindow(salonHours, selectedDate);
-  const dayBreak = resolveDayBreak(salonHours, selectedDate);
+  // Efektivni urnik - DODELJENEGA zaposlenega, ne salonovega, če obstaja
+  // (glej pogovor s Claude, arhitekturni načrt).
+  const effectiveHours = employeeHours ?? salonHours;
+  const dayWindow = resolveDayWindow(effectiveHours, selectedDate);
+  const dayBreak = resolveDayBreak(effectiveHours, selectedDate);
   const busyWithBreak = dayBreak ? [...busy, dayBreak] : busy;
   const freeTimes = computeFreeSlots(dayWindow, busyWithBreak, appointment.durationMinutes);
 
@@ -196,6 +213,14 @@ export default function ManageBookingPage({
                   </p>
                   <p className="text-cream">{formatDuration(appointment.durationMinutes)}</p>
                 </div>
+                {employeeName && (
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-cream-faint mb-0.5">
+                      Izvajalec
+                    </p>
+                    <p className="text-cream">{employeeName}</p>
+                  </div>
+                )}
                 <div>
                   <p className="text-[11px] font-bold uppercase tracking-wide text-cream-faint mb-0.5">
                     Datum

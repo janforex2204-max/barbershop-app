@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { SalonDayHours } from "@/types/database.types";
 import ManageBookingPage from "./manage-booking-page";
 
 // Token JE avtorizacija (glej supabase/schema.sql) - zato admin klient, mimo
@@ -35,6 +36,24 @@ export default async function RezervacijaTokenPage({
     notFound();
   }
 
+  // Zaposleni se pri prenaročanju NIKOLI ne izbira znova - samo prenese
+  // (glej pogovor s Claude, arhitekturni načrt). null, če je bil termin
+  // rezerviran brez dodeljenega zaposlenega (salon brez te funkcionalnosti,
+  // ali termin izpred nje).
+  let employeeName: string | null = null;
+  let employeeHours: SalonDayHours[] | null = null;
+  if (appt.employee_id) {
+    const { data: employee } = await admin
+      .from("employees")
+      .select("name, hours")
+      .eq("id", appt.employee_id)
+      .maybeSingle();
+    if (employee) {
+      employeeName = employee.name;
+      employeeHours = employee.hours;
+    }
+  }
+
   return (
     <ManageBookingPage
       token={token}
@@ -45,11 +64,14 @@ export default async function RezervacijaTokenPage({
         durationMinutes: appt.duration_minutes ?? 30,
         status: appt.status,
         customerName: appt.customer_name,
+        employeeId: appt.employee_id,
       }}
       salonId={appt.salon_id}
       salonName={salon.salon_name}
       salonHours={salon.hours}
       salonCategory={salon.category}
+      employeeName={employeeName}
+      employeeHours={employeeHours}
     />
   );
 }
