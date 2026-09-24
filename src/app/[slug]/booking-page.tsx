@@ -615,7 +615,7 @@ export default function BookingPage({
               <img
                 src={salonLogoUrl}
                 alt={salonName}
-                className="w-9 h-9 rounded-md object-cover"
+                className="w-14 h-14 rounded-lg object-cover"
               />
             ) : (
               <Scissors size={22} className="text-gold" />
