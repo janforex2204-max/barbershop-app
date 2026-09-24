@@ -15,8 +15,8 @@ import {
   resolveDayBreak,
   isSlotAvailable,
   DEFAULT_SERVICE_DURATION_MINUTES,
-  type BusyInterval,
 } from "@/lib/availability";
+import { busyForEmployee, type EmployeeBusyRow } from "@/lib/employee-availability";
 import type { NotificationPreference, SalonDayHours } from "@/types/database.types";
 
 export async function login(formData: FormData) {
@@ -189,12 +189,34 @@ export async function addManualAppointment(
   const service = String(formData.get("service") ?? "").trim();
   const appointment_date = String(formData.get("appointment_date") ?? "");
   const appointment_time = String(formData.get("appointment_time") ?? "");
+  const employee_id = String(formData.get("employee_id") ?? "").trim() || null;
 
   if (!customer_name || !customer_phone || !service || !appointment_date || !appointment_time) {
     return { error: "Izpolni vsa polja." };
   }
 
-  const window = resolveDayWindow(ownerRow.hours, appointment_date);
+  // Nikoli ne zaupamo employee_id, ki bi ga poslal klient - preveri, da
+  // pripada TEMU salonu in je aktiven (isti razlog kot trajanje storitve
+  // spodaj). salonHasActiveEmployees odloča o dvonivojskem busy filtru
+  // (glej src/lib/employee-availability.ts) NE GLEDE na to, ali je bil
+  // employee_id sploh poslan.
+  const { data: activeEmployees } = await supabase
+    .from("employees")
+    .select("id, hours")
+    .eq("salon_id", ownerRow.id)
+    .eq("active", true);
+
+  const salonHasActiveEmployees = (activeEmployees?.length ?? 0) > 0;
+  let effectiveHours = ownerRow.hours;
+  if (employee_id) {
+    const matchedEmployee = activeEmployees?.find((e) => e.id === employee_id);
+    if (!matchedEmployee) {
+      return { error: "Izbrani zaposleni ni veljaven." };
+    }
+    effectiveHours = matchedEmployee.hours;
+  }
+
+  const window = resolveDayWindow(effectiveHours, appointment_date);
   if (!window) {
     return { error: "Salon ta dan ne dela." };
   }
@@ -218,7 +240,7 @@ export async function addManualAppointment(
   // public_availability - lastnik že ima dostop do svoje tabele.
   let { data: busyRows, error: busyError } = await supabase
     .from("appointments")
-    .select("appointment_time, duration_minutes")
+    .select("appointment_time, duration_minutes, employee_id")
     .eq("salon_id", ownerRow.id)
     .eq("appointment_date", appointment_date)
     .neq("status", "cancelled");
@@ -233,7 +255,8 @@ export async function addManualAppointment(
       .eq("salon_id", ownerRow.id)
       .eq("appointment_date", appointment_date)
       .neq("status", "cancelled");
-    busyRows = fallback.data?.map((r) => ({ ...r, duration_minutes: null })) ?? null;
+    busyRows =
+      fallback.data?.map((r) => ({ ...r, duration_minutes: null, employee_id: null })) ?? null;
     busyError = fallback.error;
   }
 
@@ -241,11 +264,13 @@ export async function addManualAppointment(
     return { error: "Prišlo je do začasne napake. Poskusi znova čez trenutek." };
   }
 
-  const busy: BusyInterval[] = (busyRows ?? []).map((r) => ({
+  const rawBusy: EmployeeBusyRow[] = (busyRows ?? []).map((r) => ({
     time: r.appointment_time,
     durationMinutes: r.duration_minutes ?? 60,
+    employeeId: r.employee_id ?? null,
   }));
-  const dayBreak = resolveDayBreak(ownerRow.hours, appointment_date);
+  const busy = busyForEmployee(rawBusy, employee_id, salonHasActiveEmployees);
+  const dayBreak = resolveDayBreak(effectiveHours, appointment_date);
   if (dayBreak) busy.push(dayBreak);
 
   if (!isSlotAvailable(window, busy, durationMinutes, appointment_time)) {
@@ -264,6 +289,7 @@ export async function addManualAppointment(
     appointment_date,
     appointment_time,
     duration_minutes: durationMinutes,
+    employee_id,
     status: "booked",
     token,
   });
@@ -279,6 +305,7 @@ export async function addManualAppointment(
       service,
       appointment_date,
       appointment_time,
+      employee_id,
       status: "booked",
       token,
     });

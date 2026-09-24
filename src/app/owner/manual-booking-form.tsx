@@ -9,12 +9,13 @@ import {
   resolveDayBreak,
   computeFreeSlots,
   DEFAULT_SERVICE_DURATION_MINUTES,
-  type BusyInterval,
 } from "@/lib/availability";
+import { busyForEmployee, type EmployeeBusyRow } from "@/lib/employee-availability";
 import type { SalonDayHours } from "@/types/database.types";
 import { addManualAppointment, type ManualBookingState } from "./actions";
 
 type Service = { id: string; name: string; duration_minutes: number | null };
+type Employee = { id: string; name: string; hours: SalonDayHours[] };
 
 const initialState: ManualBookingState = {};
 
@@ -33,12 +34,16 @@ export default function ManualBookingForm({
 
   const [services, setServices] = useState<Service[]>([]);
   const [service, setService] = useState("");
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [employeeId, setEmployeeId] = useState("");
   const [date, setDate] = useState(initialDate);
   const [time, setTime] = useState("");
-  // Zasedeni intervali (čas + trajanje) - isti tip in isti izračun kot na
-  // javni strani (glej src/lib/availability.ts), zato lastnikov ročni vnos
-  // ne more več ustvariti prekrivanja, ki bi ga /[slug] preprečil.
-  const [busy, setBusy] = useState<BusyInterval[]>([]);
+  // Zasedeni intervali (čas + trajanje + kateremu zaposlenemu pripadajo) -
+  // isti tip in isti izračun kot na javni strani (glej
+  // src/lib/availability.ts, src/lib/employee-availability.ts), zato
+  // lastnikov ročni vnos ne more več ustvariti prekrivanja, ki bi ga
+  // /[slug] preprečil.
+  const [busy, setBusy] = useState<EmployeeBusyRow[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(true);
 
   const [state, formAction, pending] = useActionState(
@@ -53,10 +58,10 @@ export default function ManualBookingForm({
   // ki prepreči, da bi ZASTAREL odgovor prepisal novejše stanje). Ista 42703
   // varovalka kot na /[slug], dokler appointments.duration_minutes morda še
   // ni v produkcijski bazi.
-  async function fetchBusy(forDate: string): Promise<BusyInterval[] | null> {
+  async function fetchBusy(forDate: string): Promise<EmployeeBusyRow[] | null> {
     let { data, error } = await supabase
       .from("public_availability")
-      .select("appointment_time, duration_minutes")
+      .select("appointment_time, duration_minutes, employee_id")
       .eq("salon_id", salonId)
       .eq("appointment_date", forDate);
 
@@ -66,7 +71,8 @@ export default function ManualBookingForm({
         .select("appointment_time")
         .eq("salon_id", salonId)
         .eq("appointment_date", forDate);
-      data = fallback.data?.map((r) => ({ ...r, duration_minutes: null })) ?? null;
+      data =
+        fallback.data?.map((r) => ({ ...r, duration_minutes: null, employee_id: null })) ?? null;
       error = fallback.error;
     }
 
@@ -74,6 +80,7 @@ export default function ManualBookingForm({
     return data.map((r) => ({
       time: r.appointment_time,
       durationMinutes: r.duration_minutes ?? 60,
+      employeeId: r.employee_id ?? null,
     }));
   }
 
@@ -109,6 +116,37 @@ export default function ManualBookingForm({
       }
     }
     loadServices();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [salonId]);
+
+  // Aktivni zaposleni TEGA salona - naloži enkrat, ko se panel odpre (isti
+  // vzorec kot loadServices zgoraj). 0 zaposlenih -> employeeId ostane "" in
+  // spodnji izbirnik se sploh ne prikaže (vedenje identično kot pred to
+  // funkcionalnostjo). Točno 1 aktiven -> tiho samodejno izbran, brez
+  // vidnega izbirnika (glej pogovor s Claude - lastnik mora sebe dodati kot
+  // zaposlenega, če tudi sam streže stranke, sicer ta samodejna izbira
+  // napačno preusmeri vse ROČNE vnose na edinega dodanega zaposlenega).
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadEmployees() {
+      const { data, error } = await supabase
+        .from("employees")
+        .select("id, name, hours")
+        .eq("salon_id", salonId)
+        .eq("active", true)
+        .order("sort_order", { ascending: true });
+
+      if (cancelled) return;
+      if (!error && data) {
+        setEmployees(data);
+        if (data.length === 1) setEmployeeId(data[0].id);
+      }
+    }
+    loadEmployees();
     return () => {
       cancelled = true;
     };
@@ -156,13 +194,24 @@ export default function ManualBookingForm({
     setTime("");
   }
 
+  function handleEmployeeChange(next: string) {
+    setEmployeeId(next);
+    setTime("");
+  }
+
   const selectedService = services.find((s) => s.name === service);
   const selectedServiceDuration =
     selectedService?.duration_minutes ?? DEFAULT_SERVICE_DURATION_MINUTES;
 
-  const dayWindow = resolveDayWindow(salonHours, date);
-  const dayBreak = resolveDayBreak(salonHours, date);
-  const busyWithBreak = dayBreak ? [...busy, dayBreak] : busy;
+  // Efektivni urnik - IZBRANEGA (ali samodejno edinega) zaposlenega, ne
+  // salonov, brž ko je kdo konkreten v igri (glej src/lib/employee-availability.ts).
+  const selectedEmployee = employees.find((e) => e.id === employeeId);
+  const effectiveHours = selectedEmployee ? selectedEmployee.hours : salonHours;
+
+  const dayWindow = resolveDayWindow(effectiveHours, date);
+  const dayBreak = resolveDayBreak(effectiveHours, date);
+  const busyForSelection = busyForEmployee(busy, employeeId || null, employees.length > 0);
+  const busyWithBreak = dayBreak ? [...busyForSelection, dayBreak] : busyForSelection;
   const freeTimes = computeFreeSlots(dayWindow, busyWithBreak, selectedServiceDuration);
   const validDay = dayWindow !== null;
 
@@ -236,6 +285,30 @@ export default function ManualBookingForm({
           ))}
         </select>
 
+        {/* Prikaže se SAMO pri 2+ aktivnih zaposlenih - pri 0 ostane
+            employeeId "", pri 1 je tiho samodejno izbran (glej efekt
+            zgoraj). Brez "name" - vrednost v FormData nosi skriti input
+            spodaj, isti vzorec kot appointment_time (mreža gumbov ni
+            naravno oddajna). */}
+        {employees.length > 1 && (
+          <select
+            value={employeeId}
+            onChange={(e) => handleEmployeeChange(e.target.value)}
+            required
+            className={inputClass}
+          >
+            <option value="" disabled>
+              Izberi izvajalca
+            </option>
+            {employees.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.name}
+              </option>
+            ))}
+          </select>
+        )}
+        <input type="hidden" name="employee_id" value={employeeId} />
+
         <input
           type="date"
           name="appointment_date"
@@ -283,7 +356,13 @@ export default function ManualBookingForm({
 
         <button
           type="submit"
-          disabled={pending || !validDay || !time || freeTimes.length === 0}
+          disabled={
+            pending ||
+            !validDay ||
+            !time ||
+            freeTimes.length === 0 ||
+            (employees.length > 1 && !employeeId)
+          }
           className="w-full py-2.5 rounded-md border-none bg-burgundy text-on-accent text-sm font-semibold cursor-pointer mt-1 disabled:opacity-50"
         >
           Dodaj termin{time ? ` — ${time}` : ""}
