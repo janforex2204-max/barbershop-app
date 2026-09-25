@@ -151,11 +151,23 @@ function formatDayRange(startIso: string, endIso: string): string {
   return `${start.getDate()}. ${capitalize(startMonth)} - ${end.getDate()}. ${capitalize(endMonth)}`;
 }
 
-// Delovni dnevi (torek-sobota), grupirani po tednih - privzeto ta teden +
-// naslednji trije (cca. 4 tedne vnaprej). Pretekli dnevi v tekočem tednu so
-// izpuščeni. Oznaka vsake skupine je dejanski datumski razpon tistega bloka
-// dni ("Ta teden" ima dodano predpono, ostali imajo samo datume).
-export function upcomingBusinessWeeks(weekCount = BOOKING_WINDOW_WEEKS): BusinessWeek[] {
+// Splošen graditelj "naslednjih N tednov" (privzeto ta teden + naslednji
+// trije, cca. 4 tedne vnaprej) - dan je vključen SAMO, če isEligible(iso)
+// vrne true; klicatelj določi pomen "primernosti". Iterira VSEH 7 dni v
+// tednu (ponedeljek-nedelja), filtriranje je v celoti prepuščeno predikatu,
+// ne trdo kodiranim offsetom. Pretekli dnevi v tekočem tednu so izpuščeni.
+// Oznaka vsake skupine je dejanski datumski razpon tistega bloka dni ("Ta
+// teden" ima dodano predpono, ostali imajo samo datume).
+//
+// Namenoma TUKAJ, ne v src/lib/availability.ts - ta modul ne sme uvoziti
+// resolveDayWindow (availability.ts že uvaža isBusinessDay OD TU, obratna
+// smer bi ustvarila krožno odvisnost), zato dejansko odločanje "je ta dan
+// primeren" prepustimo klicatelju prek predikata (glej upcomingAvailableWeeks
+// v src/lib/availability.ts, ki predikat postavi na resolveDayWindow).
+export function upcomingWeeksMatching(
+  isEligible: (iso: string) => boolean,
+  weekCount = BOOKING_WINDOW_WEEKS
+): BusinessWeek[] {
   const today = todayISO();
   const monday = mondayOf(today);
 
@@ -165,11 +177,11 @@ export function upcomingBusinessWeeks(weekCount = BOOKING_WINDOW_WEEKS): Busines
     weekMonday.setDate(weekMonday.getDate() + w * 7);
 
     const dates: string[] = [];
-    for (const offset of [1, 2, 3, 4, 5]) {
+    for (const offset of [0, 1, 2, 3, 4, 5, 6]) {
       const d = new Date(weekMonday);
       d.setDate(d.getDate() + offset);
       const iso = toISODate(d);
-      if (iso >= today) dates.push(iso);
+      if (iso >= today && isEligible(iso)) dates.push(iso);
     }
 
     if (dates.length > 0) {
@@ -178,6 +190,18 @@ export function upcomingBusinessWeeks(weekCount = BOOKING_WINDOW_WEEKS): Busines
     }
   }
   return weeks;
+}
+
+// Star, trdo kodiran torek-sobota vzorec (BUSINESS_WEEKDAYS zgoraj) - JAVNA
+// rezervacijska stran (booking-page.tsx/date-picker.tsx) tega NE uporablja
+// več, glej upcomingAvailableWeeks v src/lib/availability.ts, ki namesto
+// trdega pravila dejansko bere salon_owners.hours/zaposlenega hours (glej
+// pogovor s Claude - prej DatePicker ponedeljka ni nikoli ponudil kot
+// izbirljivega, ne glede na to, kaj je bilo dejansko nastavljeno v hours).
+// Ostane kot privzeti fallback za resolveDayWindow (salon brez nastavljenega
+// hours) in za owner/month-calendar.tsx/nextBusinessDayAfterToday.
+export function upcomingBusinessWeeks(weekCount = BOOKING_WINDOW_WEEKS): BusinessWeek[] {
+  return upcomingWeeksMatching(isBusinessDay, weekCount);
 }
 
 // ---------------------------------------------------------------------------

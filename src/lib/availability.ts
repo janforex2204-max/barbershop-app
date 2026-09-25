@@ -1,5 +1,10 @@
 import type { SalonDayHours } from "@/types/database.types";
-import { isBusinessDay } from "./constants";
+import {
+  isBusinessDay,
+  upcomingWeeksMatching,
+  BOOKING_WINDOW_WEEKS,
+  type BusinessWeek,
+} from "./constants";
 
 // En sam vir resnice za izračun prostih terminov, ki upošteva TRAJANJE
 // izbrane storitve - uporabljeno na /[slug] (javna rezervacijska stran) in
@@ -74,6 +79,21 @@ export function resolveDayWindow(
   if (!day) return isBusinessDay(dateISO) ? DEFAULT_WINDOW : null;
   if (day.closed) return null;
   return { start: day.from, end: day.to };
+}
+
+// Isti tedenski/dnevni razpon kot upcomingBusinessWeeks (glej ./constants),
+// a dan vključi SAMO, če je dejansko odprt po hours (resolveDayWindow
+// zgoraj) - ne po trdem torek-sobota pravilu. Uporabljeno na javni
+// rezervacijski strani (booking-page.tsx/date-picker.tsx) in pri
+// prenaročanju (rezervacija/[token]/manage-booking-page.tsx), da DatePicker
+// dejansko ponudi VSAK dan, ki ga je lastnik (ali zaposleni) odprl - glej
+// pogovor s Claude, prej ponedeljek NI bil nikoli izbirljiv, ne glede na to,
+// kaj je bilo dejansko nastavljeno v hours.
+export function upcomingAvailableWeeks(
+  hours: SalonDayHours[] | null | undefined,
+  weekCount = BOOKING_WINDOW_WEEKS
+): BusinessWeek[] {
+  return upcomingWeeksMatching((iso) => resolveDayWindow(hours, iso) !== null, weekCount);
 }
 
 // Neobvezen premor (npr. malica) znotraj sicer odprtega dne - glej

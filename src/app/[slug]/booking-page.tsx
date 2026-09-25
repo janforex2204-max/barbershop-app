@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Scissors, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import ThemeToggle from "@/components/theme-toggle";
@@ -11,7 +11,6 @@ import {
   dayLabel,
   formatPrice,
   formatDuration,
-  upcomingBusinessWeeks,
   isValidCustomerName,
   isValidPhone,
   isValidEmail,
@@ -24,6 +23,7 @@ import {
   resolveDayWindow,
   resolveDayBreak,
   computeFreeSlots,
+  upcomingAvailableWeeks,
   DEFAULT_SERVICE_DURATION_MINUTES,
 } from "@/lib/availability";
 import { busyForEmployee, type EmployeeBusyRow } from "@/lib/employee-availability";
@@ -107,14 +107,6 @@ type WaitForm = { name: string; phone: string; email: string; service: string; e
 // nastavitve salona v bazi.
 const BARBER_POLE_WATERMARK_SLUG = "barbershop-pr-kljuni";
 
-// Prvi razpoložljivi delovni dan (torek-sobota) - privzeto izbrani datum.
-const INITIAL_DATE = upcomingBusinessWeeks()[0]?.dates[0] ?? todayISO();
-
-// Vsi datumi, ki jih DatePicker ponuja (isti nabor, iz istega izvora) - prvi
-// in zadnji tvorita razpon za EN sam poizvedbo, ki naenkrat naloži
-// zasedenost za CEL prikazan koledar (glej loadAllAvailability spodaj).
-const ALL_DATES = upcomingBusinessWeeks().flatMap((w) => w.dates);
-
 export default function BookingPage({
   slug,
   salonId,
@@ -133,6 +125,23 @@ export default function BookingPage({
   salonLogoUrl: string | null;
 }) {
   const salonTheme = resolveSalonTheme(salonCategory);
+
+  // Odvisno od salonHours (prop) - PREJ modulska konstanta, izračunana iz
+  // trdo kodiranega torek-sobota pravila (glej pogovor s Claude), zato je
+  // MORALA priti noter, v telo komponente, kjer je salonHours dejansko na
+  // voljo. useMemo, ker se od tod naprej uporablja kot useState/useRef
+  // začetna vrednost IN v več spodnjih callbackih/closurih - salonHours se v
+  // življenjski dobi te komponente ne spreminja, zato se prakticno izračuna
+  // samo enkrat.
+  const weeks = useMemo(() => upcomingAvailableWeeks(salonHours), [salonHours]);
+  // Vsi datumi, ki jih DatePicker ponuja (isti nabor, iz istega izvora) - prvi
+  // in zadnji tvorita razpon za EN sam poizvedbo, ki naenkrat naloži
+  // zasedenost za CEL prikazan koledar (glej loadAllAvailability spodaj).
+  const ALL_DATES = useMemo(() => weeks.flatMap((w) => w.dates), [weeks]);
+  // Prvi razpoložljivi dan (po DEJANSKEM hours, glej zgoraj) - privzeto
+  // izbrani datum.
+  const INITIAL_DATE = ALL_DATES[0] ?? todayISO();
+
   // createClient() vrne NOV objekt ob vsakem klicu - če bi ga klicali direktno
   // v telesu komponente, bi bil "supabase" spodaj v deps useEffect-ov vsakič
   // drugačen in bi se ti sprožali ob VSAKEM rerenderju (ne le ob dejanski
@@ -454,7 +463,7 @@ export default function BookingPage({
       setBusy(current);
       setSlotsLoading(false);
     }
-  }, [salonId, supabase, loadAvailability]);
+  }, [salonId, supabase, loadAvailability, ALL_DATES]);
 
   useEffect(() => {
     loadAllAvailability();
@@ -795,7 +804,7 @@ export default function BookingPage({
             <h2 className="font-display text-xl font-semibold mb-1 text-cream">
               Izberi dan
             </h2>
-            <DatePicker selectedDate={selectedDate} onSelect={selectDate} />
+            <DatePicker selectedDate={selectedDate} onSelect={selectDate} weeks={weeks} />
 
             {/* Storitev MORA biti izbrana PREDEN prikažemo proste termine - ti
                 so zdaj odvisni od njenega trajanja (glej computeFreeSlots

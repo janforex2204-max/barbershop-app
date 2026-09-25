@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -17,6 +17,7 @@ import {
   resolveDayWindow,
   resolveDayBreak,
   computeFreeSlots,
+  upcomingAvailableWeeks,
   type BusyInterval,
 } from "@/lib/availability";
 import { busyForEmployee, type EmployeeBusyRow } from "@/lib/employee-availability";
@@ -153,6 +154,10 @@ export default function ManageBookingPage({
   const dayBreak = resolveDayBreak(effectiveHours, selectedDate);
   const busyWithBreak = dayBreak ? [...busy, dayBreak] : busy;
   const freeTimes = computeFreeSlots(dayWindow, busyWithBreak, appointment.durationMinutes);
+  // Isti popravek kot booking-page.tsx (glej pogovor s Claude) - DatePicker
+  // dobi VSAK dan, ki je dejansko odprt po effectiveHours, ne le trdo
+  // kodiran torek-sobota nabor.
+  const weeks = useMemo(() => upcomingAvailableWeeks(effectiveHours), [effectiveHours]);
 
   async function submitReschedule() {
     if (!selectedTime) return;
@@ -294,7 +299,7 @@ export default function ManageBookingPage({
               <h2 className="font-display text-lg font-semibold mb-3 text-cream">
                 Izberi nov termin
               </h2>
-              <DatePicker selectedDate={selectedDate} onSelect={selectDate} />
+              <DatePicker selectedDate={selectedDate} onSelect={selectDate} weeks={weeks} />
 
               {actionError && (
                 <p className="text-sm text-rose bg-danger-bg border border-danger-border rounded-md px-3 py-2 mb-4">

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { dayLabel, upcomingBusinessWeeks } from "@/lib/constants";
+import { dayLabel, type BusinessWeek } from "@/lib/constants";
 
 function shortLabel(iso: string) {
   const d = new Date(iso + "T00:00:00");
@@ -10,16 +10,22 @@ function shortLabel(iso: string) {
   return { weekday, day: d.getDate(), month: d.getMonth() + 1 };
 }
 
+// weeks je zdaj VEDNO podan od klicatelja (booking-page.tsx/manage-booking-
+// page.tsx), izračunan iz DEJANSKEGA urnika (upcomingAvailableWeeks v
+// src/lib/availability.ts) - ne več interno iz trdo kodiranega torek-sobota
+// pravila (glej pogovor s Claude), ker ta komponenta sama ne pozna
+// salon_owners.hours.
 export default function DatePicker({
   selectedDate,
   onSelect,
+  weeks,
 }: {
   selectedDate: string;
   onSelect: (date: string) => void;
+  weeks: BusinessWeek[];
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const weeks = upcomingBusinessWeeks();
 
   useEffect(() => {
     if (!open) return;
