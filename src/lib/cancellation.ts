@@ -10,6 +10,7 @@ type CancelledAppointment = {
   appointment_date: string;
   appointment_time: string;
   service: string;
+  employee_id: string | null;
 };
 
 // Skupna logika za OBE poti do odpovedi termina - lastnik prek /owner
@@ -32,7 +33,15 @@ export async function notifyAffectedCustomersOfCancellation(
   client: SupabaseClient<Database>,
   appt: CancelledAppointment
 ) {
-  const { data: laterSameService } = await client
+  // "Zgodnejši termin" - STROGO ujemanje po zaposlenem (ne "OR brez
+  // zaposlenega" kot spodnji busyForEmployee dvonivojski filter v
+  // src/lib/employee-availability.ts - namerna asimetrija, glej pogovor s
+  // Claude): kar se je sprostilo, je SPECIFIČNA ura KONKRETNEGA zaposlenega,
+  // stranka pri drugem zaposlenem nima dejansko sproščenega termina - ponuditi
+  // "zgodnejšo uro" bi jo tiho preusmerilo k drugi osebi. appt.employee_id
+  // null (salon brez te funkcionalnosti) ohrani natanko today-ino vedenje:
+  // ujema SAMO druge prav tako netagirane termine.
+  let laterSameServiceQuery = client
     .from("appointments")
     .select("customer_name, customer_phone")
     .eq("salon_id", appt.salon_id)
@@ -41,6 +50,10 @@ export async function notifyAffectedCustomersOfCancellation(
     .neq("id", appt.id)
     .neq("status", "cancelled")
     .gt("appointment_time", appt.appointment_time);
+  laterSameServiceQuery = appt.employee_id
+    ? laterSameServiceQuery.eq("employee_id", appt.employee_id)
+    : laterSameServiceQuery.is("employee_id", null);
+  const { data: laterSameService } = await laterSameServiceQuery;
 
   const earlierSlotSeen = new Set<string>();
   const earlierSlotMatches = (laterSameService ?? []).filter((a) => {
@@ -49,16 +62,27 @@ export async function notifyAffectedCustomersOfCancellation(
     return true;
   });
 
-  // Ordered po created_at (prvi prijavljen na čakalno listo je prvi v
-  // seznamu) - uporablja tudi owner/page.tsx za prikaz prioritete v gumbu
-  // "Ponudi ta termin", zato mora biti vrstni red tu deterministen.
-  const { data: waitMatches } = await client
+  // Čakalna lista - "OR brez zaposlenega" (stranka, ki ji je bilo "vseeno
+  // kdo", glej booking-page.tsx waitlist obrazec, mora videti VSAKO
+  // sprostitev, ne le pri "svojem" zaposlenem). SAMO če ima appt.employee_id
+  // - sicer (salon brez te funkcionalnosti) brez employee filtra, isto
+  // vedenje kot doslej.
+  let waitMatchesQuery = client
     .from("waitlist")
     .select("*")
     .eq("salon_id", appt.salon_id)
     .eq("preferred_date", appt.appointment_date)
     .in("service_preference", ["vseeno", appt.service])
+    // Ordered po created_at (prvi prijavljen na čakalno listo je prvi v
+    // seznamu) - uporablja tudi owner/page.tsx za prikaz prioritete v gumbu
+    // "Ponudi ta termin", zato mora biti vrstni red tu deterministen.
     .order("created_at", { ascending: true });
+  if (appt.employee_id) {
+    waitMatchesQuery = waitMatchesQuery.or(
+      `employee_id.is.null,employee_id.eq.${appt.employee_id}`
+    );
+  }
+  const { data: waitMatches } = await waitMatchesQuery;
 
   const waitlistSeen = new Set<string>();
   const waitlistMatches = (waitMatches ?? []).filter((w) => {
@@ -67,12 +91,25 @@ export async function notifyAffectedCustomersOfCancellation(
     return true;
   });
 
+  // Ime zaposlenega (če je nastavljen) za obe sporočilni predlogi spodaj -
+  // en dodaten lookup, samo kadar je dejansko potreben.
+  let employeeName: string | null = null;
+  if (appt.employee_id) {
+    const { data: employee } = await client
+      .from("employees")
+      .select("name")
+      .eq("id", appt.employee_id)
+      .maybeSingle();
+    employeeName = employee?.name ?? null;
+  }
+  const employeeLine = employeeName ? ` pri ${employeeName}` : "";
+
   const newLogs = [
     ...earlierSlotMatches.map((a) => ({
       salon_id: appt.salon_id,
       recipient_name: a.customer_name,
       recipient_phone: a.customer_phone,
-      message: `Sprostil se je zgodnejši termin ob ${appt.appointment_time} - bi rad prišel prej?`,
+      message: `Sprostil se je zgodnejši termin${employeeLine} ob ${appt.appointment_time} - bi rad prišel prej?`,
       reason: "earlier_slot" as const,
       appointment_id: appt.id,
       appointment_date: appt.appointment_date,
@@ -81,7 +118,7 @@ export async function notifyAffectedCustomersOfCancellation(
       salon_id: appt.salon_id,
       recipient_name: w.customer_name,
       recipient_phone: w.customer_phone,
-      message: `Sprostil se je termin za ${appt.service} ob ${appt.appointment_time} - se želiš rezervirati?`,
+      message: `Sprostil se je termin za ${appt.service}${employeeLine} ob ${appt.appointment_time} - se želiš rezervirati?`,
       reason: "waitlist" as const,
       appointment_id: appt.id,
       appointment_date: appt.appointment_date,
