@@ -519,6 +519,14 @@ export default function BookingPage({
   const selectedEmployee = employees.find((e) => e.id === selectedEmployeeId);
   const effectiveHours = selectedEmployee ? selectedEmployee.hours : salonHours;
   const salonHasActiveEmployees = employees.length > 0;
+  // Pri 2+ zaposlenih, dokler ni izbran noben konkreten (selectedEmployeeId
+  // je "" - glej pogovor s Claude), spodnji busyForEmployee dobi
+  // employeeId=null, kar filtrira busy na SAMO netagirane termine (skoraj
+  // vedno prazno, ker imajo nove rezervacije zdaj realen employee_id) -
+  // mreža bi zato pokazala zavajajočo "vse prosto" sliko, izračunano proti
+  // splošnemu salonovemu urniku, ne proti pravemu izvajalcu. Ta zastavica
+  // spodaj SPLOH prepreči prikaz mreže, dokler stranka ne izbere nekoga.
+  const employeeSelectionPending = employees.length > 1 && !selectedEmployeeId;
 
   const dayWindow = resolveDayWindow(effectiveHours, selectedDate);
   const dayBreak = resolveDayBreak(effectiveHours, selectedDate);
@@ -910,6 +918,17 @@ export default function BookingPage({
                       className="h-[42px] rounded-md border border-border bg-ink-soft animate-pulse"
                     />
                   ))}
+                </div>
+              </>
+            ) : employeeSelectionPending ? (
+              <>
+                <h2 className="font-display text-xl font-semibold mb-3 text-cream">
+                  Prosti termini
+                </h2>
+                <div className="border border-border rounded-lg bg-panel p-5 mb-7">
+                  <p className="text-sm text-cream-muted">
+                    Izberite izvajalca, da vidite proste termine.
+                  </p>
                 </div>
               </>
             ) : freeTimes.length > 0 ? (
