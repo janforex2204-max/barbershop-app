@@ -976,13 +976,6 @@ export default function BookingPage({
                   Za izbrani dan trenutno ni prostih terminov. Povej nam, katero
                   storitev želiš, in te obvestimo, če se kaj sprosti.
                 </p>
-                <button
-                  type="button"
-                  onClick={jumpToNextAvailable}
-                  className="w-full mb-4 py-2.5 rounded-md border border-gold text-gold text-sm font-semibold cursor-pointer hover:bg-selected transition-colors"
-                >
-                  Na prvi prosti termin →
-                </button>
                 <input
                   placeholder="Ime in priimek"
                   value={waitForm.name}
@@ -1043,6 +1036,25 @@ export default function BookingPage({
                 >
                   Obvestite me, ko se sprosti termin
                 </button>
+
+                {/* Vizualno ločeno od obrazca zgoraj (glej pogovor s Claude) -
+                    ista jumpToNextAvailable funkcionalnost kot prej, samo
+                    premaknjena POD celoten obrazec in preimenovana, da
+                    eksplicitno pove, na KATEREGA izvajalca se nanaša. Ime SAMO
+                    pri 2+ zaposlenih IN dejansko izbranem (ne "Vseeno") - pri
+                    0/1 zaposlenem ostane generično besedilo (glej pogovor s
+                    Claude). */}
+                <div className="border-t border-border-soft mt-5 pt-4">
+                  <button
+                    type="button"
+                    onClick={jumpToNextAvailable}
+                    className="w-full py-2.5 rounded-md border border-gold text-gold text-sm font-semibold cursor-pointer hover:bg-selected transition-colors"
+                  >
+                    {employees.length > 1 && selectedEmployee
+                      ? `Poglejte, kdaj ima ${selectedEmployee.name} prvi prosti termin →`
+                      : "Poglejte prvi prosti termin →"}
+                  </button>
+                </div>
               </div>
             )}
           </div>
