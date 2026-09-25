@@ -108,7 +108,7 @@ export async function sendWaitlistNotification(
 
   const { data: entry } = await supabase
     .from("waitlist")
-    .select("customer_email, service_preference, salon_id")
+    .select("customer_email, service_preference, salon_id, employee_id")
     .eq("id", waitlistId)
     .maybeSingle();
 
@@ -126,12 +126,23 @@ export async function sendWaitlistNotification(
     return {};
   }
 
+  let employeeName: string | null = null;
+  if (entry.employee_id) {
+    const { data: employee } = await supabase
+      .from("employees")
+      .select("name")
+      .eq("id", entry.employee_id)
+      .maybeSingle();
+    employeeName = employee?.name ?? null;
+  }
+
   try {
     await sendWaitlistNotificationEmail({
       to: entry.customer_email,
       salonName: owner.salon_name,
       service: entry.service_preference === "vseeno" ? null : entry.service_preference,
       bookingUrl: `${PLATFORM_URL}/${owner.slug}`,
+      employeeName,
     });
   } catch (e) {
     console.error(`Napaka pri pošiljanju obvestila o prostem terminu (${waitlistId}):`, e);
@@ -152,6 +163,7 @@ export type ManualBookingState = {
     service: string;
     salonName: string;
     token: string;
+    employeeName: string | null;
   };
 };
 
@@ -202,18 +214,20 @@ export async function addManualAppointment(
   // employee_id sploh poslan.
   const { data: activeEmployees } = await supabase
     .from("employees")
-    .select("id, hours")
+    .select("id, name, hours")
     .eq("salon_id", ownerRow.id)
     .eq("active", true);
 
   const salonHasActiveEmployees = (activeEmployees?.length ?? 0) > 0;
   let effectiveHours = ownerRow.hours;
+  let employeeName: string | null = null;
   if (employee_id) {
     const matchedEmployee = activeEmployees?.find((e) => e.id === employee_id);
     if (!matchedEmployee) {
       return { error: "Izbrani zaposleni ni veljaven." };
     }
     effectiveHours = matchedEmployee.hours;
+    employeeName = matchedEmployee.name;
   }
 
   const window = resolveDayWindow(effectiveHours, appointment_date);
@@ -331,6 +345,7 @@ export async function addManualAppointment(
       service,
       salonName: ownerRow.salon_name,
       token,
+      employeeName,
     },
   };
 }

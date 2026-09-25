@@ -117,6 +117,7 @@ export async function sendBookingNotification({
   service,
   dateLabel,
   time,
+  employeeName,
 }: {
   to: string;
   salonName: string;
@@ -125,24 +126,32 @@ export async function sendBookingNotification({
   service: string;
   dateLabel: string;
   time: string;
+  // null = brez dodeljenega zaposlenega (glej pogovor s Claude, arhitekturni
+  // načrt) - vrstica se v tem primeru izpusti, isti vzorec kot serviceLine v
+  // sendWaitlistNotificationEmail spodaj.
+  employeeName?: string | null;
 }) {
   const safeName = escapeHtml(customerName);
   const safePhone = escapeHtml(customerPhone);
   const safeService = escapeHtml(service);
   const safeSalon = escapeHtml(salonName);
   const safeDate = escapeHtml(dateLabel);
+  const employeeTextLine = employeeName ? `\nIzvajalec: ${employeeName}` : "";
+  const employeeHtmlLine = employeeName
+    ? `<br>Izvajalec: ${escapeHtml(employeeName)}`
+    : "";
 
   await sendPlatformEmail(
     to,
     `Nova rezervacija - ${dateLabel} ob ${time}`,
-    `Nova rezervacija za ${salonName}:\n\n${customerName} (${customerPhone})\n${service}\n${dateLabel} ob ${time}\n\nOglej si nadzorno ploščo: ${PLATFORM_URL}/owner`,
+    `Nova rezervacija za ${salonName}:\n\n${customerName} (${customerPhone})\n${service}\n${dateLabel} ob ${time}${employeeTextLine}\n\nOglej si nadzorno ploščo: ${PLATFORM_URL}/owner`,
     `
       <div style="font-family:system-ui,sans-serif;max-width:420px;margin:0 auto;">
         <p style="font-size:15px;color:#1b1815;">Nova rezervacija za <b>${safeSalon}</b>:</p>
         <p style="font-size:14px;color:#1b1815;margin:0 0 20px;">
           <b>${safeName}</b> (${safePhone})<br>
           ${safeService}<br>
-          ${safeDate} ob ${time}
+          ${safeDate} ob ${time}${employeeHtmlLine}
         </p>
         <a href="${PLATFORM_URL}/owner"
            style="display:inline-block;background:#8C2F2F;color:#EFE6D8;text-decoration:none;
@@ -165,7 +174,12 @@ export async function sendDailyDigest({
   to: string;
   salonName: string;
   dateLabel: string;
-  appointments: { time: string; customerName: string; service: string }[];
+  appointments: {
+    time: string;
+    customerName: string;
+    service: string;
+    employeeName?: string | null;
+  }[];
 }) {
   const safeSalon = escapeHtml(salonName);
   const safeDate = escapeHtml(dateLabel);
@@ -173,7 +187,12 @@ export async function sendDailyDigest({
   const rowsText =
     appointments.length === 0
       ? "Danes ni rezerviranih terminov."
-      : appointments.map((a) => `${a.time} - ${a.customerName} (${a.service})`).join("\n");
+      : appointments
+          .map(
+            (a) =>
+              `${a.time} - ${a.customerName} (${a.service}${a.employeeName ? `, ${a.employeeName}` : ""})`
+          )
+          .join("\n");
 
   const rowsHtml =
     appointments.length === 0
@@ -185,7 +204,8 @@ export async function sendDailyDigest({
             <tr>
               <td style="padding:4px 8px 4px 0;font-weight:600;white-space:nowrap;">${escapeHtml(a.time)}</td>
               <td style="padding:4px 8px 4px 0;">${escapeHtml(a.customerName)}</td>
-              <td style="padding:4px 0;color:#8a8377;">${escapeHtml(a.service)}</td>
+              <td style="padding:4px 8px 4px 0;color:#8a8377;">${escapeHtml(a.service)}</td>
+              <td style="padding:4px 0;color:#8a8377;">${a.employeeName ? escapeHtml(a.employeeName) : ""}</td>
             </tr>`
             )
             .join("")}
@@ -224,6 +244,7 @@ export async function sendBookingConfirmationEmail({
   dateLabel,
   time,
   manageUrl,
+  employeeName,
 }: {
   to: string;
   salonName: string;
@@ -231,21 +252,26 @@ export async function sendBookingConfirmationEmail({
   dateLabel: string;
   time: string;
   manageUrl: string;
+  employeeName?: string | null;
 }) {
   const safeSalon = escapeHtml(salonName);
   const safeService = escapeHtml(service);
   const safeDate = escapeHtml(dateLabel);
+  const employeeTextLine = employeeName ? `\nIzvajalec: ${employeeName}` : "";
+  const employeeHtmlLine = employeeName
+    ? `<br>Izvajalec: ${escapeHtml(employeeName)}`
+    : "";
 
   await sendPlatformEmail(
     to,
     `Potrditev rezervacije - ${salonName}`,
-    `Tvoja rezervacija je potrjena:\n\n${salonName}\n${service}\n${dateLabel} ob ${time}\n\nUpravljaj svojo rezervacijo (odpoved/prenaročanje): ${manageUrl}`,
+    `Tvoja rezervacija je potrjena:\n\n${salonName}\n${service}\n${dateLabel} ob ${time}${employeeTextLine}\n\nUpravljaj svojo rezervacijo (odpoved/prenaročanje): ${manageUrl}`,
     `
       <div style="font-family:system-ui,sans-serif;max-width:420px;margin:0 auto;">
         <p style="font-size:15px;color:#1b1815;">Tvoja rezervacija pri <b>${safeSalon}</b> je potrjena:</p>
         <p style="font-size:14px;color:#1b1815;margin:0 0 20px;">
           ${safeService}<br>
-          ${safeDate} ob ${time}
+          ${safeDate} ob ${time}${employeeHtmlLine}
         </p>
         <a href="${manageUrl}"
            style="display:inline-block;background:#8C2F2F;color:#EFE6D8;text-decoration:none;
@@ -268,24 +294,30 @@ export async function sendWaitlistNotificationEmail({
   salonName,
   service,
   bookingUrl,
+  employeeName,
 }: {
   to: string;
   salonName: string;
   service: string | null;
   bookingUrl: string;
+  // null = "vseeno kdo" (glej booking-page.tsx waitlist obrazec) - isti
+  // null-pomeni-izpusti vzorec kot service zgoraj.
+  employeeName?: string | null;
 }) {
   const safeSalon = escapeHtml(salonName);
   const safeService = service ? escapeHtml(service) : null;
   const serviceLine = safeService ? ` za ${safeService}` : "";
+  const safeEmployee = employeeName ? escapeHtml(employeeName) : null;
+  const employeeLine = safeEmployee ? ` pri ${safeEmployee}` : "";
 
   await sendPlatformEmail(
     to,
     `Sprostil se je termin - ${salonName}`,
-    `Sprostil se je termin${serviceLine} pri ${salonName}.\n\nPreveri proste termine in rezerviraj: ${bookingUrl}`,
+    `Sprostil se je termin${serviceLine}${employeeLine} pri ${salonName}.\n\nPreveri proste termine in rezerviraj: ${bookingUrl}`,
     `
       <div style="font-family:system-ui,sans-serif;max-width:420px;margin:0 auto;">
         <p style="font-size:15px;color:#1b1815;">
-          Sprostil se je termin${serviceLine} pri <b>${safeSalon}</b>.
+          Sprostil se je termin${serviceLine}${employeeLine} pri <b>${safeSalon}</b>.
         </p>
         <p style="font-size:14px;color:#1b1815;margin:0 0 20px;">
           Preveri proste termine in rezerviraj, dokler je še na voljo.

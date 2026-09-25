@@ -599,8 +599,9 @@ export default function BookingPage({
     }
 
     showToast(`Termin potrjen: ${form.time} na ${dayLabel(selectedDate)}`);
+    const serviceName = selectedService ? selectedService.name : form.service;
     setConfirmedBooking({
-      title: selectedService ? selectedService.name : form.service,
+      title: selectedEmployee ? `${serviceName} pri ${selectedEmployee.name}` : serviceName,
       date: selectedDate,
       time: form.time,
       durationMinutes: selectedServiceDuration,

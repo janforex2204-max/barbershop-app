@@ -39,13 +39,21 @@ export async function GET(request: NextRequest) {
     try {
       const { data: appointments, error: apptError } = await admin
         .from("appointments")
-        .select("appointment_time, customer_name, service")
+        .select("appointment_time, customer_name, service, employee_id")
         .eq("salon_id", salon.id)
         .eq("appointment_date", today)
         .neq("status", "cancelled")
         .order("appointment_time", { ascending: true });
 
       if (apptError) throw apptError;
+
+      // VSI zaposleni (tudi deaktivirani, glej pogovor s Claude) - obstoječi
+      // termin lahko kaže na medtem deaktiviranega zaposlenega.
+      const { data: employees } = await admin
+        .from("employees")
+        .select("id, name")
+        .eq("salon_id", salon.id);
+      const employeeNameById = new Map((employees ?? []).map((e) => [e.id, e.name]));
 
       const { data: authUser, error: authError } = await admin.auth.admin.getUserById(
         salon.user_id
@@ -62,6 +70,7 @@ export async function GET(request: NextRequest) {
           time: a.appointment_time,
           customerName: a.customer_name,
           service: a.service,
+          employeeName: a.employee_id ? (employeeNameById.get(a.employee_id) ?? null) : null,
         })),
       });
 

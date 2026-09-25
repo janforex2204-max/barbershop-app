@@ -240,7 +240,8 @@ export default function ManualBookingForm({
               state.booked.phone,
               `Pozdravljen/a ${state.booked.name}, tvoja rezervacija je potrjena: ${dayLabel(
                 state.booked.date
-              )} ob ${state.booked.time}, ${state.booked.service} - ${state.booked.salonName}. ` +
+              )} ob ${state.booked.time}, ${state.booked.service}` +
+                `${state.booked.employeeName ? ` pri ${state.booked.employeeName}` : ""} - ${state.booked.salonName}. ` +
                 `Upravljaj svojo rezervacijo: ${bookingManageUrl(state.booked.token)}`
             )}
             target="_blank"

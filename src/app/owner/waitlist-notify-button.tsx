@@ -27,9 +27,13 @@ type Entry = {
 export default function WaitlistNotifyButton({
   entry,
   bookingUrl,
+  employeeName,
 }: {
   entry: Entry;
   bookingUrl: string;
+  // null = "vseeno kdo" (glej booking-page.tsx waitlist obrazec) - isti
+  // null-pomeni-izpusti vzorec kot service_preference = "vseeno" spodaj.
+  employeeName: string | null;
 }) {
   const [emailStatus, setEmailStatus] = useState<"idle" | "sending" | "sent">("idle");
   const [emailError, setEmailError] = useState<string | null>(null);
@@ -37,7 +41,8 @@ export default function WaitlistNotifyButton({
   function sendWhatsApp() {
     const serviceLine =
       entry.service_preference === "vseeno" ? "" : ` za ${entry.service_preference}`;
-    const message = `Sprostil se je termin${serviceLine} — preveri in rezerviraj: ${bookingUrl}`;
+    const employeeLine = employeeName ? ` pri ${employeeName}` : "";
+    const message = `Sprostil se je termin${serviceLine}${employeeLine} — preveri in rezerviraj: ${bookingUrl}`;
     window.open(whatsAppLink(entry.customer_phone, message), "_blank");
   }
 

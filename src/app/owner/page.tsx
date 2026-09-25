@@ -333,8 +333,19 @@ export default async function OwnerDashboard({
                           ? "Vseeno katera storitev"
                           : w.service_preference}
                       </div>
+                      {hasEmployees && (
+                        <div className="text-cream-faint text-xs mt-0.5">
+                          {w.employee_id
+                            ? (employeeNameById.get(w.employee_id) ?? "Neznan zaposleni")
+                            : "Vseeno kdo"}
+                        </div>
+                      )}
                     </div>
-                    <WaitlistNotifyButton entry={w} bookingUrl={bookingUrl} />
+                    <WaitlistNotifyButton
+                      entry={w}
+                      bookingUrl={bookingUrl}
+                      employeeName={w.employee_id ? (employeeNameById.get(w.employee_id) ?? null) : null}
+                    />
                   </div>
                 ))}
               </div>
@@ -441,8 +452,11 @@ export default async function OwnerDashboard({
           {(() => {
             function renderTomorrowAppointment(a: (typeof tomorrowAppointments)[number]) {
               const intro = isLiterallyTomorrow ? "jutri" : dayLabel(nextBizDay);
+              const employeeLine = a.employee_id
+                ? ` pri ${employeeNameById.get(a.employee_id) ?? "izvajalcu"}`
+                : "";
               const reminderMessage =
-                `Opomnik: ${intro} ob ${a.appointment_time} imaš rezervacijo za ${a.service} - ${salonName}. Se vidimo! ` +
+                `Opomnik: ${intro} ob ${a.appointment_time} imaš rezervacijo za ${a.service}${employeeLine} - ${salonName}. Se vidimo! ` +
                 `Upravljaj svojo rezervacijo: ${bookingManageUrl(a.token)}`;
               return (
                 <div

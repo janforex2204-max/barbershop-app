@@ -95,7 +95,14 @@ async function resolveSalonId(
 // rezervacija uspeti tudi, če email pošiljanje odpove.
 async function notifyOwnerOfBooking(
   salonId: string,
-  booking: { name: string; phone: string; service: string; date: string; time: string }
+  booking: {
+    name: string;
+    phone: string;
+    service: string;
+    date: string;
+    time: string;
+    employeeName?: string | null;
+  }
 ) {
   try {
     const admin = createAdminClient();
@@ -125,6 +132,7 @@ async function notifyOwnerOfBooking(
       service: booking.service,
       dateLabel: dayLabel(booking.date),
       time: booking.time,
+      employeeName: booking.employeeName,
     });
   } catch (e) {
     console.error(`[${salonId}] Napaka pri pošiljanju email obvestila o rezervaciji:`, e);
@@ -140,7 +148,14 @@ async function notifyOwnerOfBooking(
 // e-pošte mora uspeti tudi, če email pošiljanje odpove.
 async function notifyCustomerOfBooking(
   email: string,
-  booking: { salonName: string; service: string; date: string; time: string; token: string }
+  booking: {
+    salonName: string;
+    service: string;
+    date: string;
+    time: string;
+    token: string;
+    employeeName?: string | null;
+  }
 ) {
   try {
     await sendBookingConfirmationEmail({
@@ -150,6 +165,7 @@ async function notifyCustomerOfBooking(
       dateLabel: dayLabel(booking.date),
       time: booking.time,
       manageUrl: bookingManageUrl(booking.token),
+      employeeName: booking.employeeName,
     });
   } catch (e) {
     console.error(`Napaka pri pošiljanju potrditvene e-pošte (${email}):`, e);
@@ -218,19 +234,21 @@ export async function bookAppointment(
   // sploh poslan.
   const { data: activeEmployees } = await supabase
     .from("employees")
-    .select("id, hours")
+    .select("id, name, hours")
     .eq("salon_id", salonId)
     .eq("active", true);
 
   const salonHasActiveEmployees = (activeEmployees?.length ?? 0) > 0;
   const employeeId = input.employeeId ?? null;
   let effectiveHours = hours;
+  let employeeName: string | null = null;
   if (employeeId) {
     const matchedEmployee = activeEmployees?.find((e) => e.id === employeeId);
     if (!matchedEmployee) {
       return { error: "Izbrani izvajalec ni veljaven. Izberi drugega." };
     }
     effectiveHours = matchedEmployee.hours;
+    employeeName = matchedEmployee.name;
   }
 
   // Ponovna preverba prekrivanja NA STREŽNIKU tik pred vpisom - klientov
@@ -334,7 +352,7 @@ export async function bookAppointment(
     return { error: error.message };
   }
 
-  await notifyOwnerOfBooking(salonId, input);
+  await notifyOwnerOfBooking(salonId, { ...input, employeeName });
   if (email) {
     await notifyCustomerOfBooking(email, {
       salonName: salonName ?? "Fillio",
@@ -342,6 +360,7 @@ export async function bookAppointment(
       date: input.date,
       time: input.time,
       token,
+      employeeName,
     });
   }
 
@@ -366,7 +385,7 @@ export async function addBookingConfirmationEmail(
   const admin = createAdminClient();
   const { data: appt } = await admin
     .from("appointments")
-    .select("salon_id, service, appointment_date, appointment_time")
+    .select("salon_id, service, appointment_date, appointment_time, employee_id")
     .eq("token", token)
     .maybeSingle();
 
@@ -389,12 +408,23 @@ export async function addBookingConfirmationEmail(
     .eq("id", appt.salon_id)
     .maybeSingle();
 
+  let employeeName: string | null = null;
+  if (appt.employee_id) {
+    const { data: employee } = await admin
+      .from("employees")
+      .select("name")
+      .eq("id", appt.employee_id)
+      .maybeSingle();
+    employeeName = employee?.name ?? null;
+  }
+
   await notifyCustomerOfBooking(trimmedEmail, {
     salonName: salon?.salon_name ?? "Fillio",
     service: appt.service,
     date: appt.appointment_date,
     time: appt.appointment_time,
     token,
+    employeeName,
   });
 
   return {};
