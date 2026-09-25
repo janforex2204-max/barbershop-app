@@ -2,6 +2,7 @@ import type { SalonDayHours } from "@/types/database.types";
 import {
   isBusinessDay,
   upcomingWeeksMatching,
+  nextDayMatching,
   BOOKING_WINDOW_WEEKS,
   type BusinessWeek,
 } from "./constants";
@@ -94,6 +95,16 @@ export function upcomingAvailableWeeks(
   weekCount = BOOKING_WINDOW_WEEKS
 ): BusinessWeek[] {
   return upcomingWeeksMatching((iso) => resolveDayWindow(hours, iso) !== null, weekCount);
+}
+
+// Isti popravek kot upcomingAvailableWeeks zgoraj, za "prvi naslednji odprt
+// dan" namesto celega razpona - glej nextBusinessDayAfterToday v
+// ./constants (owner/page.tsx "Termini za jutri", glej pogovor s Claude).
+export function nextAvailableDayAfterToday(
+  hours: SalonDayHours[] | null | undefined,
+  maxLookahead = 14
+): string {
+  return nextDayMatching((iso) => resolveDayWindow(hours, iso) !== null, maxLookahead);
 }
 
 // Neobvezen premor (npr. malica) znotraj sicer odprtega dne - glej

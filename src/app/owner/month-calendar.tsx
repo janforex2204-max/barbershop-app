@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { isBusinessDay, monthGrid, monthLabel, shiftMonth } from "@/lib/constants";
+import { monthGrid, monthLabel, shiftMonth } from "@/lib/constants";
+import { resolveDayWindow } from "@/lib/availability";
+import type { SalonDayHours } from "@/types/database.types";
 
 const WEEKDAY_LABELS = ["Pon", "Tor", "Sre", "Čet", "Pet", "Sob", "Ned"];
 
@@ -10,12 +12,14 @@ export default function MonthCalendar({
   today,
   countsByDate,
   waitingDates,
+  salonHours,
 }: {
   monthStr: string;
   selectedDate: string;
   today: string;
   countsByDate: Record<string, number>;
   waitingDates: Set<string>;
+  salonHours: SalonDayHours[] | null;
 }) {
   const weeks = monthGrid(monthStr);
 
@@ -58,6 +62,7 @@ export default function MonthCalendar({
               today={today}
               count={iso ? countsByDate[iso] ?? 0 : 0}
               waiting={iso ? waitingDates.has(iso) : false}
+              salonHours={salonHours}
             />
           ))
         )}
@@ -73,6 +78,7 @@ function DayCell({
   today,
   count,
   waiting,
+  salonHours,
 }: {
   iso: string | null;
   monthStr: string;
@@ -80,11 +86,15 @@ function DayCell({
   today: string;
   count: number;
   waiting: boolean;
+  salonHours: SalonDayHours[] | null;
 }) {
   if (!iso) return <div />;
 
   const dayNum = Number(iso.slice(8, 10));
-  const closed = !isBusinessDay(iso);
+  // Popravek: PREJ trdo kodiran torek-sobota (isBusinessDay), ne glede na
+  // to, kaj je dejansko nastavljeno v salon_owners.hours (glej pogovor s
+  // Claude) - zdaj isti resolveDayWindow vir resnice kot povsod drugod.
+  const closed = resolveDayWindow(salonHours, iso) === null;
 
   if (closed) {
     // Prej "text-cream-ghost opacity-40" - DVOJNO zbledelo (ghost je že

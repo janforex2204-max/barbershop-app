@@ -109,13 +109,24 @@ export function nextBusinessDayOffsets(count: number, maxLookahead = 21) {
   return offsets;
 }
 
-// Prvi delovni dan po danes (preskoči nedeljo/ponedeljek) - za "Termini za
-// jutri" na nadzorni plošči.
-export function nextBusinessDayAfterToday(maxLookahead = 14) {
+// Splošen "prvi naslednji dan, ki ustreza" - isti razlog kot
+// upcomingWeeksMatching spodaj (predikat namesto trdega pravila neposredno
+// tu, da se ta modul izogne krožni odvisnosti s tistim, kar dejansko
+// odloči "primernost" - glej nextAvailableDayAfterToday v
+// src/lib/availability.ts).
+export function nextDayMatching(isEligible: (iso: string) => boolean, maxLookahead = 14) {
   for (let o = 1; o <= maxLookahead; o++) {
-    if (isBusinessDay(todayISO(o))) return todayISO(o);
+    if (isEligible(todayISO(o))) return todayISO(o);
   }
   return todayISO(1);
+}
+
+// Star, trdo kodiran torek-sobota vzorec - glej nextAvailableDayAfterToday
+// v src/lib/availability.ts, ki namesto tega dejansko bere salon_owners.
+// hours (glej pogovor s Claude). Obdržan za salone brez nastavljenega hours
+// (isti fallback kot resolveDayWindow).
+export function nextBusinessDayAfterToday(maxLookahead = 14) {
+  return nextDayMatching(isBusinessDay, maxLookahead);
 }
 
 // Ponedeljek tega tedna za dani datum (uporabljeno za grupiranje po tednih).

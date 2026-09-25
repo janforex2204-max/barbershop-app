@@ -9,12 +9,12 @@ import {
   dayLabel,
   monthOf,
   monthRange,
-  nextBusinessDayAfterToday,
   whatsAppLink,
   bookingManageUrl,
   resolveSalonTheme,
   PLATFORM_URL,
 } from "@/lib/constants";
+import { nextAvailableDayAfterToday } from "@/lib/availability";
 import AppointmentsHeader from "./appointments-header";
 import NotificationsPanel from "./notifications-panel";
 import NotificationSettings from "./notification-settings";
@@ -152,7 +152,7 @@ export default async function OwnerDashboard({
   const { start: monthStart, end: monthEnd } = monthRange(monthStr);
 
   const tomorrow = todayISO(1);
-  const nextBizDay = nextBusinessDayAfterToday();
+  const nextBizDay = nextAvailableDayAfterToday(ownerRow.hours);
   const isLiterallyTomorrow = nextBizDay === tomorrow;
 
   // Prej: 7 med seboj neodvisnih poizvedb (Promise.all - torej že vzporedno,
@@ -288,6 +288,7 @@ export default async function OwnerDashboard({
           today={today}
           countsByDate={countsByDate}
           waitingDates={waitingDates}
+          salonHours={ownerRow.hours}
         />
 
         {waitlistError ? (
