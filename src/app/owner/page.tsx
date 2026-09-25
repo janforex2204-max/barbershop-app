@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Clock, MessageCircle, Users } from "lucide-react";
@@ -31,6 +32,38 @@ import {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MONTH_RE = /^\d{4}-\d{2}$/;
+
+// Skupini termine po zaposlenem - isti bucket-po-ključu vzorec (ohranjen
+// vrstni red PRVE pojavitve, "brez zaposlenega" predal vedno ZADNJI) kot
+// groupServicesByCategory v [slug]/booking-page.tsx, tu prevzet za
+// employee_id namesto category. employeeNameById vsebuje VSE zaposlene
+// (tudi deaktivirane) - obstoječi termin lahko kaže na zaposlenega, ki je
+// bil medtem deaktiviran (glej pogovor s Claude, arhitekturni načrt), pa
+// mora vseeno dobiti pravo ime, ne "Neznan zaposleni".
+function groupByEmployee<T extends { employee_id: string | null }>(
+  items: T[],
+  employeeNameById: Map<string, string>
+): { employeeId: string | null; employeeName: string; items: T[] }[] {
+  const order: (string | null)[] = [];
+  const byEmployee = new Map<string | null, T[]>();
+
+  for (const item of items) {
+    const key = item.employee_id;
+    if (!byEmployee.has(key)) {
+      order.push(key);
+      byEmployee.set(key, []);
+    }
+    byEmployee.get(key)!.push(item);
+  }
+
+  const named = order.filter((key): key is string => key !== null);
+  const finalOrder: (string | null)[] = byEmployee.has(null) ? [...named, null] : named;
+  return finalOrder.map((key) => ({
+    employeeId: key,
+    employeeName: key ? (employeeNameById.get(key) ?? "Neznan zaposleni") : "Ni dodeljeno",
+    items: byEmployee.get(key)!,
+  }));
+}
 
 export default async function OwnerDashboard({
   searchParams,
@@ -184,6 +217,22 @@ export default async function OwnerDashboard({
     );
   }
 
+  // VSI zaposleni (tudi deaktivirani, glej groupByEmployee zgoraj), samo za
+  // ime/skupinjenje spodaj - ne za odločanje "ali naj se pokaže izbirnik"
+  // (to je ločena, aktivnost-scopana logika v manual-booking-form.tsx in
+  // booking-page.tsx). Skupinjenje se sploh ne prikaže, če salon NIKOLI ni
+  // dodal nobenega zaposlenega (identično vedenje kot pred to funkcionalnostjo).
+  const { data: employees } = await supabase
+    .from("employees")
+    .select("id, name")
+    .eq("salon_id", salonId);
+  const hasEmployees = (employees?.length ?? 0) > 0;
+  const employeeNameById = new Map((employees ?? []).map((e) => [e.id, e.name]));
+  const appointmentGroups = hasEmployees ? groupByEmployee(appointments, employeeNameById) : null;
+  const tomorrowGroups = hasEmployees
+    ? groupByEmployee(tomorrowAppointments, employeeNameById)
+    : null;
+
   return (
     <div data-theme={salonTheme} className="min-h-screen bg-ink text-cream font-sans px-6 py-10">
       <div className="max-w-2xl mx-auto">
@@ -313,47 +362,66 @@ export default async function OwnerDashboard({
           {!error && appointments?.length === 0 && (
             <p className="p-4 text-sm text-cream-dim">Ni terminov za ta dan.</p>
           )}
-          {appointments?.map((a) => {
-            const waitlistOffers =
-              a.status === "cancelled" ? waitlistOffersByAppointment.get(a.id) : undefined;
-            return (
-              <div key={a.id}>
-                <div className="flex items-center justify-between px-4 py-3 text-sm">
-                  <div>
-                    <span className="text-gold font-medium mr-3">
-                      {a.appointment_time}
-                    </span>
-                    <span
-                      className={
-                        a.status === "cancelled"
-                          ? "line-through text-cream-ghost"
-                          : "text-cream"
-                      }
-                    >
-                      {a.customer_name}
-                    </span>
-                    {a.status === "filled" && (
-                      <span className="text-sage text-xs ml-2">(zapolnjeno)</span>
-                    )}
-                    <span className="text-cream-faint"> — {a.service}</span>
-                  </div>
-                  {a.status === "booked" && (
-                    <form action={cancelAppointment.bind(null, a.id)}>
-                      <button
-                        type="submit"
-                        className="text-xs px-3 py-1.5 rounded border border-rose text-rose hover:bg-rose/10 cursor-pointer"
+          {(() => {
+            function renderAppointment(a: (typeof appointments)[number]) {
+              const waitlistOffers =
+                a.status === "cancelled" ? waitlistOffersByAppointment.get(a.id) : undefined;
+              return (
+                <div key={a.id}>
+                  <div className="flex items-center justify-between px-4 py-3 text-sm">
+                    <div>
+                      <span className="text-gold font-medium mr-3">
+                        {a.appointment_time}
+                      </span>
+                      <span
+                        className={
+                          a.status === "cancelled"
+                            ? "line-through text-cream-ghost"
+                            : "text-cream"
+                        }
                       >
-                        Odpovej
-                      </button>
-                    </form>
+                        {a.customer_name}
+                      </span>
+                      {a.status === "filled" && (
+                        <span className="text-sage text-xs ml-2">(zapolnjeno)</span>
+                      )}
+                      <span className="text-cream-faint"> — {a.service}</span>
+                    </div>
+                    {a.status === "booked" && (
+                      <form action={cancelAppointment.bind(null, a.id)}>
+                        <button
+                          type="submit"
+                          className="text-xs px-3 py-1.5 rounded border border-rose text-rose hover:bg-rose/10 cursor-pointer"
+                        >
+                          Odpovej
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                  {waitlistOffers && waitlistOffers.length > 0 && (
+                    <WaitlistOffer offers={waitlistOffers} />
                   )}
                 </div>
-                {waitlistOffers && waitlistOffers.length > 0 && (
-                  <WaitlistOffer offers={waitlistOffers} />
-                )}
-              </div>
-            );
-          })}
+              );
+            }
+
+            // Skupinjeno po zaposlenem (glej groupByEmployee zgoraj) SAMO,
+            // če je salon kadarkoli dodal vsaj enega zaposlenega - sicer
+            // enak ploščat seznam kot pred to funkcionalnostjo. Fragment
+            // (ne wrapper div) ohrani glave skupin in termine kot NEPOSREDNE
+            // otroke zgornjega "divide-y" vsebnika, da ločilne črte ostanejo
+            // med VSAKO vrstico, ne le med skupinami.
+            return appointmentGroups
+              ? appointmentGroups.map((group) => (
+                  <Fragment key={group.employeeId ?? "__none__"}>
+                    <p className="px-4 pt-3 pb-1 text-xs font-bold uppercase tracking-wide text-gold">
+                      {group.employeeName}
+                    </p>
+                    {group.items.map(renderAppointment)}
+                  </Fragment>
+                ))
+              : appointments?.map(renderAppointment);
+          })()}
         </div>
 
         <h2 className="text-lg font-medium mb-1 flex items-center gap-2">
@@ -370,34 +438,47 @@ export default async function OwnerDashboard({
           {!tomorrowError && tomorrowAppointments?.length === 0 && (
             <p className="p-4 text-sm text-cream-dim">Ni terminov za ta dan.</p>
           )}
-          {tomorrowAppointments?.map((a) => {
-            const intro = isLiterallyTomorrow ? "jutri" : dayLabel(nextBizDay);
-            const reminderMessage =
-              `Opomnik: ${intro} ob ${a.appointment_time} imaš rezervacijo za ${a.service} - ${salonName}. Se vidimo! ` +
-              `Upravljaj svojo rezervacijo: ${bookingManageUrl(a.token)}`;
-            return (
-              <div
-                key={a.id}
-                className="flex items-center justify-between gap-3 px-4 py-3 text-sm"
-              >
-                <div>
-                  <span className="text-gold font-medium mr-3">
-                    {a.appointment_time}
-                  </span>
-                  <span className="text-cream">{a.customer_name}</span>
-                  <span className="text-cream-faint"> — {a.service}</span>
-                </div>
-                <a
-                  href={whatsAppLink(a.customer_phone, reminderMessage)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="whitespace-nowrap flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-sage text-sage hover:bg-sage/10"
+          {(() => {
+            function renderTomorrowAppointment(a: (typeof tomorrowAppointments)[number]) {
+              const intro = isLiterallyTomorrow ? "jutri" : dayLabel(nextBizDay);
+              const reminderMessage =
+                `Opomnik: ${intro} ob ${a.appointment_time} imaš rezervacijo za ${a.service} - ${salonName}. Se vidimo! ` +
+                `Upravljaj svojo rezervacijo: ${bookingManageUrl(a.token)}`;
+              return (
+                <div
+                  key={a.id}
+                  className="flex items-center justify-between gap-3 px-4 py-3 text-sm"
                 >
-                  <MessageCircle size={13} /> Pošlji opomnik
-                </a>
-              </div>
-            );
-          })}
+                  <div>
+                    <span className="text-gold font-medium mr-3">
+                      {a.appointment_time}
+                    </span>
+                    <span className="text-cream">{a.customer_name}</span>
+                    <span className="text-cream-faint"> — {a.service}</span>
+                  </div>
+                  <a
+                    href={whatsAppLink(a.customer_phone, reminderMessage)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="whitespace-nowrap flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-sage text-sage hover:bg-sage/10"
+                  >
+                    <MessageCircle size={13} /> Pošlji opomnik
+                  </a>
+                </div>
+              );
+            }
+
+            return tomorrowGroups
+              ? tomorrowGroups.map((group) => (
+                  <Fragment key={group.employeeId ?? "__none__"}>
+                    <p className="px-4 pt-3 pb-1 text-xs font-bold uppercase tracking-wide text-gold">
+                      {group.employeeName}
+                    </p>
+                    {group.items.map(renderTomorrowAppointment)}
+                  </Fragment>
+                ))
+              : tomorrowAppointments?.map(renderTomorrowAppointment);
+          })()}
         </div>
 
         {smsError ? (
