@@ -809,63 +809,14 @@ export default function BookingPage({
         ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-8 items-start">
           <div className="min-w-0">
-            <h2 className="font-display text-xl font-semibold mb-1 text-cream">
-              Izberi dan
-            </h2>
-            <DatePicker selectedDate={selectedDate} onSelect={selectDate} weeks={weeks} />
-
-            {/* Storitev MORA biti izbrana PREDEN prikažemo proste termine - ti
-                so zdaj odvisni od njenega trajanja (glej computeFreeSlots
-                zgoraj), ne le od tega, kateri točni časi so že zasedeni. */}
-            {!servicesLoading && !servicesError && services.length > 0 && (
-              <div className="mb-6">
-                <h2 className="font-display text-xl font-semibold mb-3 text-cream">
-                  Izberi storitev
-                </h2>
-                <div className="space-y-5">
-                  {serviceGroups.map((group) => (
-                    <div key={group.category ?? "__none__"}>
-                      {/* Naslov skupine samo, če jih je VEČ kot ena - sicer
-                          bi za salone brez kategorij dobili odvečen "Ostalo"
-                          naslov nad edinim (ploščatim) seznamom. */}
-                      {serviceGroups.length > 1 && (
-                        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gold">
-                          {group.category ?? "Ostalo"}
-                        </p>
-                      )}
-                      <div className="flex flex-col gap-2">
-                        {group.services.map((s) => (
-                          <button
-                            key={s.id}
-                            type="button"
-                            onClick={() =>
-                              setForm((f) => ({ ...f, service: s.name, time: "" }))
-                            }
-                            className={`w-full flex items-center justify-between gap-3 rounded-md border px-3.5 py-2.5 text-left cursor-pointer transition-colors ${
-                              form.service === s.name
-                                ? "border-gold bg-selected text-cream"
-                                : "border-border text-cream bg-transparent hover:bg-ink-soft"
-                            }`}
-                          >
-                            <span className="text-sm font-medium">{s.name}</span>
-                            {serviceDetails(s) && (
-                              <span className="text-xs text-cream-dim whitespace-nowrap">
-                                {serviceDetails(s)}
-                              </span>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Prikaže se SAMO pri 2+ aktivnih zaposlenih - pri 0 koncept
-                zaposlenega sploh ne obstaja, pri 1 je tiho samodejno izbran
-                (glej efekt zgoraj). Ista vizualna oblika kot seznam storitev
-                zgoraj. */}
+            {/* Izberi izvajalca - NA VRHU strani, PRED dnem/storitvijo (glej
+                pogovor s Claude) - pri 2+ zaposlenih mora biti izbran
+                PREDEN se karkoli drugega sploh izračuna/prikaže (glej
+                employeeSelectionPending spodaj), da se izognemo
+                zavajajočemu prikazu "prostih" terminov, ki po dejanski
+                izbiri izvajalca izgine. Prikaže se SAMO pri 2+ aktivnih
+                zaposlenih - pri 0 koncept zaposlenega sploh ne obstaja, pri
+                1 je tiho samodejno izbran (glej efekt zgoraj). */}
             {employees.length > 1 && (
               <div className="mb-6">
                 <h2 className="font-display text-xl font-semibold mb-3 text-cream">
@@ -893,188 +844,234 @@ export default function BookingPage({
               </div>
             )}
 
-            {slotsError || servicesError ? (
-              <div className="border border-border rounded-lg bg-panel p-5">
-                <p className="text-sm text-cream-muted mb-3">
-                  Prišlo je do začasne napake pri nalaganju prostih terminov.
-                  Poskusi znova.
-                </p>
-                <button
-                  onClick={retryLoad}
-                  className="px-4 py-2 rounded-md border border-border text-cream text-sm font-medium cursor-pointer hover:bg-ink-soft"
-                >
-                  Poskusi znova
-                </button>
-              </div>
-            ) : slotsLoading || servicesLoading || employeesLoading ? (
+            {!employeeSelectionPending && (
               <>
-                <h2 className="font-display text-xl font-semibold mb-3 text-cream">
-                  Prosti termini
+                <h2 className="font-display text-xl font-semibold mb-1 text-cream">
+                  Izberi dan
                 </h2>
-                <div className="grid grid-cols-5 gap-2 mb-7">
-                  {Array.from({ length: 10 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-[42px] rounded-md border border-border bg-ink-soft animate-pulse"
-                    />
-                  ))}
-                </div>
-              </>
-            ) : employeeSelectionPending ? (
-              <>
-                <h2 className="font-display text-xl font-semibold mb-3 text-cream">
-                  Prosti termini
-                </h2>
-                <div className="border border-border rounded-lg bg-panel p-5 mb-7">
-                  <p className="text-sm text-cream-muted">
-                    Izberite izvajalca, da vidite proste termine.
-                  </p>
-                </div>
-              </>
-            ) : freeTimes.length > 0 ? (
-              <>
-                <h2 className="font-display text-xl font-semibold mb-3 text-cream">
-                  Prosti termini
-                </h2>
-                <div className="grid grid-cols-5 gap-2 mb-7">
-                  {freeTimes.map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setForm((f) => ({ ...f, time: t }))}
-                      className={`py-2.5 text-[13px] rounded-md cursor-pointer border transition-colors ${
-                        form.time === t
-                          ? "border-gold bg-selected text-cream"
-                          : "border-border text-cream bg-transparent"
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
+                <DatePicker selectedDate={selectedDate} onSelect={selectDate} weeks={weeks} />
 
-                <div className="border border-border rounded-lg bg-panel p-5">
-                  <input
-                    placeholder="Ime in priimek"
-                    value={form.name}
-                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    className={inputClass}
-                  />
-                  <input
-                    type="tel"
-                    placeholder="Telefon"
-                    value={form.phone}
-                    onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                    className={inputClass}
-                  />
-                  <input
-                    type="email"
-                    placeholder="E-pošta (neobvezno)"
-                    value={form.email}
-                    onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                    className={inputClass}
-                  />
-                  <p className="text-xs text-cream-faint -mt-1.5 mb-2.5">
-                    Neobvezno — prejmete potrditev in povezavo za odpoved/prenaročanje termina.
-                  </p>
-                  <button
-                    onClick={bookAppointment}
-                    disabled={submitting}
-                    className="w-full py-3 rounded-md border-none bg-burgundy text-on-accent text-sm font-semibold cursor-pointer mt-1 disabled:opacity-60"
-                  >
-                    Rezerviraj termin{form.time ? ` — ${form.time}` : ""}
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div className="border border-border rounded-lg bg-panel p-5">
-                <p className="text-sm text-cream-muted mb-4">
-                  {/* Isto sporočilo za "popolnoma zaseden", "salon ta dan ne
-                      dela" IN "izbrana storitev nikamor ne gre zraven" -
-                      glej dayWindow/freeTimes zgoraj, razlog ni pomemben za
-                      stranko, akcija (počakaj na seznamu) je ista. */}
-                  Za izbrani dan trenutno ni prostih terminov. Povej nam, katero
-                  storitev želiš, in te obvestimo, če se kaj sprosti.
-                </p>
-                <input
-                  placeholder="Ime in priimek"
-                  value={waitForm.name}
-                  onChange={(e) => setWaitForm((f) => ({ ...f, name: e.target.value }))}
-                  className={inputClass}
-                />
-                <input
-                  type="tel"
-                  placeholder="Telefon"
-                  value={waitForm.phone}
-                  onChange={(e) => setWaitForm((f) => ({ ...f, phone: e.target.value }))}
-                  className={inputClass}
-                />
-                <input
-                  type="email"
-                  placeholder="E-pošta (neobvezno)"
-                  value={waitForm.email}
-                  onChange={(e) => setWaitForm((f) => ({ ...f, email: e.target.value }))}
-                  className={inputClass}
-                />
-                <p className="text-xs text-cream-faint -mt-1.5 mb-2.5">
-                  Priporočeno — preko e-pošte vas obvestimo, če se termin sprosti.
-                </p>
-                <select
-                  value={waitForm.service}
-                  onChange={(e) => setWaitForm((f) => ({ ...f, service: e.target.value }))}
-                  className={inputClass}
-                >
-                  <option value="vseeno">Vseeno katera storitev</option>
-                  {services.map((s) => (
-                    <option key={s.id} value={s.name}>
-                      {serviceLabel(s)}
-                    </option>
-                  ))}
-                </select>
-                {/* Ista 0/1/2+ vidnost kot glavni izbirnik izvajalca zgoraj -
-                    "" = vseeno kdo (glej WaitForm tip in joinWaitlist). */}
-                {employees.length > 1 && (
-                  <select
-                    value={waitForm.employeeId}
-                    onChange={(e) =>
-                      setWaitForm((f) => ({ ...f, employeeId: e.target.value }))
-                    }
-                    className={inputClass}
-                  >
-                    <option value="">Vseeno kdo</option>
-                    {employees.map((e) => (
-                      <option key={e.id} value={e.id}>
-                        {e.name}
-                      </option>
-                    ))}
-                  </select>
+                {/* Storitev MORA biti izbrana PREDEN prikažemo proste termine - ti
+                    so zdaj odvisni od njenega trajanja (glej computeFreeSlots
+                    zgoraj), ne le od tega, kateri točni časi so že zasedeni. */}
+                {!servicesLoading && !servicesError && services.length > 0 && (
+                  <div className="mb-6">
+                    <h2 className="font-display text-xl font-semibold mb-3 text-cream">
+                      Izberi storitev
+                    </h2>
+                    <div className="space-y-5">
+                      {serviceGroups.map((group) => (
+                        <div key={group.category ?? "__none__"}>
+                          {/* Naslov skupine samo, če jih je VEČ kot ena - sicer
+                              bi za salone brez kategorij dobili odvečen "Ostalo"
+                              naslov nad edinim (ploščatim) seznamom. */}
+                          {serviceGroups.length > 1 && (
+                            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gold">
+                              {group.category ?? "Ostalo"}
+                            </p>
+                          )}
+                          <div className="flex flex-col gap-2">
+                            {group.services.map((s) => (
+                              <button
+                                key={s.id}
+                                type="button"
+                                onClick={() =>
+                                  setForm((f) => ({ ...f, service: s.name, time: "" }))
+                                }
+                                className={`w-full flex items-center justify-between gap-3 rounded-md border px-3.5 py-2.5 text-left cursor-pointer transition-colors ${
+                                  form.service === s.name
+                                    ? "border-gold bg-selected text-cream"
+                                    : "border-border text-cream bg-transparent hover:bg-ink-soft"
+                                }`}
+                              >
+                                <span className="text-sm font-medium">{s.name}</span>
+                                {serviceDetails(s) && (
+                                  <span className="text-xs text-cream-dim whitespace-nowrap">
+                                    {serviceDetails(s)}
+                                  </span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
-                <button
-                  onClick={joinWaitlist}
-                  disabled={submitting}
-                  className="w-full py-3 rounded-md border-none bg-burgundy text-on-accent text-sm font-semibold cursor-pointer mt-1 disabled:opacity-60"
-                >
-                  Obvestite me, ko se sprosti termin
-                </button>
 
-                {/* Vizualno ločeno od obrazca zgoraj (glej pogovor s Claude) -
-                    ista jumpToNextAvailable funkcionalnost kot prej, samo
-                    premaknjena POD celoten obrazec in preimenovana, da
-                    eksplicitno pove, na KATEREGA izvajalca se nanaša. Ime SAMO
-                    pri 2+ zaposlenih IN dejansko izbranem (ne "Vseeno") - pri
-                    0/1 zaposlenem ostane generično besedilo (glej pogovor s
-                    Claude). */}
-                <div className="border-t border-border-soft mt-5 pt-4">
-                  <button
-                    type="button"
-                    onClick={jumpToNextAvailable}
-                    className="w-full py-2.5 rounded-md border border-gold text-gold text-sm font-semibold cursor-pointer hover:bg-selected transition-colors"
-                  >
-                    {employees.length > 1 && selectedEmployee
-                      ? `Poglejte, kdaj ima ${selectedEmployee.name} prvi prosti termin →`
-                      : "Poglejte prvi prosti termin →"}
-                  </button>
-                </div>
-              </div>
+                {slotsError || servicesError ? (
+                  <div className="border border-border rounded-lg bg-panel p-5">
+                    <p className="text-sm text-cream-muted mb-3">
+                      Prišlo je do začasne napake pri nalaganju prostih terminov.
+                      Poskusi znova.
+                    </p>
+                    <button
+                      onClick={retryLoad}
+                      className="px-4 py-2 rounded-md border border-border text-cream text-sm font-medium cursor-pointer hover:bg-ink-soft"
+                    >
+                      Poskusi znova
+                    </button>
+                  </div>
+                ) : slotsLoading || servicesLoading || employeesLoading ? (
+                  <>
+                    <h2 className="font-display text-xl font-semibold mb-3 text-cream">
+                      Prosti termini
+                    </h2>
+                    <div className="grid grid-cols-5 gap-2 mb-7">
+                      {Array.from({ length: 10 }).map((_, i) => (
+                        <div
+                          key={i}
+                          className="h-[42px] rounded-md border border-border bg-ink-soft animate-pulse"
+                        />
+                      ))}
+                    </div>
+                  </>
+                ) : freeTimes.length > 0 ? (
+                  <>
+                    <h2 className="font-display text-xl font-semibold mb-3 text-cream">
+                      Prosti termini
+                    </h2>
+                    <div className="grid grid-cols-5 gap-2 mb-7">
+                      {freeTimes.map((t) => (
+                        <button
+                          key={t}
+                          onClick={() => setForm((f) => ({ ...f, time: t }))}
+                          className={`py-2.5 text-[13px] rounded-md cursor-pointer border transition-colors ${
+                            form.time === t
+                              ? "border-gold bg-selected text-cream"
+                              : "border-border text-cream bg-transparent"
+                          }`}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="border border-border rounded-lg bg-panel p-5">
+                      <input
+                        placeholder="Ime in priimek"
+                        value={form.name}
+                        onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                        className={inputClass}
+                      />
+                      <input
+                        type="tel"
+                        placeholder="Telefon"
+                        value={form.phone}
+                        onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                        className={inputClass}
+                      />
+                      <input
+                        type="email"
+                        placeholder="E-pošta (neobvezno)"
+                        value={form.email}
+                        onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                        className={inputClass}
+                      />
+                      <p className="text-xs text-cream-faint -mt-1.5 mb-2.5">
+                        Neobvezno — prejmete potrditev in povezavo za odpoved/prenaročanje termina.
+                      </p>
+                      <button
+                        onClick={bookAppointment}
+                        disabled={submitting}
+                        className="w-full py-3 rounded-md border-none bg-burgundy text-on-accent text-sm font-semibold cursor-pointer mt-1 disabled:opacity-60"
+                      >
+                        Rezerviraj termin{form.time ? ` — ${form.time}` : ""}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="border border-border rounded-lg bg-panel p-5">
+                    <p className="text-sm text-cream-muted mb-4">
+                      {/* Isto sporočilo za "popolnoma zaseden", "salon ta dan ne
+                          dela" IN "izbrana storitev nikamor ne gre zraven" -
+                          glej dayWindow/freeTimes zgoraj, razlog ni pomemben za
+                          stranko, akcija (počakaj na seznamu) je ista. */}
+                      Za izbrani dan trenutno ni prostih terminov. Povej nam, katero
+                      storitev želiš, in te obvestimo, če se kaj sprosti.
+                    </p>
+                    <input
+                      placeholder="Ime in priimek"
+                      value={waitForm.name}
+                      onChange={(e) => setWaitForm((f) => ({ ...f, name: e.target.value }))}
+                      className={inputClass}
+                    />
+                    <input
+                      type="tel"
+                      placeholder="Telefon"
+                      value={waitForm.phone}
+                      onChange={(e) => setWaitForm((f) => ({ ...f, phone: e.target.value }))}
+                      className={inputClass}
+                    />
+                    <input
+                      type="email"
+                      placeholder="E-pošta (neobvezno)"
+                      value={waitForm.email}
+                      onChange={(e) => setWaitForm((f) => ({ ...f, email: e.target.value }))}
+                      className={inputClass}
+                    />
+                    <p className="text-xs text-cream-faint -mt-1.5 mb-2.5">
+                      Priporočeno — preko e-pošte vas obvestimo, če se termin sprosti.
+                    </p>
+                    <select
+                      value={waitForm.service}
+                      onChange={(e) => setWaitForm((f) => ({ ...f, service: e.target.value }))}
+                      className={inputClass}
+                    >
+                      <option value="vseeno">Vseeno katera storitev</option>
+                      {services.map((s) => (
+                        <option key={s.id} value={s.name}>
+                          {serviceLabel(s)}
+                        </option>
+                      ))}
+                    </select>
+                    {/* Ista 0/1/2+ vidnost kot glavni izbirnik izvajalca zgoraj -
+                        "" = vseeno kdo (glej WaitForm tip in joinWaitlist). */}
+                    {employees.length > 1 && (
+                      <select
+                        value={waitForm.employeeId}
+                        onChange={(e) =>
+                          setWaitForm((f) => ({ ...f, employeeId: e.target.value }))
+                        }
+                        className={inputClass}
+                      >
+                        <option value="">Vseeno kdo</option>
+                        {employees.map((e) => (
+                          <option key={e.id} value={e.id}>
+                            {e.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <button
+                      onClick={joinWaitlist}
+                      disabled={submitting}
+                      className="w-full py-3 rounded-md border-none bg-burgundy text-on-accent text-sm font-semibold cursor-pointer mt-1 disabled:opacity-60"
+                    >
+                      Obvestite me, ko se sprosti termin
+                    </button>
+
+                    {/* Vizualno ločeno od obrazca zgoraj (glej pogovor s Claude) -
+                        ista jumpToNextAvailable funkcionalnost kot prej, samo
+                        premaknjena POD celoten obrazec in preimenovana, da
+                        eksplicitno pove, na KATEREGA izvajalca se nanaša. Ime SAMO
+                        pri 2+ zaposlenih IN dejansko izbranem (ne "Vseeno") - pri
+                        0/1 zaposlenem ostane generično besedilo (glej pogovor s
+                        Claude). */}
+                    <div className="border-t border-border-soft mt-5 pt-4">
+                      <button
+                        type="button"
+                        onClick={jumpToNextAvailable}
+                        className="w-full py-2.5 rounded-md border border-gold text-gold text-sm font-semibold cursor-pointer hover:bg-selected transition-colors"
+                      >
+                        {employees.length > 1 && selectedEmployee
+                          ? `Poglejte, kdaj ima ${selectedEmployee.name} prvi prosti termin →`
+                          : "Poglejte prvi prosti termin →"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
