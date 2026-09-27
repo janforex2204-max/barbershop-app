@@ -8,6 +8,7 @@ import { notifyNewRegistration } from "@/lib/email";
 import { generateUniqueSlug } from "@/lib/slug";
 import { translateAuthError } from "@/lib/auth-errors";
 import { PLATFORM_URL } from "@/lib/constants";
+import { defaultHours } from "@/lib/default-hours";
 import type { SalonDayHours } from "@/types/database.types";
 
 type ServiceTemplate = { name: string; durationMinutes: number };
@@ -116,6 +117,7 @@ async function doRegisterOwner(formData: FormData): Promise<RegisterOwnerState> 
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const salonName = String(formData.get("salon_name") ?? "").trim();
+  const ownerName = String(formData.get("owner_name") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
   const whatsappConsent = formData.get("whatsapp_consent") === "true";
   const category = String(formData.get("category") ?? "").trim() || null;
@@ -136,7 +138,7 @@ async function doRegisterOwner(formData: FormData): Promise<RegisterOwnerState> 
     }
   }
 
-  if (!email || !password || !salonName || !phone) {
+  if (!email || !password || !salonName || !ownerName || !phone) {
     return { error: "Izpolni vsa polja." };
   }
   if (password.length < 8) {
@@ -266,6 +268,29 @@ async function doRegisterOwner(formData: FormData): Promise<RegisterOwnerState> 
     // Ne prekini registracije zaradi tega - lastnik lahko storitve doda
     // ročno prek Table Editorja.
     console.error("Napaka pri dodajanju privzetih storitev:", servicesError);
+  }
+
+  // Lastnik dobi SVOJ employees zapis samodejno, z imenom iz "Ime in
+  // priimek" (Korak 2, glej page.tsx) in kopijo salonovega urnika (ne živo
+  // povezavo, glej isti vzorec v owner/employees-actions.ts addEmployee) -
+  // brez tega bi bila /[slug] izbira izvajalca za nov, čisto svež salon
+  // prazna, dokler lastnik sam ne bi obiskal /owner/employees. Za OBSTOJEČE
+  // salone (registrirane PRED to funkcionalnostjo) se ta koda nikoli ne
+  // požene - ostanejo pri "0 zaposlenih" vedenju, dokler se sami ne dodajo
+  // (glej pogovor s Claude, arhitekturni načrt).
+  const employeeHours: SalonDayHours[] =
+    Array.isArray(hours) && hours.length > 0 ? hours : defaultHours();
+
+  const { error: employeeError } = await admin.from("employees").insert({
+    salon_id: salon.id,
+    name: ownerName,
+    hours: employeeHours,
+    sort_order: 1,
+  });
+  if (employeeError) {
+    // Ne prekini registracije zaradi tega - lastnik lahko zaposlenega doda
+    // ročno prek /owner/employees.
+    console.error("Napaka pri ustvarjanju zaposlenega (lastnik):", employeeError);
   }
 
   try {

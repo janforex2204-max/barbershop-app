@@ -21,6 +21,7 @@ export default function RegisterPage() {
   const [subtype, setSubtype] = useState<string | null>(null);
   const [customCategory, setCustomCategory] = useState("");
   const [salonName, setSalonName] = useState("");
+  const [ownerName, setOwnerName] = useState("");
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
   const [hours, setHours] = useState<SalonDayHours[]>(defaultHours);
@@ -45,7 +46,8 @@ export default function RegisterPage() {
     ? customCategory.trim().length > 0
     : false;
 
-  const canContinueStep2 = salonName.trim().length > 0 && address.trim().length > 0;
+  const canContinueStep2 =
+    salonName.trim().length > 0 && ownerName.trim().length > 0 && address.trim().length > 0;
 
   const passwordsMatch = password.length > 0 && password === confirmPassword;
 
@@ -96,6 +98,7 @@ export default function RegisterPage() {
       formData.set("category", categoryDisplay);
       formData.set("subtype", subtypeDisplay);
       formData.set("salon_name", salonName);
+      formData.set("owner_name", ownerName);
       formData.set("address", address);
       formData.set("phone", phone);
       formData.set("hours", JSON.stringify(hours));
@@ -292,6 +295,22 @@ export default function RegisterPage() {
                 placeholder="npr. Barbershop pr' Kljuni"
                 className="w-full rounded-[3px] border border-white/15 bg-[#17181B] px-3.5 py-3 text-[15px] text-white placeholder:text-white/30"
               />
+            </div>
+            <div>
+              <label htmlFor="r-owner-name" className="mb-2 block text-[13px] font-bold text-white/60">
+                Ime in priimek
+              </label>
+              <input
+                id="r-owner-name"
+                type="text"
+                value={ownerName}
+                onChange={(e) => setOwnerName(e.target.value)}
+                placeholder="npr. Jan Novak"
+                className="w-full rounded-[3px] border border-white/15 bg-[#17181B] px-3.5 py-3 text-[15px] text-white placeholder:text-white/30"
+              />
+              <p className="mt-1.5 text-xs text-white/35">
+                To ime bo vidno strankam na rezervacijski strani kot izvajalec (npr. &quot;Izberi izvajalca&quot;).
+              </p>
             </div>
             <div>
               <label htmlFor="r-addr" className="mb-2 block text-[13px] font-bold text-white/60">
