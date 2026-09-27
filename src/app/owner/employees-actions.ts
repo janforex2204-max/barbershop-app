@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { defaultHours } from "@/lib/default-hours";
 import type { SalonDayHours } from "@/types/database.types";
 
@@ -128,4 +129,78 @@ export async function updateEmployeeHours(
 
   revalidatePath("/owner/employees");
   return {};
+}
+
+const MAX_PHOTO_SIZE_BYTES = 2 * 1024 * 1024;
+const PHOTO_EXT_BY_TYPE: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+};
+
+// Isti vzorec kot uploadSalonLogo v ./actions.ts (glej opombo tam in
+// "employee-photos" bucket v supabase/schema.sql) - session-scoped klient tu
+// preveri DVOJE (seja + da employeeId dejansko pripada TEMU salonu, ne le da
+// zaposleni nekje obstaja - brez tega bi lastnik lahko s prirejenim
+// employeeId prepisal sliko zaposlenega drugega salona), dejanski zapis
+// (Storage + employees.photo_url) pa naredi admin klient.
+export async function uploadEmployeePhoto(
+  employeeId: string,
+  formData: FormData
+): Promise<{ url?: string; error?: string }> {
+  const supabase = await createClient();
+  const salonId = await resolveApprovedSalonId(supabase);
+  if (!salonId) {
+    return { error: "Seja je potekla. Prijavi se znova." };
+  }
+
+  const { data: employeeRow } = await supabase
+    .from("employees")
+    .select("id")
+    .eq("id", employeeId)
+    .eq("salon_id", salonId)
+    .maybeSingle();
+  if (!employeeRow) {
+    return { error: "Zaposleni ne obstaja." };
+  }
+
+  const file = formData.get("file");
+  if (!(file instanceof File)) {
+    return { error: "Datoteka manjka." };
+  }
+
+  const ext = PHOTO_EXT_BY_TYPE[file.type];
+  if (!ext) {
+    return { error: "Dovoljeni formati: PNG, JPEG ali WebP." };
+  }
+  if (file.size > MAX_PHOTO_SIZE_BYTES) {
+    return { error: "Datoteka je prevelika (največ 2 MB)." };
+  }
+
+  const admin = createAdminClient();
+  // "<employee_id>.<ext>" (ne izvirno ime datoteke) + upsert - vedno ISTA
+  // pot za TEGA zaposlenega, zato nova nalaganja preprosto prepišejo prejšnjo.
+  const path = `${salonId}/${employeeId}.${ext}`;
+  const { error: uploadError } = await admin.storage
+    .from("employee-photos")
+    .upload(path, file, { upsert: true, contentType: file.type });
+  if (uploadError) {
+    return { error: uploadError.message };
+  }
+
+  const { data } = admin.storage.from("employee-photos").getPublicUrl(path);
+  // Cache-bust - pot je zaradi upsert vedno ista, brez tega bi brskalnik
+  // (ali CDN) po zamenjavi slike lahko še vedno prikazoval STARO.
+  const publicUrl = `${data.publicUrl}?v=${Date.now()}`;
+
+  const { error: dbError } = await admin
+    .from("employees")
+    .update({ photo_url: publicUrl })
+    .eq("id", employeeId);
+  if (dbError) {
+    return { error: dbError.message };
+  }
+
+  revalidatePath("/owner/employees");
+  return { url: publicUrl };
 }

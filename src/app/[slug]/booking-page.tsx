@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Scissors, Mail } from "lucide-react";
+import { Scissors, Mail, User, Users, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import ThemeToggle from "@/components/theme-toggle";
 import { GoogleIcon, AppleIcon } from "@/components/brand-icons";
@@ -49,7 +49,10 @@ type Service = {
   category: string | null;
 };
 
-type Employee = { id: string; name: string; hours: SalonDayHours[] };
+// photoUrl - krožna slika, prikazana na kartici spodaj (glej "Izberi
+// izvajalca") - null = brez naložene slike, kartica prikaže generično ikono
+// osebe namesto <img> (glej owner/employees-actions.ts uploadEmployeePhoto).
+type Employee = { id: string; name: string; hours: SalonDayHours[]; photoUrl: string | null };
 
 // Samo "15,00 €, 30 min" del (brez imena) - za grupiran seznam spodaj, kjer
 // je ime storitve že prikazano ločeno. Vsak del izpisan SAMO, če je lastnik
@@ -314,7 +317,7 @@ export default function BookingPage({
       const { data, error } = await Promise.resolve(
         supabase
           .from("employees")
-          .select("id, name, hours")
+          .select("id, name, hours, photo_url")
           .eq("salon_id", salonId)
           .eq("active", true)
           .order("sort_order", { ascending: true })
@@ -322,8 +325,14 @@ export default function BookingPage({
 
       if (cancelled) return;
       if (!error && data) {
-        setEmployees(data);
-        if (data.length === 1) setSelectedEmployeeId(data[0].id);
+        const mapped = data.map((e) => ({
+          id: e.id,
+          name: e.name,
+          hours: e.hours,
+          photoUrl: e.photo_url,
+        }));
+        setEmployees(mapped);
+        if (mapped.length === 1) setSelectedEmployeeId(mapped[0].id);
       }
       setEmployeesLoading(false);
     }
@@ -862,7 +871,7 @@ export default function BookingPage({
                 <h2 className="font-display text-xl font-semibold mb-3 text-cream">
                   Izberi izvajalca
                 </h2>
-                <div className="flex flex-col gap-2">
+                <div className="grid grid-cols-2 gap-3">
                   {/* "Vsi zaposleni" NA VRHU - unija razpoložljivosti, server
                       ob oddaji atomarno dodeli konkretnega prostega
                       zaposlenega (glej pogovor s Claude, arhitekturni
@@ -875,15 +884,25 @@ export default function BookingPage({
                       setSelectedEmployeeId(ANY_EMPLOYEE);
                       setForm((f) => ({ ...f, time: "" }));
                     }}
-                    className={`w-full text-left rounded-md border px-3.5 py-2.5 text-sm font-medium cursor-pointer transition-colors ${
+                    className={`relative flex flex-col items-center gap-2 rounded-lg border-2 px-3 py-4 text-center cursor-pointer transition-colors ${
                       selectedEmployeeId === ANY_EMPLOYEE
-                        ? "border-gold bg-selected text-cream"
-                        : "border-border text-cream bg-transparent hover:bg-ink-soft"
+                        ? "border-gold bg-selected"
+                        : "border-border bg-transparent hover:bg-ink-soft"
                     }`}
                   >
-                    Vsi zaposleni
-                    <span className="block text-xs text-cream-dim font-normal">
-                      za največjo razpoložljivost
+                    {selectedEmployeeId === ANY_EMPLOYEE && (
+                      <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-gold text-ink flex items-center justify-center">
+                        <Check size={13} strokeWidth={3} />
+                      </span>
+                    )}
+                    <div className="w-16 h-16 rounded-full bg-ink-field border border-border flex items-center justify-center shrink-0">
+                      <Users size={26} className="text-cream-faint" />
+                    </div>
+                    <span className="text-sm font-medium text-cream">
+                      Vsi zaposleni
+                      <span className="block text-[11px] text-cream-dim font-normal mt-0.5">
+                        za največjo razpoložljivost
+                      </span>
                     </span>
                   </button>
                   {employees.map((e) => (
@@ -894,13 +913,30 @@ export default function BookingPage({
                         setSelectedEmployeeId(e.id);
                         setForm((f) => ({ ...f, time: "" }));
                       }}
-                      className={`w-full text-left rounded-md border px-3.5 py-2.5 text-sm font-medium cursor-pointer transition-colors ${
+                      className={`relative flex flex-col items-center gap-2 rounded-lg border-2 px-3 py-4 text-center cursor-pointer transition-colors ${
                         selectedEmployeeId === e.id
-                          ? "border-gold bg-selected text-cream"
-                          : "border-border text-cream bg-transparent hover:bg-ink-soft"
+                          ? "border-gold bg-selected"
+                          : "border-border bg-transparent hover:bg-ink-soft"
                       }`}
                     >
-                      {e.name}
+                      {selectedEmployeeId === e.id && (
+                        <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-gold text-ink flex items-center justify-center">
+                          <Check size={13} strokeWidth={3} />
+                        </span>
+                      )}
+                      <div className="w-16 h-16 rounded-full bg-ink-field border border-border overflow-hidden flex items-center justify-center shrink-0">
+                        {e.photoUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- zunanja, dinamična Storage URL (ni lokalna slika), next/image bi zahteval remotePatterns za Supabase domeno
+                          <img
+                            src={e.photoUrl}
+                            alt={e.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <User size={26} className="text-cream-faint" />
+                        )}
+                      </div>
+                      <span className="text-sm font-medium text-cream">{e.name}</span>
                     </button>
                   ))}
                 </div>

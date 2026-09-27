@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { resolveSalonTheme } from "@/lib/constants";
 import { addEmployee, updateEmployee } from "../employees-actions";
 import EmployeeHoursEditor from "./employee-hours-editor";
+import EmployeePhotoUpload from "../employee-photo-upload";
 import PoweredBy from "@/components/powered-by";
 import ThemeToggle from "@/components/theme-toggle";
 
@@ -94,6 +95,7 @@ export default async function EmployeesPage({
                 key={employee.id}
                 className="border border-border rounded-lg bg-panel p-4 space-y-4"
               >
+                <EmployeePhotoUpload employeeId={employee.id} initialPhotoUrl={employee.photo_url} />
                 <form
                   action={updateEmployee.bind(null, employee.id)}
                   className="flex flex-wrap items-end gap-3"

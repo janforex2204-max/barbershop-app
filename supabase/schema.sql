@@ -166,6 +166,12 @@ create table if not exists employees (
 
 create index if not exists employees_salon_idx on employees (salon_id);
 
+-- Slika zaposlenega (krožna, prikazana na /[slug] pri izbiri izvajalca) -
+-- glej owner/employees-actions.ts uploadEmployeePhoto in bucket
+-- "employee-photos" spodaj. NULL = brez naložene slike, /[slug] v tem
+-- primeru prikaže generično ikono osebe namesto <img>.
+alter table employees add column if not exists photo_url text;
+
 -- ---------------------------------------------------------------------------
 -- TERMINI (appointments)
 -- ---------------------------------------------------------------------------
@@ -541,6 +547,28 @@ create policy "salon_logos_owner_delete" on storage.objects
       select id::text from salon_owners where user_id = auth.uid()
     )
   );
+
+-- Slika zaposlenega (glej employees.photo_url zgoraj) - JAVEN bucket, ista
+-- oblika/omejitve kot "salon-logos" zgoraj, pot "{salon_id}/{employee_id}.
+-- <ext>" (glej owner/employees-actions.ts uploadEmployeePhoto). Za razliko
+-- od "salon-logos" NAMENOMA BREZ owner insert/update/delete politik - glej
+-- opombo pri "salon-logos" tik zgoraj (session-scoped browser upload je v
+-- praksi padel na RLS), zato pisanje tu OD ZAČETKA gre SAMO prek ADMIN
+-- klienta (uploadEmployeePhoto preveri lastništvo TAM, s cookie-scoped
+-- klientom, preden admin klient dejansko piše) - RLS politike za pisanje bi
+-- bile tu enako neuporabljene, kot so že pri "salon-logos" zgoraj.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'employee-photos',
+  'employee-photos',
+  true,
+  2097152, -- 2 MB
+  array['image/png', 'image/jpeg', 'image/webp']
+)
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
 
 -- Enako kot notify po services zgoraj - vrne PostgREST-ov schema cache po
 -- ZGORNJIH ALTER/VIEW spremembah (novi stolpci/view-i so sicer dostopni šele

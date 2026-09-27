@@ -73,6 +73,10 @@ export type Database = {
           active: boolean;
           sort_order: number;
           created_at: string;
+          // Krožna slika, prikazana na /[slug] pri izbiri izvajalca - null =
+          // brez naložene slike (glej owner/employees-actions.ts
+          // uploadEmployeePhoto in "employee-photos" bucket v schema.sql).
+          photo_url: string | null;
         };
         Insert: {
           id?: string;
@@ -82,6 +86,7 @@ export type Database = {
           active?: boolean;
           sort_order?: number;
           created_at?: string;
+          photo_url?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["employees"]["Insert"]>;
         Relationships: [];
