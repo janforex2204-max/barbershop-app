@@ -18,7 +18,12 @@ import {
   isSlotAvailable,
   DEFAULT_SERVICE_DURATION_MINUTES,
 } from "@/lib/availability";
-import { busyForEmployee, type EmployeeBusyRow } from "@/lib/employee-availability";
+import {
+  busyForEmployee,
+  groupBusyByEmployee,
+  ANY_EMPLOYEE,
+  type EmployeeBusyRow,
+} from "@/lib/employee-availability";
 import type { SalonDayHours } from "@/types/database.types";
 
 // KRITIČNO: salon_id se za VSAK klic izpelje TUKAJ, na strežniku, iz `slug`
@@ -181,9 +186,13 @@ export async function bookAppointment(
     service: string;
     date: string;
     time: string;
+    // Poleg "null" (brez izvajalca) in pravega employee id-ja tudi
+    // ANY_EMPLOYEE ("Vsi zaposleni" - glej pogovor s Claude) - strežnik ga
+    // spodaj v celoti razreši na pravega UUID-ja, PREDEN pride do
+    // KATEREGAKOLI insert-a.
     employeeId?: string | null;
   }
-): Promise<{ error?: string; token?: string }> {
+): Promise<{ error?: string; token?: string; employeeName?: string | null }> {
   // Server Action je dosegljiv z neposrednim POST-om mimo UI-ja, zato se ne
   // zanašamo samo na validacijo v booking-page.tsx (glej isValidCustomerName/
   // isValidPhone v src/lib/constants.ts za pravili in razlago).
@@ -231,24 +240,32 @@ export async function bookAppointment(
   // pripada TEMU salonu in je aktiven (isti razlog kot storitev zgoraj).
   // salonHasActiveEmployees odloča o dvonivojskem busy filtru spodaj (glej
   // src/lib/employee-availability.ts) NE GLEDE na to, ali je bil employeeId
-  // sploh poslan.
+  // sploh poslan. sort_order dodan za "Vsi zaposleni" izenačenje (glej
+  // spodaj).
   const { data: activeEmployees } = await supabase
     .from("employees")
-    .select("id, name, hours")
+    .select("id, name, hours, sort_order")
     .eq("salon_id", salonId)
     .eq("active", true);
 
   const salonHasActiveEmployees = (activeEmployees?.length ?? 0) > 0;
-  const employeeId = input.employeeId ?? null;
+  const rawEmployeeId = input.employeeId ?? null;
+  const wantsAnyEmployee = rawEmployeeId === ANY_EMPLOYEE;
+
+  // employeeId je KONČNA, dejansko zapisana vrednost - za "Vsi zaposleni" jo
+  // spodnja zanka šele razreši v pravi UUID; za konkreten izbran zaposleni
+  // (ali brez zaposlenega) je znana že tu, kot doslej.
+  let employeeId: string | null = null;
   let effectiveHours = hours;
   let employeeName: string | null = null;
-  if (employeeId) {
-    const matchedEmployee = activeEmployees?.find((e) => e.id === employeeId);
+  if (rawEmployeeId && !wantsAnyEmployee) {
+    const matchedEmployee = activeEmployees?.find((e) => e.id === rawEmployeeId);
     if (!matchedEmployee) {
       return { error: "Izbrani izvajalec ni veljaven. Izberi drugega." };
     }
     effectiveHours = matchedEmployee.hours;
     employeeName = matchedEmployee.name;
+    employeeId = matchedEmployee.id;
   }
 
   // Ponovna preverba prekrivanja NA STREŽNIKU tik pred vpisom - klientov
@@ -256,7 +273,9 @@ export async function bookAppointment(
   // stranka je medtem rezervirala) ali klient preprosto POŠLJE poljuben čas
   // mimo UI-ja (glej komentar zgoraj o neposrednem POST-u). Spodnji unique
   // index še vedno lovi IDENTIČEN čas kot zadnjo varovalko, tole pa lovi
-  // PREKRIVAJOČE se, a različne čase, ki jih index ne bi zaznal.
+  // PREKRIVAJOČE se, a različne čase, ki jih index ne bi zaznal. Skupno
+  // za VSE tri poti (konkreten/brez/"vsi zaposleni") - vsaka samo drugače
+  // agregira ISTE surove vrstice.
   let { data: busyRows, error: busyError } = await supabase
     .from("public_availability")
     .select("appointment_time, duration_minutes, employee_id")
@@ -289,47 +308,100 @@ export async function bookAppointment(
     durationMinutes: r.duration_minutes ?? 60,
     employeeId: r.employee_id ?? null,
   }));
-  const busy = busyForEmployee(rawBusy, employeeId, salonHasActiveEmployees);
-  const dayBreak = resolveDayBreak(effectiveHours, input.date);
-  if (dayBreak) busy.push(dayBreak);
-  const window = resolveDayWindow(effectiveHours, input.date);
-
-  if (!isSlotAvailable(window, busy, durationMinutes, input.time)) {
-    return { error: "Ta termin ni več na voljo za izbrano storitev. Izberi drugega." };
-  }
 
   // Isti vzorec kot salon_owners.approval_token (admin/approve/route.ts) -
   // glej supabase/schema.sql za polno razlago. Avtorizacija za
   // /rezervacija/[token] (glej ta pogovor s Claude).
   const token = randomBytes(32).toString("hex");
 
-  let { error } = await supabase.from("appointments").insert({
-    salon_id: salonId,
-    customer_name: input.name,
-    customer_phone: input.phone,
-    customer_email: email,
-    service: input.service,
-    appointment_date: input.date,
-    appointment_time: input.time,
-    duration_minutes: durationMinutes,
-    employee_id: employeeId,
-    status: "booked",
-    ip_address: ip,
-    token,
-  });
+  if (wantsAnyEmployee) {
+    // "Vsi zaposleni" - atomarna dodelitev (glej pogovor s Claude,
+    // arhitekturni načrt). NAMENOMA ločeno od spodnje (obstoječe,
+    // nespremenjene) poti - drugačna predhodna validacija, drugačna
+    // zanka namesto enega samega insert-a.
+    if (!salonHasActiveEmployees) {
+      return { error: "Trenutno ni na voljo nobenega izvajalca." };
+    }
 
-  // KRITIČNA varovalka - če appointments.duration_minutes migracija še ni
-  // zagnana, tale insert BREZ nje popolnoma blokira VSAKO rezervacijo na
-  // platformi (ne samo prikaz cene/trajanja kot pri zgornjih fallbackih),
-  // dokler nekdo ne požene SQL-ja - enak vzorec, samo bistveno višji vpliv.
-  // Termin se v tem primeru vseeno zapiše, samo brez duration_minutes
-  // (izračun prekrivanja zanj kasneje pade nazaj na privzetih 60 min, glej
-  // loadAvailability v booking-page.tsx).
-  if (error?.code === "42703") {
-    console.error(
-      `[${slug}] appointments.duration_minutes še ne obstaja (manjkajoča migracija) - vpisujem termin brez njega.`
-    );
-    const fallback = await supabase.from("appointments").insert({
+    const busyByEmployee = groupBusyByEmployee(rawBusy, activeEmployees ?? []);
+    // Kandidati = tisti, za katere je termin PO PREDHODNI (optimizacijski,
+    // ne dokončni - glej spodaj) preverbi dejansko prost, razvrščeni po
+    // "najmanj zaseden danes" (izognemo se novemu trajnemu stanju/
+    // round-robin kazalcu), izenačenje po sort_order.
+    const candidates = (activeEmployees ?? [])
+      .map((e) => {
+        const empBusy = busyByEmployee.get(e.id) ?? [];
+        const empBreak = resolveDayBreak(e.hours, input.date);
+        const empBusyWithBreak = empBreak ? [...empBusy, empBreak] : empBusy;
+        const empWindow = resolveDayWindow(e.hours, input.date);
+        return {
+          id: e.id,
+          name: e.name,
+          sortOrder: e.sort_order,
+          busyCountToday: empBusy.length,
+          isFree: isSlotAvailable(empWindow, empBusyWithBreak, durationMinutes, input.time),
+        };
+      })
+      .filter((c) => c.isFree)
+      .sort((a, b) => a.busyCountToday - b.busyCountToday || a.sortOrder - b.sortOrder);
+
+    let assigned: { id: string; name: string } | null = null;
+    let unexpectedError: string | null = null;
+
+    // Dejanska pravilnost NI odvisna od zgornje (lahko zastarele) preverbe -
+    // vsak poskus insert-a je varovan z appointments_salon_date_time_
+    // employee_active_idx (glej supabase/schema.sql), ki je PO ZAPOSLENEM
+    // ločena unique celica. Če dva kupca hkrati "zadeneta" istega
+    // kandidata, ena dobi 23505 in preprosto preide na naslednjega PROSTEGA
+    // kandidata - baza je edini razsodnik, ne ta zanka.
+    for (const candidate of candidates) {
+      const { error: attemptError } = await supabase.from("appointments").insert({
+        salon_id: salonId,
+        customer_name: input.name,
+        customer_phone: input.phone,
+        customer_email: email,
+        service: input.service,
+        appointment_date: input.date,
+        appointment_time: input.time,
+        duration_minutes: durationMinutes,
+        employee_id: candidate.id,
+        status: "booked",
+        ip_address: ip,
+        token,
+      });
+      if (!attemptError) {
+        assigned = candidate;
+        break;
+      }
+      if (attemptError.code !== "23505") {
+        unexpectedError = attemptError.message;
+        break;
+      }
+      // 23505 - ta kandidat je bil pravkar zaseden, poskusi naslednjega.
+    }
+
+    if (!assigned) {
+      if (unexpectedError) {
+        return { error: unexpectedError };
+      }
+      return { error: "Ta termin ni več na voljo. Izberi drugega." };
+    }
+
+    employeeId = assigned.id;
+    employeeName = assigned.name;
+  } else {
+    // OBSTOJEČA pot (konkreten izbran zaposleni, ali brez zaposlenega za
+    // salone brez te funkcionalnosti) - NESPREMENJENA.
+    const busy = busyForEmployee(rawBusy, employeeId, salonHasActiveEmployees);
+    const dayBreak = resolveDayBreak(effectiveHours, input.date);
+    if (dayBreak) busy.push(dayBreak);
+    const window = resolveDayWindow(effectiveHours, input.date);
+
+    if (!isSlotAvailable(window, busy, durationMinutes, input.time)) {
+      return { error: "Ta termin ni več na voljo za izbrano storitev. Izberi drugega." };
+    }
+
+    let { error } = await supabase.from("appointments").insert({
       salon_id: salonId,
       customer_name: input.name,
       customer_phone: input.phone,
@@ -337,19 +409,46 @@ export async function bookAppointment(
       service: input.service,
       appointment_date: input.date,
       appointment_time: input.time,
+      duration_minutes: durationMinutes,
       employee_id: employeeId,
       status: "booked",
       ip_address: ip,
       token,
     });
-    error = fallback.error;
-  }
 
-  if (error) {
-    if (error.code === "23505") {
-      return { error: "Ta termin je bil pravkar zaseden. Izberi drugega." };
+    // KRITIČNA varovalka - če appointments.duration_minutes migracija še ni
+    // zagnana, tale insert BREZ nje popolnoma blokira VSAKO rezervacijo na
+    // platformi (ne samo prikaz cene/trajanja kot pri zgornjih fallbackih),
+    // dokler nekdo ne požene SQL-ja - enak vzorec, samo bistveno višji
+    // vpliv. Termin se v tem primeru vseeno zapiše, samo brez
+    // duration_minutes (izračun prekrivanja zanj kasneje pade nazaj na
+    // privzetih 60 min, glej loadAvailability v booking-page.tsx).
+    if (error?.code === "42703") {
+      console.error(
+        `[${slug}] appointments.duration_minutes še ne obstaja (manjkajoča migracija) - vpisujem termin brez njega.`
+      );
+      const fallback = await supabase.from("appointments").insert({
+        salon_id: salonId,
+        customer_name: input.name,
+        customer_phone: input.phone,
+        customer_email: email,
+        service: input.service,
+        appointment_date: input.date,
+        appointment_time: input.time,
+        employee_id: employeeId,
+        status: "booked",
+        ip_address: ip,
+        token,
+      });
+      error = fallback.error;
     }
-    return { error: error.message };
+
+    if (error) {
+      if (error.code === "23505") {
+        return { error: "Ta termin je bil pravkar zaseden. Izberi drugega." };
+      }
+      return { error: error.message };
+    }
   }
 
   await notifyOwnerOfBooking(salonId, { ...input, employeeName });
@@ -364,7 +463,7 @@ export async function bookAppointment(
     });
   }
 
-  return { token };
+  return { token, employeeName };
 }
 
 // Klicano iz potrditvene strani (booking-page.tsx), SAMO če stranka e-pošte

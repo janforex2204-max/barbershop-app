@@ -26,7 +26,13 @@ import {
   upcomingAvailableWeeks,
   DEFAULT_SERVICE_DURATION_MINUTES,
 } from "@/lib/availability";
-import { busyForEmployee, type EmployeeBusyRow } from "@/lib/employee-availability";
+import {
+  busyForEmployee,
+  groupBusyByEmployee,
+  computeFreeSlotsAnyEmployee,
+  ANY_EMPLOYEE,
+  type EmployeeBusyRow,
+} from "@/lib/employee-availability";
 import type { SalonDayHours } from "@/types/database.types";
 import DatePicker from "./date-picker";
 import {
@@ -519,13 +525,22 @@ export default function BookingPage({
   const selectedEmployee = employees.find((e) => e.id === selectedEmployeeId);
   const effectiveHours = selectedEmployee ? selectedEmployee.hours : salonHours;
   const salonHasActiveEmployees = employees.length > 0;
+  // "Vsi zaposleni" (glej pogovor s Claude, arhitekturni načrt) - drugačna
+  // pot skozi mrežo prostih terminov spodaj (unija med vsemi, ne posamezen
+  // zaposleni). selectedEmployee zanj namerno ostane undefined (sentinel se
+  // ne ujema z nobenim pravim id-jem) - to je ŽELENO, saj marsikatera
+  // spodnja koda (npr. oznaka gumba "prvi prosti termin") tako samodejno
+  // pade nazaj na generično besedilo brez posebne obravnave.
+  const isAnyEmployee = selectedEmployeeId === ANY_EMPLOYEE;
   // Pri 2+ zaposlenih, dokler ni izbran noben konkreten (selectedEmployeeId
   // je "" - glej pogovor s Claude), spodnji busyForEmployee dobi
   // employeeId=null, kar filtrira busy na SAMO netagirane termine (skoraj
   // vedno prazno, ker imajo nove rezervacije zdaj realen employee_id) -
   // mreža bi zato pokazala zavajajočo "vse prosto" sliko, izračunano proti
   // splošnemu salonovemu urniku, ne proti pravemu izvajalcu. Ta zastavica
-  // spodaj SPLOH prepreči prikaz mreže, dokler stranka ne izbere nekoga.
+  // spodaj SPLOH prepreči prikaz mreže, dokler stranka ne izbere nekoga
+  // (izbira "Vsi zaposleni" JE veljavna, popolna izbira - selectedEmployeeId
+  // je resničen niz, torej to spodaj samodejno postane false).
   const employeeSelectionPending = employees.length > 1 && !selectedEmployeeId;
 
   const dayWindow = resolveDayWindow(effectiveHours, selectedDate);
@@ -536,7 +551,14 @@ export default function BookingPage({
     salonHasActiveEmployees
   );
   const busyWithBreak = dayBreak ? [...busyForSelection, dayBreak] : busyForSelection;
-  const freeTimes = computeFreeSlots(dayWindow, busyWithBreak, selectedServiceDuration);
+  const freeTimes = isAnyEmployee
+    ? computeFreeSlotsAnyEmployee(
+        employees,
+        selectedDate,
+        groupBusyByEmployee(busy, employees),
+        selectedServiceDuration
+      )
+    : computeFreeSlots(dayWindow, busyWithBreak, selectedServiceDuration);
 
   // Poišče prvi PRIHODNJI dan (znotraj že prikazanega koledarja) z vsaj enim
   // prostim terminom za TRENUTNO izbrano storitev - bere iz že napolnjenega
@@ -548,6 +570,16 @@ export default function BookingPage({
     for (let i = idx + 1; i < ALL_DATES.length; i++) {
       const date = ALL_DATES[i];
       const cachedBusy = availabilityCacheRef.current.get(date) ?? [];
+      if (isAnyEmployee) {
+        const freeAny = computeFreeSlotsAnyEmployee(
+          employees,
+          date,
+          groupBusyByEmployee(cachedBusy, employees),
+          selectedServiceDuration
+        );
+        if (freeAny.length > 0) return date;
+        continue;
+      }
       const window = resolveDayWindow(effectiveHours, date);
       const brk = resolveDayBreak(effectiveHours, date);
       const busyForDay = busyForEmployee(
@@ -596,20 +628,25 @@ export default function BookingPage({
       return;
     }
     setSubmitting(true);
-    const { error, token } = await bookAppointmentAction(slug, {
-      name: form.name,
-      phone: form.phone,
-      email: form.email || undefined,
-      service: form.service,
-      date: selectedDate,
-      time: form.time,
-      employeeId: selectedEmployeeId || null,
-    });
+    const { error, token, employeeName: assignedEmployeeName } = await bookAppointmentAction(
+      slug,
+      {
+        name: form.name,
+        phone: form.phone,
+        email: form.email || undefined,
+        service: form.service,
+        date: selectedDate,
+        time: form.time,
+        employeeId: selectedEmployeeId || null,
+      }
+    );
     setSubmitting(false);
 
     if (error) {
       showToast(
-        error.includes("zaseden") ? error : "Napaka pri rezervaciji: " + error
+        error.includes("zaseden") || error.includes("na voljo")
+          ? error
+          : "Napaka pri rezervaciji: " + error
       );
       loadAvailability(selectedDate);
       return;
@@ -617,8 +654,11 @@ export default function BookingPage({
 
     showToast(`Termin potrjen: ${form.time} na ${dayLabel(selectedDate)}`);
     const serviceName = selectedService ? selectedService.name : form.service;
+    // Server je dokončna avtoriteta o TEM, KDO je dejansko dodeljen (glej
+    // pogovor s Claude) - pri "Vsi zaposleni" tega vnaprej sploh ne vemo,
+    // klientov selectedEmployee je tam vedno undefined.
     setConfirmedBooking({
-      title: selectedEmployee ? `${serviceName} pri ${selectedEmployee.name}` : serviceName,
+      title: assignedEmployeeName ? `${serviceName} pri ${assignedEmployeeName}` : serviceName,
       date: selectedDate,
       time: form.time,
       durationMinutes: selectedServiceDuration,
@@ -823,6 +863,29 @@ export default function BookingPage({
                   Izberi izvajalca
                 </h2>
                 <div className="flex flex-col gap-2">
+                  {/* "Vsi zaposleni" NA VRHU - unija razpoložljivosti, server
+                      ob oddaji atomarno dodeli konkretnega prostega
+                      zaposlenega (glej pogovor s Claude, arhitekturni
+                      načrt). NIKOLI employeeId=null - to bi prek
+                      busyForEmployee-jevega "OR null" pravila termin
+                      dejansko zaklenilo za vsakogar. */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedEmployeeId(ANY_EMPLOYEE);
+                      setForm((f) => ({ ...f, time: "" }));
+                    }}
+                    className={`w-full text-left rounded-md border px-3.5 py-2.5 text-sm font-medium cursor-pointer transition-colors ${
+                      selectedEmployeeId === ANY_EMPLOYEE
+                        ? "border-gold bg-selected text-cream"
+                        : "border-border text-cream bg-transparent hover:bg-ink-soft"
+                    }`}
+                  >
+                    Vsi zaposleni
+                    <span className="block text-xs text-cream-dim font-normal">
+                      za največjo razpoložljivost
+                    </span>
+                  </button>
                   {employees.map((e) => (
                     <button
                       key={e.id}
@@ -1120,8 +1183,12 @@ export default function BookingPage({
                   <p className="text-[11px] font-bold uppercase tracking-wide text-cream-faint mb-0.5">
                     Izvajalec
                   </p>
-                  <p className={selectedEmployee ? "text-cream" : "text-cream-faint"}>
-                    {selectedEmployee ? selectedEmployee.name : "Še ni izbrano"}
+                  <p className={selectedEmployee || isAnyEmployee ? "text-cream" : "text-cream-faint"}>
+                    {selectedEmployee
+                      ? selectedEmployee.name
+                      : isAnyEmployee
+                        ? "Vsi zaposleni"
+                        : "Še ni izbrano"}
                   </p>
                 </div>
               )}
