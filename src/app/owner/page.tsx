@@ -236,11 +236,8 @@ export default async function OwnerDashboard({
   return (
     <div data-theme={salonTheme} className="min-h-screen bg-ink text-cream font-sans px-6 py-10">
       <div className="max-w-2xl mx-auto">
-        <div className="flex items-center gap-3 mb-4">
+        <div className="mb-4">
           <PoweredBy size="lg" />
-          {/* Glej isto opombo v [slug]/booking-page.tsx - preklop nima
-              učinka, ko je tema salona vsiljena prek data-theme zgoraj. */}
-          {!salonTheme && <ThemeToggle />}
         </div>
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -248,45 +245,63 @@ export default async function OwnerDashboard({
             <h1 className="text-sm font-medium text-cream-dim">Nadzorna plošča</h1>
             <p className="text-sm text-cream-faint">{user.email}</p>
           </div>
-          {/* inline-flex + flex-col + items-stretch (namesto prejšnjega
-              vodoravnega flex, ki se je pri ozkem max-w-2xl lomil v dve
-              vrsti) - vsi štirje elementi se raztegnejo na širino
-              NAJŠIRŠEGA med njimi ("Storitve in cenik"), container pa se
-              sam skrči na TO širino (shrink-to-fit), brez trdo kodirane
-              vrednosti v px. whitespace-nowrap prepreči lom besedila v 2
-              vrstici pri ozkih zaslonih - brez njega bi imeli gumbi z
-              daljšim/krajšim besedilom RAZLIČNO višino, ko bi se container
-              skrčil (preverjeno vse do 320px širine, brez preliva). Gumb
-              "Odjava" je edini v <form>, zato potrebuje w-full - Link
-              elementa sta že neposredna flex elementa in se raztegneta
-              samodejno. */}
-          <div className="inline-flex flex-col items-stretch gap-2">
-            <Link
-              href="/owner/services"
-              className="text-sm text-center whitespace-nowrap border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft"
-            >
-              Storitve in cenik
-            </Link>
-            <Link
-              href="/owner/hours"
-              className="text-sm text-center whitespace-nowrap border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft"
-            >
-              Delovni čas
-            </Link>
-            <Link
-              href="/owner/employees"
-              className="text-sm text-center whitespace-nowrap border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft"
-            >
-              Zaposleni
-            </Link>
-            <form action={logout}>
-              <button
-                type="submit"
-                className="w-full text-sm text-center whitespace-nowrap border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft cursor-pointer"
+          {/* Desni stolpec - flex-col + items-end poravna VSE otroke (preklop
+              teme + spodnji gumbi) na isti desni rob, čisto ob robu te
+              (max-w-2xl) glave (justify-end logika, glej pogovor s Claude).
+              Preklop teme je NAMENOMA svoj, ožji element nad širšim stolpcem
+              gumbov - ni raztegnjen na njihovo širino (drugačna vrsta
+              kontrolnika, kvadratna ikona, ne besedilni gumb), a poravnan na
+              ISTI desni rob prek items-end. */}
+          <div className="flex flex-col items-end gap-2">
+            {/* Glej isto opombo v [slug]/booking-page.tsx - preklop nima
+                učinka, ko je tema salona vsiljena prek data-theme zgoraj.
+                Večji (size 20) + border/bg-ink-field (namesto privzetega
+                golega besedila) - na prvi pogled očitno klikljiv gumb, ne
+                dekoracija, isti "opazen" vzorec kot že na /[slug] in
+                /rezervacija/[token] (glej ThemeToggle). */}
+            {!salonTheme && (
+              <ThemeToggle size={20} className="border border-border bg-ink-field p-2" />
+            )}
+            {/* inline-flex + flex-col + items-stretch (namesto prejšnjega
+                vodoravnega flex, ki se je pri ozkem max-w-2xl lomil v dve
+                vrsti) - vsi štirje elementi se raztegnejo na širino
+                NAJŠIRŠEGA med njimi ("Storitve in cenik"), container pa se
+                sam skrči na TO širino (shrink-to-fit), brez trdo kodirane
+                vrednosti v px. whitespace-nowrap prepreči lom besedila v 2
+                vrstici pri ozkih zaslonih - brez njega bi imeli gumbi z
+                daljšim/krajšim besedilom RAZLIČNO višino, ko bi se container
+                skrčil (preverjeno vse do 320px širine, brez preliva). Gumb
+                "Odjava" je edini v <form>, zato potrebuje w-full - Link
+                elementa sta že neposredna flex elementa in se raztegneta
+                samodejno. */}
+            <div className="inline-flex flex-col items-stretch gap-2">
+              <Link
+                href="/owner/services"
+                className="text-sm text-center whitespace-nowrap border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft"
               >
-                Odjava
-              </button>
-            </form>
+                Storitve in cenik
+              </Link>
+              <Link
+                href="/owner/hours"
+                className="text-sm text-center whitespace-nowrap border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft"
+              >
+                Delovni čas
+              </Link>
+              <Link
+                href="/owner/employees"
+                className="text-sm text-center whitespace-nowrap border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft"
+              >
+                Zaposleni
+              </Link>
+              <form action={logout}>
+                <button
+                  type="submit"
+                  className="w-full text-sm text-center whitespace-nowrap border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft cursor-pointer"
+                >
+                  Odjava
+                </button>
+              </form>
+            </div>
           </div>
         </div>
 
