@@ -23,8 +23,12 @@ export type DayWindow = { start: string; end: string };
 
 // Vsi kandidatni začetni časi so VEDNO na četrt ure, ne glede na trajanje
 // storitve (npr. 15-minutna storitev med 14:00-15:00 prosto ponudi 14:00,
-// 14:15, 14:30, 14:45 - ne pa npr. 14:07).
-const SLOT_GRANULARITY_MINUTES = 15;
+// 14:15, 14:30, 14:45 - ne pa npr. 14:07). Izvožen - uporabljen tudi kot
+// najmanjša smiselna "storitev" pri preverbi "ali ima ta dan sploh kaj
+// prostega" (glej booking-page.tsx fullyBookedDates), ko storitev še ni
+// izbrana - finejše od te mreže ni mogoče preveriti, zato je to najbolj
+// duration-neodvisna preverba, ki jo computeFreeSlots sploh lahko da.
+export const SLOT_GRANULARITY_MINUTES = 15;
 
 // Uporabljeno, kadar izbrana storitev nima nastavljenega trajanja
 // (services.duration_minutes je null) - glej owner/services/page.tsx.

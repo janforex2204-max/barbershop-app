@@ -25,6 +25,7 @@ import {
   computeFreeSlots,
   upcomingAvailableWeeks,
   DEFAULT_SERVICE_DURATION_MINUTES,
+  SLOT_GRANULARITY_MINUTES,
 } from "@/lib/availability";
 import {
   busyForEmployee,
@@ -186,6 +187,15 @@ export default function BookingPage({
   // (stale-while-revalidate), ker se zasedenost lahko medtem spremeni (druga
   // stranka je rezervirala termin).
   const availabilityCacheRef = useRef<Map<string, EmployeeBusyRow[]>>(new Map());
+  // REAKTIVNO zrcalo zgornjega ref-a - SAMO za fullyBookedDates spodaj, ki
+  // (za razliko od selectDate/findNextAvailableDate, ki ref berejo v
+  // dogodkih/callbackih, kar je varno) svojo vrednost potrebuje MED
+  // renderjem, kjer branje ref.current ni dovoljeno (React pravilo, glej
+  // pogovor s Claude). Posodobi se na ISTIH mestih, kjer se že tako ali
+  // tako kliče setBusy spodaj (torej znotraj async funkcije, po await-u -
+  // to je varno, "setState v efektu" pravilo prepoveduje samo NEPOGOJNE
+  // klice neposredno v telesu efekta, ne pa znotraj async nadaljevanja).
+  const [busyByDate, setBusyByDate] = useState<Map<string, EmployeeBusyRow[]>>(new Map());
   // Poveča se ob kliku na "Poskusi znova" - v deps spodnjega useEffect-a, da
   // gumb lahko ponovno sproži nalaganje storitev (loadAvailability za
   // termine kliče uporabnik neposredno, ker je to že samostojna funkcija).
@@ -402,6 +412,7 @@ export default function BookingPage({
       // stanja za NEK DRUG dan, kot ga uporabnik trenutno gleda.
       if (date !== latestDateRef.current) return;
 
+      setBusyByDate((prev) => new Map(prev).set(date, takenIntervals));
       setSlotsError(false);
       setBusy(takenIntervals);
       setSlotsLoading(false);
@@ -470,6 +481,7 @@ export default function BookingPage({
         employeeId: row.employee_id ?? null,
       });
     }
+    setBusyByDate(new Map(availabilityCacheRef.current));
 
     const current = availabilityCacheRef.current.get(latestDateRef.current);
     if (current) {
@@ -567,6 +579,63 @@ export default function BookingPage({
         selectedServiceDuration
       )
     : computeFreeSlots(dayWindow, busyWithBreak, selectedServiceDuration);
+
+  // Kateri prikazani dnevi (v DatePicker-ju) za TRENUTNO izbranega izvajalca
+  // (ali - pri "Vsi zaposleni" - noben aktiven zaposlen) nimajo ČISTO
+  // NOBENEGA prostega časa, ne glede na konkretno storitev (ta v tem koraku
+  // še ni izbrana - glej pogovor s Claude) - zato SLOT_GRANULARITY_MINUTES
+  // namesto selectedServiceDuration, najmanjša smiselna enota, finejše
+  // computeFreeSlots/computeFreeSlotsAnyEmployee itak ne znata preveriti.
+  // Bere iz busyByDate (REAKTIVNO zrcalo availabilityCacheRef, glej zgoraj) -
+  // ne iz samega ref-a, ker branje ref.current med renderjem (tudi znotraj
+  // useMemo) ni dovoljeno.
+  //
+  // Zaprt dan (window === null, ali pri "Vsi zaposleni" noben zaposlen ta
+  // dan sploh ne dela) je NAMENOMA izpuščen - to je ločeno, že obstoječe
+  // stanje (glej pogovor s Claude), ne sme se zmešati z "odprto, a
+  // trenutno brez prostega časa".
+  const fullyBookedDates = useMemo(() => {
+    const result = new Set<string>();
+    if (employeeSelectionPending) return result;
+
+    for (const date of ALL_DATES) {
+      const cachedBusy = busyByDate.get(date) ?? [];
+      if (isAnyEmployee) {
+        const anyoneOpen = employees.some((e) => resolveDayWindow(e.hours, date) !== null);
+        if (!anyoneOpen) continue;
+        const freeAny = computeFreeSlotsAnyEmployee(
+          employees,
+          date,
+          groupBusyByEmployee(cachedBusy, employees),
+          SLOT_GRANULARITY_MINUTES
+        );
+        if (freeAny.length === 0) result.add(date);
+        continue;
+      }
+      const window = resolveDayWindow(effectiveHours, date);
+      if (!window) continue;
+      const brk = resolveDayBreak(effectiveHours, date);
+      const busyForDay = busyForEmployee(
+        cachedBusy,
+        selectedEmployeeId || null,
+        salonHasActiveEmployees
+      );
+      const busyForDayWithBreak = brk ? [...busyForDay, brk] : busyForDay;
+      if (computeFreeSlots(window, busyForDayWithBreak, SLOT_GRANULARITY_MINUTES).length === 0) {
+        result.add(date);
+      }
+    }
+    return result;
+  }, [
+    ALL_DATES,
+    employeeSelectionPending,
+    isAnyEmployee,
+    employees,
+    effectiveHours,
+    selectedEmployeeId,
+    salonHasActiveEmployees,
+    busyByDate,
+  ]);
 
   // Poišče prvi PRIHODNJI dan (znotraj že prikazanega koledarja) z vsaj enim
   // prostim terminom za TRENUTNO izbrano storitev - bere iz že napolnjenega
@@ -954,7 +1023,12 @@ export default function BookingPage({
                 <h2 className="font-display text-xl font-semibold mb-1 text-cream">
                   Izberi dan
                 </h2>
-                <DatePicker selectedDate={selectedDate} onSelect={selectDate} weeks={weeks} />
+                <DatePicker
+                  selectedDate={selectedDate}
+                  onSelect={selectDate}
+                  weeks={weeks}
+                  fullyBookedDates={fullyBookedDates}
+                />
 
                 {/* Storitev MORA biti izbrana PREDEN prikažemo proste termine - ti
                     so zdaj odvisni od njenega trajanja (glej computeFreeSlots

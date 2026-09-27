@@ -19,10 +19,16 @@ export default function DatePicker({
   selectedDate,
   onSelect,
   weeks,
+  fullyBookedDates,
 }: {
   selectedDate: string;
   onSelect: (date: string) => void;
   weeks: BusinessWeek[];
+  // Dnevi brez ČISTO NOBENEGA prostega časa za trenutno izbranega izvajalca
+  // (glej booking-page.tsx fullyBookedDates) - samo vizualna oznaka, dan
+  // ostane KLIKLJIV (morda se je nekaj sprostilo). Neobvezno - manage-
+  // booking-page.tsx (prenaročanje) tega ne pošilja in ostaja nespremenjen.
+  fullyBookedDates?: Set<string>;
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -64,6 +70,7 @@ export default function DatePicker({
               <div className="grid grid-cols-5 gap-1.5">
                 {week.dates.map((d) => {
                   const { weekday, day, month } = shortLabel(d);
+                  const isFullyBooked = fullyBookedDates?.has(d) ?? false;
                   return (
                     <button
                       key={d}
@@ -72,6 +79,7 @@ export default function DatePicker({
                         onSelect(d);
                         setOpen(false);
                       }}
+                      title={isFullyBooked ? "Trenutno brez prostih terminov - lahko se še sprosti" : undefined}
                       className={`py-2 rounded-md border cursor-pointer transition-colors capitalize ${
                         selectedDate === d
                           ? "border-gold bg-selected text-cream"
@@ -81,6 +89,17 @@ export default function DatePicker({
                       <div className="text-[11px] leading-tight">{weekday}</div>
                       <div className="text-xs leading-tight">
                         {day}.{month}.
+                      </div>
+                      {/* Fiksna višina NE GLEDE na to, ali je pika prikazana -
+                          brez tega bi gumbi znotraj istega tedna imeli
+                          neenako višino (glej pogovor s Claude). Majhna
+                          pika namesto besedila/prečrtanja - dan ostane
+                          vizualno "normalen" in klikljiv, samo z rahlim
+                          namigom, ne z videzom onemogočenega gumba. */}
+                      <div className="h-2 mt-1 flex items-center justify-center">
+                        {isFullyBooked && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose/70" />
+                        )}
                       </div>
                     </button>
                   );
