@@ -293,7 +293,6 @@ export default function BookingPage({
       } else {
         setServicesError(false);
         setServices(data);
-        setForm((f) => ({ ...f, service: f.service || data[0]?.name || "" }));
       }
       setServicesLoading(false);
     }
@@ -620,8 +619,11 @@ export default function BookingPage({
   // samo za BRANJE (storitve/zasedenost), nikoli se ne pošlje kot vrednost,
   // ki bi jo strežnik za vpis "verjel" klientu.
   async function bookAppointment() {
-    if (!form.name || !form.phone || !form.time) {
-      showToast("Izpolni ime, telefon in izberi uro.");
+    // form.service ni več samodejno prednastavljen na prvo storitev (glej
+    // pogovor s Claude) - brez te preverbe bi bilo mogoče oddati rezervacijo
+    // s praznim service="", če stranka nikoli ne klikne konkretne storitve.
+    if (!form.name || !form.phone || !form.service || !form.time) {
+      showToast("Izpolni ime, telefon, izberi storitev in uro.");
       return;
     }
     if (!isValidCustomerName(form.name)) {
@@ -856,7 +858,11 @@ export default function BookingPage({
             </button>
           </div>
         ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-8 items-start">
+        <div
+          className={`grid grid-cols-1 gap-8 items-start ${
+            employeeSelectionPending ? "" : "lg:grid-cols-[1fr_260px]"
+          }`}
+        >
           <div className="min-w-0">
             {/* Izberi izvajalca - NA VRHU strani, PRED dnem/storitvijo (glej
                 pogovor s Claude) - pri 2+ zaposlenih mora biti izbran
@@ -1182,7 +1188,14 @@ export default function BookingPage({
               ne lepi tik ob robu zaslona (glej pogovor s Claude - poskus s
               samodejnim "odlepljanjem" ob dnu strani je delal opazen skok, ko
               je zmanjkalo prostora za sticky - raje preprost, ves čas
-              prilepljen panel z malo več zgornjega odmika). */}
+              prilepljen panel z malo več zgornjega odmika).
+
+              Skrit dokler je employeeSelectionPending (glej pogovor s Claude) -
+              ista zastavica/pogoj kot pri mreži "Prosti termini" zgoraj, da se
+              panel ne prikaže PRED prvim korakom (izbira izvajalca) v novem
+              vrstnem redu. Pri 0/1 zaposlenem (pending vedno false) se obnaša
+              identično kot prej - takoj vidno. */}
+          {!employeeSelectionPending && (
           <aside className="border border-border rounded-lg bg-panel p-5 lg:sticky lg:top-24">
             <h2 className="font-display text-lg font-semibold mb-4 text-cream">
               Pregled termina
@@ -1244,6 +1257,7 @@ export default function BookingPage({
               </div>
             </div>
           </aside>
+          )}
         </div>
         )}
       </main>
