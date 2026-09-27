@@ -179,6 +179,11 @@ export default function BookingPage({
   // "zastarelih" odgovorov, če stranka hitro preklaplja med dnevi in starejši
   // klic (za prej izbrani dan) pride nazaj PO novejšem.
   const latestDateRef = useRef(INITIAL_DATE);
+  // Sidro za scroll ob "Poglejte prvi prosti termin" (glej jumpToNextAvailable
+  // spodaj) - klik izbere nov datum, a brez tega pogled ostane tam, kjer je
+  // bil gumb (pogosto precej pod izbirnikom dneva), stranka pa novo izbire
+  // sploh ne vidi, dokler sama ne povleče navzgor.
+  const dateSectionRef = useRef<HTMLHeadingElement>(null);
   // Predpomnilnik zasedenosti po datumu (v ref-u, ne state - pisanje sem NE
   // sme sprožiti rerenderja, ker se polni v enem samem "bulk" klicu za VES
   // prikazan koledar - glej loadAllAvailability spodaj). Ob izbiri
@@ -676,6 +681,10 @@ export default function BookingPage({
     const next = findNextAvailableDate();
     if (next) {
       selectDate(next);
+      // Gumb je lahko precej POD izbirnikom dneva (glej pogovor s Claude) -
+      // brez tega bi izbira novega datuma ostala nevidna, dokler stranka
+      // sama ne povleče pogleda navzgor.
+      dateSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     } else {
       showToast("V prikazanem obdobju ni prostih terminov za izbrano storitev.");
     }
@@ -1020,7 +1029,10 @@ export default function BookingPage({
 
             {!employeeSelectionPending && (
               <>
-                <h2 className="font-display text-xl font-semibold mb-1 text-cream">
+                <h2
+                  ref={dateSectionRef}
+                  className="font-display text-xl font-semibold mb-1 text-cream scroll-mt-6"
+                >
                   Izberi dan
                 </h2>
                 <DatePicker
