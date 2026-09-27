@@ -65,6 +65,61 @@ function groupByEmployee<T extends { employee_id: string | null }>(
   }));
 }
 
+// Preklop teme + 4 navigacijski gumbi - EN vir resnice za seznam, izrisan
+// DVAKRAT na klicnem mestu spodaj (glej pogovor s Claude): enkrat kot
+// absolutno pozicioniran stranski stolpec ob glavi (xl+, dovolj prostora v
+// robu), enkrat kot sklad V TOKU pod info blokom (pod xl, kjer stranski
+// stolpec fizično ne bi imel prostora) - lastnik ni želel, da navpičen
+// sklad znotraj same glave "raztegne" (podaljša) stran navzdol.
+function OwnerHeaderControls({ salonTheme }: { salonTheme: "spa" | undefined }) {
+  return (
+    <>
+      {/* Glej isto opombo v [slug]/booking-page.tsx - preklop nima učinka,
+          ko je tema salona vsiljena prek data-theme. Večji (size 20) +
+          border/bg-ink-field - na prvi pogled očitno klikljiv gumb, isti
+          "opazen" vzorec kot že na /[slug] in /rezervacija/[token]. */}
+      {!salonTheme && (
+        <ThemeToggle size={20} className="border border-border bg-ink-field p-2" />
+      )}
+      {/* inline-flex + flex-col + items-stretch - vsi štirje elementi se
+          raztegnejo na širino NAJŠIRŠEGA med njimi ("Storitve in cenik"),
+          container pa se sam skrči na TO širino (shrink-to-fit).
+          whitespace-nowrap prepreči lom besedila v 2 vrstici pri ozkih
+          stolpcih - brez njega bi imeli gumbi RAZLIČNO višino. Gumb
+          "Odjava" je edini v <form>, zato potrebuje w-full - Link elementa
+          sta že neposredna flex elementa in se raztegneta samodejno. */}
+      <div className="inline-flex flex-col items-stretch gap-2">
+        <Link
+          href="/owner/services"
+          className="text-sm text-center whitespace-nowrap border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft"
+        >
+          Storitve in cenik
+        </Link>
+        <Link
+          href="/owner/hours"
+          className="text-sm text-center whitespace-nowrap border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft"
+        >
+          Delovni čas
+        </Link>
+        <Link
+          href="/owner/employees"
+          className="text-sm text-center whitespace-nowrap border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft"
+        >
+          Zaposleni
+        </Link>
+        <form action={logout}>
+          <button
+            type="submit"
+            className="w-full text-sm text-center whitespace-nowrap border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft cursor-pointer"
+          >
+            Odjava
+          </button>
+        </form>
+      </div>
+    </>
+  );
+}
+
 export default async function OwnerDashboard({
   searchParams,
 }: {
@@ -239,69 +294,31 @@ export default async function OwnerDashboard({
         <div className="mb-4">
           <PoweredBy size="lg" />
         </div>
-        <div className="flex items-center justify-between mb-8">
+        {/* relative SAMO na tem info bloku (ne na celi strani) - sidro za
+            absolutno pozicioniran stranski stolpec spodaj (xl+), da ta NI
+            del normalnega toka in torej ne vpliva na višino/scroll ostanka
+            strani (paneli spodaj), ne glede na to, kako visok je sam
+            (preklop + 4 gumbi) - glej pogovor s Claude, "raztegne stran". */}
+        <div className="mb-8 relative">
           <div>
             <p className="font-display text-3xl text-gold mb-1">{salonName}</p>
             <h1 className="text-sm font-medium text-cream-dim">Nadzorna plošča</h1>
             <p className="text-sm text-cream-faint">{user.email}</p>
           </div>
-          {/* Desni stolpec - flex-col + items-end poravna VSE otroke (preklop
-              teme + spodnji gumbi) na isti desni rob, čisto ob robu te
-              (max-w-2xl) glave (justify-end logika, glej pogovor s Claude).
-              Preklop teme je NAMENOMA svoj, ožji element nad širšim stolpcem
-              gumbov - ni raztegnjen na njihovo širino (drugačna vrsta
-              kontrolnika, kvadratna ikona, ne besedilni gumb), a poravnan na
-              ISTI desni rob prek items-end. */}
-          <div className="flex flex-col items-end gap-2">
-            {/* Glej isto opombo v [slug]/booking-page.tsx - preklop nima
-                učinka, ko je tema salona vsiljena prek data-theme zgoraj.
-                Večji (size 20) + border/bg-ink-field (namesto privzetega
-                golega besedila) - na prvi pogled očitno klikljiv gumb, ne
-                dekoracija, isti "opazen" vzorec kot že na /[slug] in
-                /rezervacija/[token] (glej ThemeToggle). */}
-            {!salonTheme && (
-              <ThemeToggle size={20} className="border border-border bg-ink-field p-2" />
-            )}
-            {/* inline-flex + flex-col + items-stretch (namesto prejšnjega
-                vodoravnega flex, ki se je pri ozkem max-w-2xl lomil v dve
-                vrsti) - vsi štirje elementi se raztegnejo na širino
-                NAJŠIRŠEGA med njimi ("Storitve in cenik"), container pa se
-                sam skrči na TO širino (shrink-to-fit), brez trdo kodirane
-                vrednosti v px. whitespace-nowrap prepreči lom besedila v 2
-                vrstici pri ozkih zaslonih - brez njega bi imeli gumbi z
-                daljšim/krajšim besedilom RAZLIČNO višino, ko bi se container
-                skrčil (preverjeno vse do 320px širine, brez preliva). Gumb
-                "Odjava" je edini v <form>, zato potrebuje w-full - Link
-                elementa sta že neposredna flex elementa in se raztegneta
-                samodejno. */}
-            <div className="inline-flex flex-col items-stretch gap-2">
-              <Link
-                href="/owner/services"
-                className="text-sm text-center whitespace-nowrap border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft"
-              >
-                Storitve in cenik
-              </Link>
-              <Link
-                href="/owner/hours"
-                className="text-sm text-center whitespace-nowrap border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft"
-              >
-                Delovni čas
-              </Link>
-              <Link
-                href="/owner/employees"
-                className="text-sm text-center whitespace-nowrap border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft"
-              >
-                Zaposleni
-              </Link>
-              <form action={logout}>
-                <button
-                  type="submit"
-                  className="w-full text-sm text-center whitespace-nowrap border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft cursor-pointer"
-                >
-                  Odjava
-                </button>
-              </form>
-            </div>
+
+          {/* Pod xl - stranski stolpec (glej spodaj) fizično nima prostora v
+              robu, zato tu sklad V TOKU, pod info blokom. */}
+          <div className="xl:hidden mt-4 flex flex-col items-end gap-2">
+            <OwnerHeaderControls salonTheme={salonTheme} />
+          </div>
+
+          {/* xl+ - absolutno pozicioniran, TAKOJ ZA desnim robom te
+              (max-w-2xl) glave (left-full) + majhna vrzel (ml-6), navpično
+              centriran na info blok (top-1/2 -translate-y-1/2). Prostor za
+              to obstaja samo na dovolj širokih zaslonih - preverjeno
+              empirično, da se ne prekriva/prilepi na vsebino. */}
+          <div className="hidden xl:flex absolute top-1/2 -translate-y-1/2 left-full ml-6 flex-col items-stretch gap-2">
+            <OwnerHeaderControls salonTheme={salonTheme} />
           </div>
         </div>
 
