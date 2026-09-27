@@ -280,7 +280,7 @@ export default async function OwnerDashboard({
 
         <LogoUpload initialLogoUrl={ownerRow.logo_url} />
 
-        <NotificationSettings current={notificationPreference} plan={ownerRow.plan} />
+        <NotificationSettings current={notificationPreference} />
 
         <MonthCalendar
           monthStr={monthStr}

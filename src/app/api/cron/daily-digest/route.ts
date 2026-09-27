@@ -21,11 +21,12 @@ export async function GET(request: NextRequest) {
   const admin = createAdminClient();
   const today = todayISO();
 
+  // Email obveščanje ni plan-omejeno (glej pogovor s Claude) - brez
+  // .eq("plan", "pro"), edini pogoj je notification_preference = "daily".
   const { data: salons, error } = await admin
     .from("salon_owners")
     .select("id, salon_name, user_id")
     .eq("status", "approved")
-    .eq("plan", "pro")
     .eq("notification_preference", "daily");
 
   if (error) {

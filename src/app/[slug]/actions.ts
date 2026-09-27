@@ -113,11 +113,13 @@ async function notifyOwnerOfBooking(
     const admin = createAdminClient();
     const { data: owner } = await admin
       .from("salon_owners")
-      .select("plan, notification_preference, user_id, salon_name")
+      .select("notification_preference, user_id, salon_name")
       .eq("id", salonId)
       .maybeSingle();
 
-    if (!owner || owner.plan !== "pro" || owner.notification_preference !== "per_booking") {
+    // Email obveščanje ni plan-omejeno (glej pogovor s Claude) - edini pogoj
+    // je, da si lastnik to izbral na /owner.
+    if (!owner || owner.notification_preference !== "per_booking") {
       return;
     }
 

@@ -371,7 +371,7 @@ export async function updateNotificationPreference(formData: FormData) {
 
   const { data: ownerRow } = await supabase
     .from("salon_owners")
-    .select("id, plan")
+    .select("id")
     .eq("user_id", user.id)
     .eq("status", "approved")
     .maybeSingle();
@@ -380,19 +380,18 @@ export async function updateNotificationPreference(formData: FormData) {
   }
 
   const requested = String(formData.get("notification_preference") ?? "off");
+  // Vsem trem vrednostim (glej NOTIFICATION_PREFERENCES) je dovoljen dostop
+  // vsem planom - email obveščanje ni več plan-omejeno (glej pogovor s
+  // Claude, Resend email ne stane nič bistvenega, v nasprotju s SMS/Twilio
+  // pri notifications-panel.tsx, ki OSTAJA Fillio Pro).
   const preference = NOTIFICATION_PREFERENCES.includes(requested as NotificationPreference)
     ? (requested as NotificationPreference)
     : "off";
 
-  // Strežniško preverjanje, NE samo onemogočen UI - "daily"/"per_booking" sta
-  // na voljo samo za plan 'pro', ne glede na to, kaj bi (morda z ročno
-  // sestavljenim POST-om, mimo onemogočenih radio gumbov) poslal klient.
-  const finalPreference: NotificationPreference = ownerRow.plan === "pro" ? preference : "off";
-
   const admin = createAdminClient();
   await admin
     .from("salon_owners")
-    .update({ notification_preference: finalPreference })
+    .update({ notification_preference: preference })
     .eq("id", ownerRow.id);
 
   revalidatePath("/owner");
