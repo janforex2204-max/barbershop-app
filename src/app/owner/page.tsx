@@ -248,29 +248,41 @@ export default async function OwnerDashboard({
             <h1 className="text-sm font-medium text-cream-dim">Nadzorna plošča</h1>
             <p className="text-sm text-cream-faint">{user.email}</p>
           </div>
-          <div className="flex items-center gap-2">
+          {/* inline-flex + flex-col + items-stretch (namesto prejšnjega
+              vodoravnega flex, ki se je pri ozkem max-w-2xl lomil v dve
+              vrsti) - vsi štirje elementi se raztegnejo na širino
+              NAJŠIRŠEGA med njimi ("Storitve in cenik"), container pa se
+              sam skrči na TO širino (shrink-to-fit), brez trdo kodirane
+              vrednosti v px. whitespace-nowrap prepreči lom besedila v 2
+              vrstici pri ozkih zaslonih - brez njega bi imeli gumbi z
+              daljšim/krajšim besedilom RAZLIČNO višino, ko bi se container
+              skrčil (preverjeno vse do 320px širine, brez preliva). Gumb
+              "Odjava" je edini v <form>, zato potrebuje w-full - Link
+              elementa sta že neposredna flex elementa in se raztegneta
+              samodejno. */}
+          <div className="inline-flex flex-col items-stretch gap-2">
             <Link
               href="/owner/services"
-              className="text-sm border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft"
+              className="text-sm text-center whitespace-nowrap border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft"
             >
               Storitve in cenik
             </Link>
             <Link
               href="/owner/hours"
-              className="text-sm border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft"
+              className="text-sm text-center whitespace-nowrap border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft"
             >
               Delovni čas
             </Link>
             <Link
               href="/owner/employees"
-              className="text-sm border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft"
+              className="text-sm text-center whitespace-nowrap border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft"
             >
               Zaposleni
             </Link>
             <form action={logout}>
               <button
                 type="submit"
-                className="text-sm border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft cursor-pointer"
+                className="w-full text-sm text-center whitespace-nowrap border border-border rounded-md px-3 py-1.5 hover:bg-ink-soft cursor-pointer"
               >
                 Odjava
               </button>
