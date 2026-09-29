@@ -108,36 +108,53 @@ export default function DayHoursEditor({
         const hasBreak = d.breakFrom !== undefined && d.breakTo !== undefined;
         return (
           <div key={d.day} className="flex flex-col gap-1.5">
-            <div className="grid grid-cols-[120px_90px_1fr_auto_1fr] items-center gap-3">
-              <span className={s.dayLabel}>{d.day}</span>
-              <button
-                type="button"
-                onClick={() => toggleDayClosed(i)}
-                className={d.closed ? s.toggleClosed : s.toggleOpen}
-              >
-                {d.closed ? "Zaprto" : "Odprto"}
-              </button>
-              <input
-                type="time"
-                value={d.from}
-                disabled={d.closed}
-                onChange={(e) => updateDayTime(i, "from", e.target.value)}
-                className={s.timeInput}
-              />
-              <span className={s.dash}>–</span>
-              <input
-                type="time"
-                value={d.to}
-                disabled={d.closed}
-                onChange={(e) => updateDayTime(i, "to", e.target.value)}
-                className={s.timeInput}
-              />
+            {/* Pod sm: se 120px+90px fiksna stolpca + gap-3 (skupaj skoraj
+                260px) na ozkih (telefonskih) širinah niso pustila dovolj
+                prostora za DVA <input type="time"> - ta ima naravno
+                (nekrčljivo) minimalno širino, zato je mreža tiho prelivala
+                čez rob (glej pogovor s Claude - "tanka navpična črta" je
+                bila dejansko odrezan rob drugega polja). sm:contents na obeh
+                ovojnikih spodaj ob sm: "izgine" iz drevesa - njuni otroci
+                takrat postanejo neposredni elementi TE mreže (natanko
+                prvotnih 5 stolpcev, brez spremembe na namizju), pod sm: pa
+                sta preprosta dva zložena flex-vrstica (dan+gumb, nato ločeno
+                CEL razpon urne vrstice zase, sполno širino za oba vnosa). */}
+            <div className="flex flex-col gap-1.5 sm:grid sm:grid-cols-[120px_90px_1fr_auto_1fr] sm:items-center sm:gap-3">
+              <div className="flex items-center gap-3 sm:contents">
+                <span className={s.dayLabel}>{d.day}</span>
+                <button
+                  type="button"
+                  onClick={() => toggleDayClosed(i)}
+                  className={d.closed ? s.toggleClosed : s.toggleOpen}
+                >
+                  {d.closed ? "Zaprto" : "Odprto"}
+                </button>
+              </div>
+              <div className="flex items-center gap-3 sm:contents">
+                <input
+                  type="time"
+                  value={d.from}
+                  disabled={d.closed}
+                  onChange={(e) => updateDayTime(i, "from", e.target.value)}
+                  className={`${s.timeInput} min-w-0 flex-1 sm:flex-initial`}
+                />
+                <span className={s.dash}>–</span>
+                <input
+                  type="time"
+                  value={d.to}
+                  disabled={d.closed}
+                  onChange={(e) => updateDayTime(i, "to", e.target.value)}
+                  className={`${s.timeInput} min-w-0 flex-1 sm:flex-initial`}
+                />
+              </div>
             </div>
             {/* Premor - SAMO za odprte dni (glej pogovor s Claude), poravnan
                 pod stolpec za odpri/zapri gumb (pl-[120px] preskoči
-                dnevni-label stolpec zgoraj). */}
+                dnevni-label stolpec zgoraj) - SAMO na sm:+, kjer ta stolpec
+                dejansko obstaja (glej mrežo tik zgoraj); pod sm: je mreža
+                zložena, zato tam ni česa poravnati. */}
             {!d.closed && (
-              <div className="flex items-center gap-2 pl-[120px]">
+              <div className="flex items-center gap-2 sm:pl-[120px]">
                 <label className={s.breakLabel}>
                   <input
                     type="checkbox"
