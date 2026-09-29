@@ -258,6 +258,7 @@ export default async function OwnerDashboard({
     customerName: a.customer_name,
     service: a.service,
     employeeId: a.employee_id,
+    ownerNote: a.owner_note,
   }));
 
   const { appointments: monthAppointments, waitlist: monthWaitlist } = monthOverview;
@@ -333,7 +334,7 @@ export default async function OwnerDashboard({
       ? (
           await supabase
             .from("employees")
-            .select("id, name, hours")
+            .select("id, name, hours, color, photo_url")
             .eq("salon_id", salonId)
             .eq("active", true)
             .order("sort_order", { ascending: true })
@@ -341,7 +342,15 @@ export default async function OwnerDashboard({
       : [];
 
   return (
-    <div data-theme={salonTheme} className="min-h-screen bg-ink text-cream font-sans px-6 py-10">
+    // data-design="v2" - preskusna "premium prenova" (glej pogovor s Claude,
+    // sence/zaobljenost/razmik/pisava/barve), NAMENOMA samo na tem EDINEM
+    // zaslonu, dokler lastnik ne potrdi - glej [data-design="v2"] v
+    // globals.css za celoten obseg.
+    <div
+      data-theme={salonTheme}
+      data-design="v2"
+      className="min-h-screen bg-ink text-cream font-sans px-6 py-10"
+    >
       <div className="max-w-2xl mx-auto">
         <div className="mb-4">
           <PoweredBy size="lg" />

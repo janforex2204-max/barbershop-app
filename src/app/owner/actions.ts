@@ -75,6 +75,34 @@ export async function cancelAppointment(appointmentId: string) {
   revalidatePath("/owner");
 }
 
+// Kratka INTERNA opomba k terminu (glej owner/week-calendar.tsx - majhna
+// ikona na bloku, appointment-note-button.tsx) - isti RLS-only vzorec kot
+// cancelAppointment zgoraj (appointments_owner_full_access že sam omeji na
+// klicateljev salon, dodatna .select() preverba tu ni potrebna, ker gre
+// samo za bare update, ne za stransko-učinkovito akcijo kot zgoraj).
+// Prazen niz shranimo kot null - "izbriši opombo" je enakovredno "ni
+// opombe", ne poseben "prazna opomba" zapis.
+export async function updateAppointmentNote(
+  appointmentId: string,
+  note: string
+): Promise<{ error?: string }> {
+  const supabase = await createClient();
+
+  const trimmed = note.trim();
+  const { error } = await supabase
+    .from("appointments")
+    .update({ owner_note: trimmed || null })
+    .eq("id", appointmentId);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  updateTag(OWNER_CALENDAR_TAG);
+  revalidatePath("/owner");
+  return {};
+}
+
 // Ko lastnik pošlje pripravljeno WhatsApp sporočilo stranki, obvestilo
 // označimo kot obravnavano (izgine s seznama čakajočih). Če stranka termin
 // dejansko potrdi, ga lastnik doda ročno prek "Dodaj termin" obrazca.

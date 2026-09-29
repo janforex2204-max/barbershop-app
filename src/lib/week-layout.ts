@@ -9,7 +9,63 @@ export type WeekAppointment = {
   customerName: string;
   service: string;
   employeeId: string | null;
+  // Kratka INTERNA opomba lastnika (glej owner/week-calendar.tsx) - NIKOLI
+  // prikazana strankam (glej supabase/schema.sql).
+  ownerNote: string | null;
 };
+
+export type WeekCalendarEmployee = {
+  id: string;
+  name: string;
+  hours: SalonDayHours[];
+  color: string | null;
+  photo_url: string | null;
+};
+
+// Deljeno med week-calendar.tsx (dnevi-kot-stolpci) IN day-employee-
+// columns.tsx (zaposleni-kot-stolpci, glej pogovor s Claude, item 3) - ISTA
+// gostota/gutter/min-višina na obeh, da postavitvi vizualno ne razhajata.
+// Tu, NE v week-calendar.tsx, da se izogne kroženemu uvozu (week-calendar
+// uvozi DayEmployeeColumns, DayEmployeeColumns bi sicer uvozil nazaj iz
+// week-calendar).
+export const PX_PER_MINUTE = 1.05;
+export const MIN_BLOCK_HEIGHT = 34;
+export const TIME_GUTTER_PX = 44;
+
+export function formatHourLabel(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  return `${String(h).padStart(2, "0")}:00`;
+}
+
+// Deljena paleta za owner/week-calendar.tsx (prikaz) IN
+// owner/employees/employee-color-picker.tsx (izbira) - glej --color-cal-*
+// v globals.css (konstantne, ne obrnejo se s temo). Zaposleni izbere ENO od
+// TEH ("var(--color-cal-3)" ipd., shranjeno dobesedno v employees.color) -
+// "none" NI del izbire, samo interni privzetek za nedodeljene termine.
+export const EMPLOYEE_COLOR_PALETTE = [
+  "var(--color-cal-1)",
+  "var(--color-cal-2)",
+  "var(--color-cal-3)",
+  "var(--color-cal-4)",
+  "var(--color-cal-5)",
+  "var(--color-cal-6)",
+];
+
+// Barva termina - najprej zaposlenega LASTNA izbira (employees.color), če
+// je nastavljena; sicer star ciklični razpored po sort_order (nazaj
+// združljivo - obstoječi zaposleni, ki si (še) ni izbral barve, ne "skoči"
+// na nepričakovano barvo). employeeId null (ni dodeljen) vedno nevtralna
+// --color-cal-none, ne del cikla/izbire.
+export function resolveEmployeeColor(
+  employeeId: string | null,
+  employees: { id: string; color: string | null }[]
+): string {
+  if (!employeeId) return "var(--color-cal-none)";
+  const index = employees.findIndex((e) => e.id === employeeId);
+  if (index === -1) return "var(--color-cal-none)";
+  const chosen = employees[index].color;
+  return chosen ?? EMPLOYEE_COLOR_PALETTE[index % EMPLOYEE_COLOR_PALETTE.length];
+}
 
 export type LaidOutAppointment = WeekAppointment & {
   startMinutes: number;

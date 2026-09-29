@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { defaultHours } from "@/lib/default-hours";
+import { EMPLOYEE_COLOR_PALETTE } from "@/lib/week-layout";
 import type { SalonDayHours } from "@/types/database.types";
 
 // Isti vzorec kot resolveApprovedSalonId v ./services-actions.ts - salon_id
@@ -233,4 +234,29 @@ export async function regenerateEmployeeScheduleToken(
 
   revalidatePath("/owner/employees");
   return { token };
+}
+
+// Barva termina v tedenskem koledarju (owner/employee-color-picker.tsx) -
+// isti RLS-only vzorec kot regenerateEmployeeScheduleToken zgoraj. `color`
+// je namerno OMEJEN na EMPLOYEE_COLOR_PALETTE (glej week-layout.ts) - Server
+// Action je dosegljiv mimo UI-ja, zato se ne zanašamo samo na to, da
+// klient pošlje samo ponujene vrednosti.
+export async function updateEmployeeColor(
+  employeeId: string,
+  color: string
+): Promise<{ error?: string }> {
+  if (!EMPLOYEE_COLOR_PALETTE.includes(color)) {
+    return { error: "Neveljavna barva." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("employees").update({ color }).eq("id", employeeId);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/owner/employees");
+  revalidatePath("/owner");
+  return {};
 }

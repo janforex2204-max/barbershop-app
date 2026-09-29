@@ -66,8 +66,14 @@
   --color-cal-2: #6b4d8a;
   --color-cal-3: #b8622f;
   --color-cal-4: #2d7d78;
+  /* Dodani za owner/employee-color-picker.tsx (glej pogovor s Claude, item
+     4) - zaposleni zdaj lahko izbere KATEROKOLI od vseh šestih (ne samo
+     tiste, ki bi mu "pripadla" po cikličnem vrstnem redu), zato morajo
+     obstajati kot poimenovani žetoni, ne samo kot implicitna cikel-vrednost. */
+  --color-cal-5: #a8447c;
+  --color-cal-6: #5a8f3d;
   /* Termin brez dodeljenega zaposlenega (employee_id null, glej pogovor s
-     Claude - stari/pred-migracijski zapisi) - nevtralna, ne del cikla. */
+     Claude - stari/pred-migracijski zapisi) - nevtralna, ne del cikla/izbire. */
   --color-cal-none: #5c574d;
 
   /* Uporabljeno samo v BarberPoleWatermark (src/app/[slug]/barber-pole-watermark.tsx) */
@@ -272,4 +278,181 @@ body {
    koledar deluje kot prava mreža, ne le kot plavajoča števila. */
 [data-theme="spa"] .month-calendar-cell.border-transparent {
   border-color: var(--color-border);
+}
+
+/*
+  ===========================================================================
+  "Premium prenova" - PRESKUSNA cona (glej pogovor s Claude) - lastnik je
+  eksplicitno zahteval, da se spremeni SAMO EN reprezentativen zaslon
+  (/owner nadzorna plošča) najprej, preostala aplikacija (/[slug],
+  /rezervacija/[token], registracija) pa ostane NEDOTAKNJENA, dokler ne
+  potrdi rezultata. Zato je VSE spodaj namerno ZAMEJENO na
+  [data-design="v2"] - ta atribut je (za zdaj) dodan SAMO na
+  owner/page.tsx-ev najbolj zunanji div. Ko/če lastnik potrdi, se te
+  vrednosti preprosto premaknejo v osnovne @theme/[data-theme] bloke ZGORAJ
+  (prepišejo obstoječe), ta cona pa se v celoti odstrani - noben
+  komponentni .tsx ne bo treba spremeniti ŠE ENKRAT, ker že vsi uporabljajo
+  iste skupne spremenljivke/imena razredov (rounded-md/-lg, border
+  border-border ...), samo njihova VREDNOST se spremeni.
+
+  Isti 3-nivojski vzorec kot obstoječi temni/[data-theme="light"]/
+  [data-theme="spa"] sistem zgoraj - sence/barve morajo biti prilagojene
+  glede na to, ali je OZADJE temno ali svetlo (isti razlog kot povsod
+  zgoraj), zaobljenost/razmik/pisava pa sta neodvisna od teme, zato sta v
+  spodnjem OSNOVNEM [data-design="v2"] bloku samo enkrat.
+  ===========================================================================
+*/
+[data-design="v2"] {
+  /* Ozadje - SKORAJ ČRNO, nevtralno (prej #1b1815, topel rjav/bronast
+     odtenek - glej pogovor s Claude, "ne rjav/bronast gradient"). Zlata
+     ostane OSTER poudarek (border/besedilo/izbrana stanja spodaj), ne
+     barva, ki obarva celotno površino. Ista relativna svetlost/vrstni red
+     kot prej (field temnejši od ink, soft/elevated svetlejša) - samo hue
+     skoraj popolnoma odstranjen. */
+  --color-ink: #0e0d0c;
+  --color-ink-soft: #181716;
+  --color-ink-elevated: #221f1d;
+  --color-ink-field: #0a0909;
+  --color-border: #2b2826;
+  --color-border-soft: #201e1c;
+
+  /* Zaobljenost - opazno mehkejša (prej 6/8/12px). Prepiše Tailwindov
+     privzet --radius-md/-lg/-xl NEPOSREDNO (isti "brez inline, torej
+     var()-referenca" mehanizem kot --color-* zgoraj - preverjeno v
+     node_modules/tailwindcss/theme.css, Tailwindov LASTEN privzeti @theme
+     blok prav tako ni inline), zato se VSAK obstoječ rounded-md/-lg/-xl
+     razred v tem obsegu samodejno poveča, brez spremembe ijedne .tsx
+     datoteke. */
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  /* Razmik - vsi p-, gap- in m- razredi izhajajo iz TEGA enega multiplikatorja
+     (privzeto 0.25rem) - ~12% večji naredi "diha" dosledno povsod, brez
+     spremembe posameznih razredov. Namerno zmerno (ne dvakrat večje) - vsi
+     ročno umerjeni postavitve (npr. day-hours-editor.tsx mreža, glej
+     pogovor s Claude) uporabljajo TRDE px vrednosti za širine stolpcev, ne
+     ta multiplikator, zato ostanejo nedotaknjene; sam razmik OKROG njih pa
+     se lepo poveča. */
+  --spacing: 0.28rem;
+
+  /* Pisava - Manrope namesto Fraunces za naslove (glej pogovor s Claude,
+     "brez nenavadnih/stiliziranih potez") - Inter za telo ostane
+     NESPREMENJEN (že natanko "čist/berljiv/premium" standard, ki ga
+     lastnik opisuje). Manrope je že naložen (marketinške strani, glej
+     --font-marketing zgoraj) - ista pisava, ki jo Fillio ŽE uporablja za
+     "premium" prvi vtis na fillio.si, zdaj tudi v sami aplikaciji, namesto
+     dveh neusklajenih identitet. Prepiše --font-fraunces (SPODNJO
+     spremenljivko, na katero se .font-display SKLICUJE), ne --font-display
+     neposredno - --font-display sam je "inline" pečen kot dobesedna
+     "var(--font-fraunces)" referenca (glej opombo pri @theme inline
+     zgoraj), zato prepis MORA biti na --font-fraunces, isti trik kot že
+     uporablja [data-theme="spa"] spodaj za Cormorant/Nunito Sans. Ime
+     spremenljivke ("fraunces") je po tem prepisu zavajajoče - to je
+     ZAVESTNO sprejeto za PRESKUSNO cono, počiščeno šele, ko/če postane
+     trajna (glej opombo cone zgoraj). */
+  --font-fraunces: var(--font-manrope);
+
+  /* Barve - bolj nasičene/žive različice ISTIH odtenkov (gold/burgundy
+     ostajata "barbershop" identiteta - glej pogovor s Claude, item 6:
+     razmišljal sem o povsem drugi paleti, a bi to opustilo že vzpostavljeno
+     znamko; premalo nasičenosti/kontrasta je bil dejanski vzrok "ploščatega"
+     vtisa, ne sama barvna družina). Burgundy/on-accent ostajata
+     TEMA-NEODVISNA (isti razlog kot obstoječa opomba pri njima zgoraj), zato
+     sta tu, v osnovnem bloku, samo enkrat - brez ponovitve v
+     light/spa blokih spodaj. */
+  --color-burgundy: #a5302f;
+  --color-sage: #6bad55;
+
+  /* Sence - privzete (temna tema), vidne na temnem ink ozadju potrebujejo
+     večjo neprosojnost kot na svetlem (glej light/spa preglasitve spodaj) -
+     prepišeta Tailwindov --shadow-sm/-md, isti var()-referenčni mehanizem
+     kot --radius-* zgoraj. Za zdaj samo sm/md (kartice/gumbi/paneli, glej
+     spodnji .border.border-border kljuka) - lg pusti Tailwindov privzetek,
+     ni (še) uporabljen nikjer v tej preskusni coni. */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.22);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.35), 0 2px 5px rgba(0, 0, 0, 0.25);
+  --color-gold: #c9962f;
+  --color-gold-soft: #dcae55;
+  --color-rose: #dd6f6c;
+
+  /* Koledarski vsebnik (tedenski IN mesečni) - LASTNA, izstopajoča
+     obravnava (glej pogovor s Claude, item 2), vidno drugačna od navadnih
+     nevtralnih panelov spodaj: tanek zlat rob + mehak zlat "sij" (0 0 X
+     razpon, brez zamika - enakomeren halo, ne usmerjena senca) + močnejša
+     globinska senca kot --shadow-md. */
+  --shadow-calendar: 0 0 0 1px rgba(201, 150, 47, 0.45), 0 0 24px rgba(201, 150, 47, 0.18),
+    0 12px 32px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+/* Isti "svetlo ozadje" pogoj kot obstoječi :root[data-theme="light"] zgoraj -
+   descendant selektor (ne kombiniran [data-theme="light"][data-design="v2"]),
+   ker je data-theme="light" na <html>, data-design="v2" pa na
+   owner/page.tsx-evem NOTRANJEM ovojniku, ne na istem elementu. */
+:root[data-theme="light"] [data-design="v2"] {
+  /* Isti princip kot temna osnova zgoraj (glej pogovor s Claude, item 6) -
+     čisto, hladno skoraj-belo ozadje namesto toplega kremnega preleska
+     (prej #f7f3ec), zlata ostane oster poudarek. */
+  --color-ink: #faf9f7;
+  --color-ink-soft: #f2f0ec;
+  --color-ink-elevated: #ebe8e2;
+  --color-ink-field: #ffffff;
+  --color-border: #e2ddd3;
+  --color-border-soft: #ece8e1;
+
+  --shadow-sm: 0 1px 3px rgba(20, 15, 5, 0.09), 0 1px 2px rgba(20, 15, 5, 0.06);
+  --shadow-md: 0 4px 14px rgba(20, 15, 5, 0.1), 0 2px 5px rgba(20, 15, 5, 0.07);
+  --color-gold: #8a611a;
+  --color-gold-soft: #a3752a;
+  --color-rose: #b8433f;
+  --shadow-calendar: 0 0 0 1px rgba(138, 97, 26, 0.35), 0 0 22px rgba(138, 97, 26, 0.12),
+    0 10px 28px rgba(20, 15, 5, 0.14), 0 3px 10px rgba(20, 15, 5, 0.08);
+}
+
+/* Tu je data-theme="spa" IN data-design="v2" na ISTEM elementu
+   (owner/page.tsx-ev ovojnik), zato kombiniran (brez presledka) selektor -
+   isti vzorec kot obstoječi [data-theme="spa"] zgoraj. Spa OBDRŽI svojo
+   rožnato identiteto (glej pogovor s Claude - to je NJENA "barbershop
+   gold/burgundy", ne "ploščat" problem, ki je bil specifičen za temno
+   temo) - samo koledarski poudarek postane enako oster/izstopajoč. */
+[data-theme="spa"][data-design="v2"] {
+  --shadow-sm: 0 1px 3px rgba(80, 40, 35, 0.12), 0 1px 2px rgba(80, 40, 35, 0.08);
+  --shadow-md: 0 4px 14px rgba(80, 40, 35, 0.14), 0 2px 5px rgba(80, 40, 35, 0.09);
+  --color-gold: #b1552e;
+  --color-gold-soft: #c96a3d;
+  --color-rose: #b8433f;
+  --shadow-calendar: 0 0 0 1px rgba(177, 85, 46, 0.4), 0 0 22px rgba(177, 85, 46, 0.16),
+    0 10px 28px rgba(80, 40, 35, 0.18), 0 3px 10px rgba(80, 40, 35, 0.1);
+}
+
+/* Retroaktivno "podvzame" sence pod VSAK element, ki že uporablja
+   dosledno ponavljajoč se border-border+rounded "kartica/gumb/panel"
+   vzorec (glej pogovor s Claude - 21 pojavitev samo v datotekah, ki jih
+   /owner nadzorna plošča izriše) - BREZ spreminjanja ijedne .tsx
+   datoteke v tej preskusni fazi. To cilja na Tailwindove LASTNE generirane
+   razredna imena kot CSS selektor (ne "uradna" pot), kar je za to
+   preskusno cono namerno - hitro, popolnoma zamejeno v [data-design="v2"],
+   brez tveganja za preostalo aplikacijo. Če se lastnik odloči za to smer,
+   se ob razširitvi na CELO aplikacijo to nadomesti z eksplicitnim
+   shadow-md/-sm na vsaki komponenti (čistejše dolgoročno). */
+[data-design="v2"] .border.border-border {
+  box-shadow: var(--shadow-sm);
+}
+[data-design="v2"] .bg-panel.border {
+  box-shadow: var(--shadow-md);
+}
+
+/* Koledar (tedenski IN mesečni) - LASTNA, izstopajoča obravnava (glej
+   pogovor s Claude, item 2) - oba imata TUDI .border.border-border (glej
+   week-calendar.tsx/month-calendar.tsx), ki bi sicer (višja specifičnost,
+   dva razreda) prepisal spodnje nazaj na navadno --shadow-sm; .border.
+   border-border ponovljen tu dvigne specifičnost NAD tisto pravilo, brez
+   !important. Tanek zlat rob (border-color prepiše nevtralno
+   --color-border) + sij + močnejša senca (--shadow-calendar, glej temno/
+   light/spa bloke zgoraj) - vidno ločen od navadnih panelov (Storitve,
+   Zaposleni, Delovni čas), ker je to osrednja funkcija strani. */
+[data-design="v2"] .week-calendar-container.border.border-border,
+[data-design="v2"] .month-calendar-container.border.border-border {
+  border-color: var(--color-gold);
+  box-shadow: var(--shadow-calendar);
 }

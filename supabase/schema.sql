@@ -172,6 +172,14 @@ create index if not exists employees_salon_idx on employees (salon_id);
 -- primeru prikaže generično ikono osebe namesto <img>.
 alter table employees add column if not exists photo_url text;
 
+-- Barva termina v tedenskem koledarju (owner/week-calendar.tsx) - zaposleni
+-- si jo SAM izbere na /owner/employees (glej employee-color-picker.tsx), iz
+-- majhne fiksne palete (glej EMPLOYEE_COLOR_PALETTE v week-calendar.tsx -
+-- CSS spremenljivka, npr. "var(--color-cal-1)", ne dobesedna hex, glej
+-- pogovor s Claude). NULL = ni si (še) izbral - koledar v tem primeru pade
+-- nazaj na star ciklični razpored po sort_order (nespremenjeno vedenje).
+alter table employees add column if not exists color text;
+
 -- ---------------------------------------------------------------------------
 -- TERMINI (appointments)
 -- ---------------------------------------------------------------------------
@@ -197,6 +205,13 @@ create table if not exists appointments (
 -- "on delete set null", NE cascade - izbris zaposlenega (ni izpostavljen v
 -- UI, samo Table Editor escape hatch) ne sme uničiti zgodovine termina.
 alter table appointments add column if not exists employee_id uuid references employees(id) on delete set null;
+
+-- Kratka INTERNA opomba lastnika k terminu (glej owner/week-calendar.tsx -
+-- majhna ikona na bloku, klik razširi/uredi) - NULL, dokler ni nastavljena.
+-- NAMENOMA nikoli brano/prikazano na /[slug], /rezervacija/[token] ali v
+-- email/SMS obvestilih - to ni polje, ki bi ga kdaj videla stranka (glej
+-- pogovor s Claude, "samo za internega lastnika, NIKOLI vidno stranki").
+alter table appointments add column if not exists owner_note text;
 
 -- Prepreči dvojno rezervacijo istega termina PRI ISTEM SALONU (dva različna
 -- salona lahko oba prosto uporabljata npr. 10:00 isti dan). KRITIČNO:

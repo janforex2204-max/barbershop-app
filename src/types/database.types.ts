@@ -81,6 +81,11 @@ export type Database = {
           // /moj-urnik/[token] (glej supabase/schema.sql, isti vzorec kot
           // appointments.token).
           schedule_token: string;
+          // Barva termina v tedenskem koledarju - CSS spremenljivka (npr.
+          // "var(--color-cal-1)"), ki jo zaposleni sam izbere na
+          // /owner/employees. null = koledar pade nazaj na star ciklični
+          // razpored (glej owner/week-calendar.tsx).
+          color: string | null;
         };
         Insert: {
           id?: string;
@@ -92,6 +97,7 @@ export type Database = {
           created_at?: string;
           photo_url?: string | null;
           schedule_token: string;
+          color?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["employees"]["Insert"]>;
         Relationships: [];
@@ -123,6 +129,9 @@ export type Database = {
           // (aktivnih) zaposlenih in za vse termine pred to funkcionalnostjo
           // (glej employees zgoraj in pogovor s Claude).
           employee_id: string | null;
+          // Kratka INTERNA opomba lastnika (glej owner/week-calendar.tsx) -
+          // NIKOLI brana/prikazana strankama (glej supabase/schema.sql).
+          owner_note: string | null;
         };
         Insert: {
           id?: string;
@@ -140,6 +149,7 @@ export type Database = {
           token: string;
           customer_email?: string | null;
           employee_id?: string | null;
+          owner_note?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["appointments"]["Insert"]>;
         Relationships: [];

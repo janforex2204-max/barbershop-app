@@ -294,6 +294,14 @@ export function weekDates(weekStartIso: string): string[] {
   });
 }
 
+// Za prejšnji/naslednji dan v dnevnem pogledu tedenskega koledarja (glej
+// owner/day-employee-columns.tsx, "vzorec kot Fresha" - pogovor s Claude).
+export function addDays(iso: string, delta: number): string {
+  const d = new Date(iso + "T00:00:00");
+  d.setDate(d.getDate() + delta);
+  return toISODate(d);
+}
+
 // "22.–28. september 2026" (isti mesec) ali "29. sep – 5. okt 2026" (teden
 // sega čez mesec/leto) - kratka oblika meseca na OBEH koncih v tem primeru,
 // da je jasno, kateri je kateri.

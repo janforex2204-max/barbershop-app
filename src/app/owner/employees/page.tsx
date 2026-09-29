@@ -6,6 +6,7 @@ import { addEmployee, updateEmployee } from "../employees-actions";
 import EmployeeHoursEditor from "./employee-hours-editor";
 import EmployeePhotoUpload from "../employee-photo-upload";
 import EmployeeScheduleLink from "./employee-schedule-link";
+import EmployeeColorPicker from "./employee-color-picker";
 import PoweredBy from "@/components/powered-by";
 import ThemeToggle from "@/components/theme-toggle";
 
@@ -136,6 +137,10 @@ export default async function EmployeesPage({
                     Osebni urnik (samo za {employee.name.split(" ")[0]}, brez prijave)
                   </p>
                   <EmployeeScheduleLink employeeId={employee.id} initialToken={employee.schedule_token} />
+                </div>
+                <div>
+                  <p className="text-xs text-cream-faint mb-2">Barva v tedenskem koledarju</p>
+                  <EmployeeColorPicker employeeId={employee.id} initialColor={employee.color} />
                 </div>
                 <div>
                   <p className="text-xs text-cream-faint mb-2">Urnik</p>

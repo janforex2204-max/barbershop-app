@@ -61,7 +61,9 @@ export const getCachedWeekData = unstable_cache(
     const admin = createAdminClient();
     const { data, error } = await admin
       .from("appointments")
-      .select("id, appointment_date, appointment_time, duration_minutes, customer_name, service, employee_id")
+      .select(
+        "id, appointment_date, appointment_time, duration_minutes, customer_name, service, employee_id, owner_note"
+      )
       .eq("salon_id", salonId)
       .gte("appointment_date", weekStart)
       .lte("appointment_date", weekEnd)
