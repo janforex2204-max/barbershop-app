@@ -251,6 +251,19 @@ update appointments set token = encode(gen_random_bytes(32), 'hex') where token 
 alter table appointments alter column token set not null;
 create unique index if not exists appointments_token_idx on appointments (token);
 
+-- Kriptografsko naključen, neuganljiv token za /moj-urnik/[token] - ISTI
+-- vzorec/utemeljitev kot appointments.token tik zgoraj, samo na employees.
+-- Zaposleni od tu naprej lahko sam pogleda svoje prihodnje termine, brez
+-- prijave. Generira ga addEmployee (owner/employees-actions.ts) za nove
+-- zaposlene; obstoječi dobijo token TU, z backfillom spodaj.
+-- regenerateEmployeeScheduleToken prepiše to vrednost ob "Ustvari nov
+-- link" - star token takoj preneha delovati (unique index spodaj), s tem
+-- lastnik lahko kadarkoli prekliče dostop starega linka.
+alter table employees add column if not exists schedule_token text;
+update employees set schedule_token = encode(gen_random_bytes(32), 'hex') where schedule_token is null;
+alter table employees alter column schedule_token set not null;
+create unique index if not exists employees_schedule_token_idx on employees (schedule_token);
+
 -- Neobvezno polje v obrazcu za rezervacijo (pod telefonom, glej
 -- booking-page.tsx) - ob oddaji se, če je izpolnjeno, takoj pošlje ENKRATNA
 -- potrditvena e-pošta (glej notifyCustomerOfBooking v [slug]/actions.ts in

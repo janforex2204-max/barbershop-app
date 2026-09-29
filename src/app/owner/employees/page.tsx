@@ -5,6 +5,7 @@ import { resolveSalonTheme } from "@/lib/constants";
 import { addEmployee, updateEmployee } from "../employees-actions";
 import EmployeeHoursEditor from "./employee-hours-editor";
 import EmployeePhotoUpload from "../employee-photo-upload";
+import EmployeeScheduleLink from "./employee-schedule-link";
 import PoweredBy from "@/components/powered-by";
 import ThemeToggle from "@/components/theme-toggle";
 
@@ -130,6 +131,12 @@ export default async function EmployeesPage({
                     Neaktiven - ne prikaže se pri izbiri za nove rezervacije, že obstoječi termini zanj ostanejo v veljavi.
                   </p>
                 )}
+                <div>
+                  <p className="text-xs text-cream-faint mb-2">
+                    Osebni urnik (samo za {employee.name.split(" ")[0]}, brez prijave)
+                  </p>
+                  <EmployeeScheduleLink employeeId={employee.id} initialToken={employee.schedule_token} />
+                </div>
                 <div>
                   <p className="text-xs text-cream-faint mb-2">Urnik</p>
                   <EmployeeHoursEditor employeeId={employee.id} initialHours={employee.hours} />

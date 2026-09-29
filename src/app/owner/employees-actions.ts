@@ -1,5 +1,6 @@
 "use server";
 
+import { randomBytes } from "crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -64,6 +65,9 @@ export async function addEmployee(formData: FormData) {
     name,
     hours: seedHours,
     sort_order: (count ?? 0) + 1,
+    // Isti vzorec kot appointments.token ([slug]/actions.ts) - avtorizacija
+    // za /moj-urnik/[token] (glej supabase/schema.sql).
+    schedule_token: randomBytes(32).toString("hex"),
   });
 
   if (error) {
@@ -203,4 +207,30 @@ export async function uploadEmployeePhoto(
 
   revalidatePath("/owner/employees");
   return { url: publicUrl };
+}
+
+// "Ustvari nov link" na /owner/employees - PREPIŠE schedule_token, s čimer
+// stari /moj-urnik/[token] link takoj preneha delovati (unique index v
+// schema.sql, [token] stran bere admin klient prek TOČNO te vrednosti,
+// glej pogovor s Claude). Isti RLS-only vzorec kot updateEmployee/
+// updateEmployeeHours zgoraj (employees_owner_manage: salon_id =
+// my_salon_id() že sam poskrbi za mejo lastništva) - za razliko od
+// uploadEmployeePhoto tu ni Storage zapisa, ki bi zahteval admin klienta.
+export async function regenerateEmployeeScheduleToken(
+  employeeId: string
+): Promise<{ token?: string; error?: string }> {
+  const supabase = await createClient();
+  const token = randomBytes(32).toString("hex");
+
+  const { error } = await supabase
+    .from("employees")
+    .update({ schedule_token: token })
+    .eq("id", employeeId);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath("/owner/employees");
+  return { token };
 }

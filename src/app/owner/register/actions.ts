@@ -286,6 +286,9 @@ async function doRegisterOwner(formData: FormData): Promise<RegisterOwnerState> 
     name: ownerName,
     hours: employeeHours,
     sort_order: 1,
+    // Isti vzorec kot owner/employees-actions.ts addEmployee - avtorizacija
+    // za /moj-urnik/[token] (glej supabase/schema.sql).
+    schedule_token: randomBytes(32).toString("hex"),
   });
   if (employeeError) {
     // Ne prekini registracije zaradi tega - lastnik lahko zaposlenega doda

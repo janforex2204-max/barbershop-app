@@ -77,6 +77,10 @@ export type Database = {
           // brez naložene slike (glej owner/employees-actions.ts
           // uploadEmployeePhoto in "employee-photos" bucket v schema.sql).
           photo_url: string | null;
+          // Kriptografsko naključen, neuganljiv - avtorizacija za
+          // /moj-urnik/[token] (glej supabase/schema.sql, isti vzorec kot
+          // appointments.token).
+          schedule_token: string;
         };
         Insert: {
           id?: string;
@@ -87,6 +91,7 @@ export type Database = {
           sort_order?: number;
           created_at?: string;
           photo_url?: string | null;
+          schedule_token: string;
         };
         Update: Partial<Database["public"]["Tables"]["employees"]["Insert"]>;
         Relationships: [];

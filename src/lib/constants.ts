@@ -490,6 +490,13 @@ export function bookingManageUrl(token: string): string {
   return `${PLATFORM_URL}/rezervacija/${token}`;
 }
 
+// Isti vzorec kot bookingManageUrl zgoraj, za /moj-urnik/[token] (glej
+// owner/employees-actions.ts regenerateEmployeeScheduleToken in
+// owner/employees/employee-schedule-link.tsx).
+export function employeeScheduleUrl(token: string): string {
+  return `${PLATFORM_URL}/moj-urnik/${token}`;
+}
+
 // Namenoma ohlapno (samo "nekaj@nekaj.nekaj") - dovolj za zavrnitev OČITNO
 // nepopolnega vnosa na opt-in polju za potrditveno e-pošto (glej
 // booking-page.tsx), ne polna RFC 5322 validacija (Resend bo tako ali tako
