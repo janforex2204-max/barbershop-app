@@ -266,6 +266,57 @@ export function monthGrid(monthStr: string): (string | null)[][] {
   return weeks;
 }
 
+// Ponedeljek tedna, ki mu iso pripada - isti "teden se začne s ponedeljkom"
+// dogovor kot monthGrid zgoraj (leadingBlanks izračun tam). Uporabljeno kot
+// kanoničen "?date=" vrednost za tedenski pogled (owner/week-calendar.tsx) -
+// katerikoli dan znotraj tedna se normalizira na isti ponedeljek, da URL
+// vedno kaže na začetek tedna.
+export function weekStartOf(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  const diff = (d.getDay() + 6) % 7; // dni od ponedeljka (getDay: ned=0)
+  d.setDate(d.getDate() - diff);
+  return toISODate(d);
+}
+
+export function shiftWeek(weekStartIso: string, delta: number): string {
+  const d = new Date(weekStartIso + "T00:00:00");
+  d.setDate(d.getDate() + delta * 7);
+  return toISODate(d);
+}
+
+// 7 zaporednih datumov od weekStartIso (ponedeljek) do nedelje.
+export function weekDates(weekStartIso: string): string[] {
+  const d = new Date(weekStartIso + "T00:00:00");
+  return Array.from({ length: 7 }, (_, i) => {
+    const day = new Date(d);
+    day.setDate(d.getDate() + i);
+    return toISODate(day);
+  });
+}
+
+// "22.–28. september 2026" (isti mesec) ali "29. sep – 5. okt 2026" (teden
+// sega čez mesec/leto) - kratka oblika meseca na OBEH koncih v tem primeru,
+// da je jasno, kateri je kateri.
+export function weekLabel(weekStartIso: string): string {
+  const dates = weekDates(weekStartIso);
+  const start = new Date(dates[0] + "T00:00:00");
+  const end = new Date(dates[6] + "T00:00:00");
+  const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear();
+
+  if (sameMonth) {
+    const monthYear = end.toLocaleDateString("sl-SI", { month: "long", year: "numeric" });
+    return `${start.getDate()}.–${end.getDate()}. ${monthYear}`;
+  }
+
+  const startLabel = start.toLocaleDateString("sl-SI", { day: "numeric", month: "short" });
+  const endLabel = end.toLocaleDateString("sl-SI", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  return `${startLabel} – ${endLabel}`;
+}
+
 // ---------------------------------------------------------------------------
 // Validacija vnosa na javnem rezervacijskem obrazcu (/[slug]) - uporabljeno
 // TAKO na klientu (takojšen toast) KOT na strežniku (actions.ts, ker je

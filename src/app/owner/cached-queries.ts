@@ -51,6 +51,28 @@ export const getCachedMonthOverview = unstable_cache(
   { revalidate: 20, tags: [OWNER_CALENDAR_TAG] }
 );
 
+// Za tedenski pogled (owner/week-calendar.tsx) - ena poizvedba za celoten
+// prikazan teden (7 dni), isti "range poizvedba namesto po-dnevne" pristop
+// kot getCachedMonthOverview zgoraj, a s polnimi stolpci (čas/trajanje/
+// zaposleni/stranka/storitev), ki jih risba mreže dejansko potrebuje - ne
+// samo štetje kot mesečni pregled.
+export const getCachedWeekData = unstable_cache(
+  async (salonId: string, weekStart: string, weekEnd: string) => {
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from("appointments")
+      .select("id, appointment_date, appointment_time, duration_minutes, customer_name, service, employee_id")
+      .eq("salon_id", salonId)
+      .gte("appointment_date", weekStart)
+      .lte("appointment_date", weekEnd)
+      .neq("status", "cancelled")
+      .order("appointment_time", { ascending: true });
+    return { appointments: data ?? [], error: error?.message ?? null };
+  },
+  ["owner-week-data"],
+  { revalidate: 20, tags: [OWNER_CALENDAR_TAG] }
+);
+
 export const getCachedDayData = unstable_cache(
   async (salonId: string, date: string) => {
     const admin = createAdminClient();

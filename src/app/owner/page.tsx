@@ -9,16 +9,20 @@ import {
   dayLabel,
   monthOf,
   monthRange,
+  weekStartOf,
+  weekDates,
   whatsAppLink,
   bookingManageUrl,
   resolveSalonTheme,
   PLATFORM_URL,
 } from "@/lib/constants";
 import { nextAvailableDayAfterToday } from "@/lib/availability";
+import type { WeekAppointment } from "@/lib/week-layout";
 import AppointmentsHeader from "./appointments-header";
 import NotificationsPanel from "./notifications-panel";
 import NotificationSettings from "./notification-settings";
 import MonthCalendar from "./month-calendar";
+import WeekCalendar from "./week-calendar";
 import WaitlistOffer from "./waitlist-offer";
 import WaitlistNotifyButton from "./waitlist-notify-button";
 import LogoUpload from "./logo-upload";
@@ -28,6 +32,7 @@ import {
   getCachedDayData,
   getCachedMonthOverview,
   getCachedTomorrowAppointments,
+  getCachedWeekData,
 } from "./cached-queries";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -123,7 +128,7 @@ function OwnerHeaderControls({ salonTheme }: { salonTheme: "spa" | undefined }) 
 export default async function OwnerDashboard({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string; month?: string }>;
+  searchParams: Promise<{ date?: string; month?: string; view?: string; week?: string }>;
 }) {
   const supabase = await createClient();
 
@@ -202,6 +207,16 @@ export default async function OwnerDashboard({
   const selectedDate = params.date && DATE_RE.test(params.date) ? params.date : today;
   const monthStr =
     params.month && MONTH_RE.test(params.month) ? params.month : monthOf(selectedDate);
+  // "week" pogled je izbiren dodatek k mesečnemu (glej pogovor s Claude) -
+  // katerikoli neveljaven/manjkajoč "view" pade nazaj na obstoječe mesečno
+  // vedenje, brez spremembe za nikogar, ki tega parametra ne pozna.
+  const view = params.view === "week" ? "week" : "month";
+  // weekStartOf normalizira NA PONEDELJEK, tudi če bi "?week=" kazal na
+  // sredino tedna - URL vedno kaže na začetek tedna (glej week-calendar.tsx
+  // navigacijske povezave, ki vedno pošljejo že normaliziran ponedeljek,
+  // to tu je varovalka za ročno sestavljen/star URL).
+  const weekStart =
+    params.week && DATE_RE.test(params.week) ? weekStartOf(params.week) : weekStartOf(selectedDate);
 
   const isToday = selectedDate === today;
   const { start: monthStart, end: monthEnd } = monthRange(monthStr);
@@ -224,6 +239,26 @@ export default async function OwnerDashboard({
     getCachedDayData(salonId, selectedDate),
     getCachedTomorrowAppointments(salonId, nextBizDay),
   ]);
+
+  // Samo, če je tedenski pogled dejansko izbran - brez tega bi VSAK obisk
+  // /owner (tudi tisti, ki tedenskega pogleda sploh ne uporabljajo) sprožil
+  // dodatno, tu nepotrebno poizvedbo.
+  const weekDatesRange = weekDates(weekStart);
+  const weekData =
+    view === "week"
+      ? await getCachedWeekData(salonId, weekDatesRange[0], weekDatesRange[6])
+      : null;
+  const weekAppointments: WeekAppointment[] = (weekData?.appointments ?? []).map((a) => ({
+    id: a.id,
+    date: a.appointment_date,
+    time: a.appointment_time,
+    // Isti 60-min privzetek kot povsod drugod, dokler migracija morda ni
+    // požena (glej pogovor s Claude, services.price incident).
+    durationMinutes: a.duration_minutes ?? 60,
+    customerName: a.customer_name,
+    service: a.service,
+    employeeId: a.employee_id,
+  }));
 
   const { appointments: monthAppointments, waitlist: monthWaitlist } = monthOverview;
   const {
@@ -288,6 +323,23 @@ export default async function OwnerDashboard({
     ? groupByEmployee(tomorrowAppointments, employeeNameById)
     : null;
 
+  // SAMO aktivni, z uro/vrstnim redom - za week-calendar.tsx (razpon ur +
+  // barvna legenda). Ločeno od "employees" zgoraj (ki namerno vključuje
+  // neaktivne, za ime-po-id iskanje na obstoječih terminih) - neaktiven
+  // zaposlen ne sme podaljšati prikazanega urnega razpona niti dobiti
+  // svoje barve v legendi.
+  const activeEmployeesForWeek =
+    view === "week"
+      ? (
+          await supabase
+            .from("employees")
+            .select("id, name, hours")
+            .eq("salon_id", salonId)
+            .eq("active", true)
+            .order("sort_order", { ascending: true })
+        ).data ?? []
+      : [];
+
   return (
     <div data-theme={salonTheme} className="min-h-screen bg-ink text-cream font-sans px-6 py-10">
       <div className="max-w-2xl mx-auto">
@@ -326,14 +378,49 @@ export default async function OwnerDashboard({
 
         <NotificationSettings current={notificationPreference} />
 
-        <MonthCalendar
-          monthStr={monthStr}
-          selectedDate={selectedDate}
-          today={today}
-          countsByDate={countsByDate}
-          waitingDates={waitingDates}
-          salonHours={ownerRow.hours}
-        />
+        {/* Preklop mesečni/tedenski pogled - čist URL (?view=), brez client
+            JS-a, isti vzorec kot vsa ostala koledarska navigacija na tej
+            strani (glej pogovor s Claude - tedenski pogled je DODATNA
+            možnost, "month" ostane privzet, da se za obstoječe uporabnike/
+            zaznamke ne spremeni ničesar). */}
+        <div className="inline-flex gap-1 bg-ink-soft p-1 rounded-md mb-3">
+          <Link
+            href={`/owner?date=${selectedDate}&month=${monthStr}`}
+            className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+              view === "month" ? "bg-burgundy text-on-accent" : "text-cream-dim hover:text-cream"
+            }`}
+          >
+            Mesečni pregled
+          </Link>
+          <Link
+            href={`/owner?date=${selectedDate}&view=week&week=${weekStart}`}
+            className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+              view === "week" ? "bg-burgundy text-on-accent" : "text-cream-dim hover:text-cream"
+            }`}
+          >
+            Tedenski pogled
+          </Link>
+        </div>
+
+        {view === "week" ? (
+          <WeekCalendar
+            weekStart={weekStart}
+            selectedDate={selectedDate}
+            today={today}
+            appointments={weekAppointments}
+            employees={activeEmployeesForWeek}
+            salonHours={ownerRow.hours}
+          />
+        ) : (
+          <MonthCalendar
+            monthStr={monthStr}
+            selectedDate={selectedDate}
+            today={today}
+            countsByDate={countsByDate}
+            waitingDates={waitingDates}
+            salonHours={ownerRow.hours}
+          />
+        )}
 
         {waitlistError ? (
           <p className="text-sm text-rose mb-10">

@@ -53,6 +53,23 @@
   --color-burgundy: #8c2f2f;
   --color-on-accent: #f5ede0;
 
+  /* Barve blokov v tedenskem koledarju (owner/week-calendar.tsx), po
+     zaposlenem, v vrstnem redu sort_order (cikel, če je zaposlenih več kot
+     4). Namenoma KONSTANTNE (isti vzorec/razlog kot burgundy zgoraj) - to so
+     prepoznavne "nalepke" po osebi, ne vlogno-odvisni žetoni, zato naj bodo
+     dosledne ne glede na temo strani. Vse štiri dovolj temne/nasičene za
+     belo besedilo (--color-on-accent zgoraj) čez celotno površino bloka.
+     Namerno RAZLIČNE od gold/sage/rose - te tri že nosijo drug pomen
+     (izbrano/pozitivno/napaka) na isti strani, ponovna uporaba tu bi bila
+     zavajajoča. */
+  --color-cal-1: #3b5f8a;
+  --color-cal-2: #6b4d8a;
+  --color-cal-3: #b8622f;
+  --color-cal-4: #2d7d78;
+  /* Termin brez dodeljenega zaposlenega (employee_id null, glej pogovor s
+     Claude - stari/pred-migracijski zapisi) - nevtralna, ne del cikla. */
+  --color-cal-none: #5c574d;
+
   /* Uporabljeno samo v BarberPoleWatermark (src/app/[slug]/barber-pole-watermark.tsx) */
   --watermark-red: #d16b64;
   --watermark-neutral: #efe6d8;
