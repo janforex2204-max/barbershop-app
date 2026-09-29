@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, Inter, Manrope, Cormorant_Garamond, Nunito_Sans } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
+import ServiceWorkerRegister from "@/components/service-worker-register";
 import "./globals.css";
 
 // Teče sinhrono, PREDEN se React sploh naloži/hidrira - prepreči "flash"
@@ -58,6 +59,23 @@ const nunitoSans = Nunito_Sans({
 export const metadata: Metadata = {
   title: "Fillio — rezervacije",
   description: "Rezervacijski sistem za frizerske salone",
+  manifest: "/manifest.json",
+  // iOS ne bere manifest.json - "Dodaj na domači zaslon" tam potrebuje TE
+  // meta oznake posebej (Next jih generira iz appleWebApp spodaj). title
+  // je ime POD ikono na domačem zaslonu (krajše kot celoten <title>).
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Fillio",
+  },
+};
+
+// Ločeno od metadata zgoraj (Next.js zahteva - themeColor/viewport tu, ne v
+// Metadata). themeColor obarva brskalnikovo orodno vrstico/status vrstico
+// na Androidu, ko je stran odprta kot PWA (glej background_color/
+// theme_color v public/manifest.json - ista #101113 barva).
+export const viewport: Viewport = {
+  themeColor: "#101113",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -71,7 +89,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className="font-sans min-h-full flex flex-col bg-ink text-cream">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <ServiceWorkerRegister />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );
