@@ -37,6 +37,16 @@ export function formatHourLabel(minutes: number): string {
   return `${String(h).padStart(2, "0")}:00`;
 }
 
+// Za razliko od formatHourLabel (zaokroži na uro, za urne oznake mreže) -
+// TOČEN čas termina (npr. "11:00–11:45"), izrisan NEPOSREDNO na bloku
+// (calendar-block.tsx) - navpična pozicija/višina bloka sama po sebi ni
+// dovolj natančna za oceno točne ure (vzorec kot Fresha, glej pogovor s
+// Claude).
+export function formatTimeRange(startMinutes: number, endMinutes: number): string {
+  const fmt = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+  return `${fmt(startMinutes)}–${fmt(endMinutes)}`;
+}
+
 // Deljena paleta za owner/week-calendar.tsx (prikaz) IN
 // owner/employees/employee-color-picker.tsx (izbira) - glej --color-cal-*
 // v globals.css (konstantne, ne obrnejo se s temo). Zaposleni izbere ENO od

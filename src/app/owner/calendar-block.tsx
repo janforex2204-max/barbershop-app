@@ -1,6 +1,6 @@
 import Link from "next/link";
 import AppointmentNoteButton from "./appointment-note-button";
-import type { LaidOutAppointment } from "@/lib/week-layout";
+import { formatTimeRange, type LaidOutAppointment } from "@/lib/week-layout";
 
 // Deljen med week-calendar.tsx (dnevni stolpci, mobilno + 0/1 zaposlenih) in
 // day-employee-columns.tsx (stolpci po zaposlenem, namizje + 2+ zaposlenih,
@@ -45,6 +45,12 @@ export default function CalendarBlock({
         className="absolute inset-0 rounded px-1 py-0.5 overflow-hidden text-[10px] leading-tight text-white hover:brightness-110 transition-[filter]"
         style={{ background: color }}
       >
+        {/* Točen čas kot besedilo - navpična pozicija/višina bloka sama po
+            sebi ni dovolj natančna za oceno prave ure (vzorec kot Fresha,
+            glej pogovor s Claude). */}
+        <div className="truncate text-[9px] leading-tight opacity-90">
+          {formatTimeRange(appt.startMinutes, appt.endMinutes)}
+        </div>
         <div className="font-semibold truncate">{appt.customerName}</div>
         <div className="truncate opacity-80">{appt.service}</div>
       </Link>

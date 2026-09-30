@@ -201,6 +201,14 @@ export function computeGapMinutes(
   let boundary = dayEnd;
   for (const b of busy) {
     const busyStart = toMinutes(b.time);
+    const busyEnd = busyStart + b.durationMinutes;
+    // `fromTime` pade ZNOTRAJ tega že tekočega zasedenega intervala - prave
+    // vrzeli sploh ni (zaokroževanje klika na koledarju na četrt ure ga je
+    // lahko potisnilo tik ob/v obstoječ termin, glej pogovor s Claude -
+    // brez tega bi spodnja zanka ta interval preprosto preskočila, saj
+    // busyStart < from, in vrzel bi bila napačno izračunana do NASLEDNJEGA
+    // (bolj oddaljenega) termina).
+    if (busyStart <= from && busyEnd > from) return 0;
     if (busyStart >= from && busyStart < boundary) boundary = busyStart;
   }
   return boundary - from;

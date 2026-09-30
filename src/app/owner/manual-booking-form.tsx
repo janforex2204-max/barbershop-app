@@ -16,6 +16,7 @@ import {
 import { busyForEmployee, type EmployeeBusyRow } from "@/lib/employee-availability";
 import type { SalonDayHours } from "@/types/database.types";
 import { addManualAppointment, type ManualBookingState } from "./actions";
+import ServiceListbox from "./service-listbox";
 
 type Service = { id: string; name: string; duration_minutes: number | null };
 type Employee = { id: string; name: string; hours: SalonDayHours[] };
@@ -236,7 +237,12 @@ export default function ManualBookingForm({
   // zaseden termin/premor/konec delovnika. null, dokler čas še ni izbran
   // (obstoječi "+ Dodaj termin ročno" vstop brez prefill-a) - v tem primeru
   // spodnji izbirnik storitev ostane popolnoma nespremenjen (brez oznak).
-  const gapMinutes = time ? computeGapMinutes(dayWindow, busyWithBreak, time) : null;
+  // ALI dokler se `busy` še nalaga (slotsLoading) - brez tega bi ob
+  // predizpolnjenem odprtju (klik na koledarju) izbirnik za kratek trenutek
+  // (dokler se fetchBusy ne konča) napačno prikazal VSE storitve kot
+  // ustrezne, ker `busy` še vedno prazen array (glej pogovor s Claude -
+  // prijavljen kot "noben servis ni bil označen kot neustrezen").
+  const gapMinutes = time && !slotsLoading ? computeGapMinutes(dayWindow, busyWithBreak, time) : null;
 
   // Za VSAKO storitev (ne samo izbrano) - ali se prilega vrzeli PRI
   // IZBRANEM ČASU. Storitve, ki NE ustrezajo, ostanejo VIDNE (onemogočene,
@@ -262,7 +268,13 @@ export default function ManualBookingForm({
   }
 
   return (
-    <div className="border border-border rounded-lg bg-panel p-5 mb-4">
+    // bg-ink-elevated, NE bg-panel (--color-panel je NAMENOMA transparent za
+    // večino tem, glej globals.css) - v modalnem prikazu (calendar-booking-
+    // context.tsx) je to prej pustilo skozi barvne koledarske bloke pod
+    // seboj (glej pogovor s Claude - isti pojav, ki je bil že prej popravljen
+    // na appointment-note-button.tsx modalu). ink-elevated je dosledno
+    // neprozorna vrednost v VSEH temah.
+    <div className="border border-border rounded-lg bg-ink-elevated p-5 mb-4">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-medium text-cream-dim">
           Ročni vnos termina (telefonska rezervacija)
@@ -317,27 +329,19 @@ export default function ManualBookingForm({
           required
           className={inputClass}
         />
-        <select
-          name="service"
+        {/* ServiceListbox namesto native <select> - glej opombo tam, nativni
+            <option> ne podpira zanesljivega oblikovanja med brskalniki.
+            Brez "name" na sami komponenti - vrednost v FormData nosi skriti
+            input spodaj, isti vzorec kot appointment_time/employee_id. */}
+        <ServiceListbox
+          options={services.map((s) => ({ id: s.id, name: s.name, ...serviceFitInfo(s) }))}
           value={service}
-          onChange={(e) => handleServiceChange(e.target.value)}
-          required
-          className={inputClass}
-        >
-          {services.map((s) => {
-            const info = serviceFitInfo(s);
-            return (
-              <option
-                key={s.id}
-                value={s.name}
-                disabled={!info.fits}
-                style={!info.fits ? { color: "var(--color-rose)" } : undefined}
-              >
-                {info.label}
-              </option>
-            );
-          })}
-        </select>
+          onChange={handleServiceChange}
+        />
+        {/* "required" nima učinka na type="hidden" (izven omejitvene
+            validacije po HTML specifikaciji) - prazna storitev je že
+            preverjena na strežniku (addManualAppointment, ./actions.ts). */}
+        <input type="hidden" name="service" value={service} />
 
         {/* Prikaže se SAMO pri 2+ aktivnih zaposlenih - pri 0 ostane
             employeeId "", pri 1 je tiho samodejno izbran (glej efekt
