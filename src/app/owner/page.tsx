@@ -18,7 +18,7 @@ import {
 } from "@/lib/constants";
 import { nextAvailableDayAfterToday } from "@/lib/availability";
 import type { WeekAppointment } from "@/lib/week-layout";
-import { fraunces } from "@/lib/fonts";
+import { playfairDisplay } from "@/lib/fonts";
 import AppointmentsHeader from "./appointments-header";
 import { CalendarBookingProvider } from "./calendar-booking-context";
 import NotificationsPanel from "./notifications-panel";
@@ -362,14 +362,29 @@ export default async function OwnerDashboard({
             (preklop + 4 gumbi) - glej pogovor s Claude, "raztegne stran". */}
         <div className="mb-8 relative">
           <div>
-            {/* fraunces.className NAMESTO font-display (Tailwind razred, ki
-                bi tu prebral --font-fraunces - ta je znotraj [data-design=
-                "v2"] prepisan na Manrope, glej globals.css) - lastnik je
-                želel bolj "premium" ime salona (glej pogovor s Claude),
-                pravi elegantni serif Fraunces (namesto splošne UI pisave)
-                izstopa SAMO tu, kjer je to namenoma, ostala postavitev
-                ostane pri Manrope. */}
-            <p className={`${fraunces.className} text-5xl font-semibold tracking-tight text-gold mb-2`}>
+            {/* playfairDisplay.className NAMESTO font-display (Tailwind
+                razred, ki bi tu prebral --font-fraunces - ta je znotraj
+                [data-design="v2"] prepisan na Manrope, glej globals.css) -
+                lastniku ni bil všeč prejšnji poskus s Fraunces (prevečkrat
+                "mehek"), Playfair Display je bolj dramatičen, visoko-
+                kontrasten serif, pogosto uporabljen za luksuzne/premium
+                blagovne znamke (glej pogovor s Claude). Sklad text-shadow
+                spodaj (isti odtenek kot zlata barva, vsak nivo temnejši in
+                bolj zamaknjen prek color-mix()) ustvari "izrezljan"/
+                izbočen 3D učinek namesto ploščatega besedila - lastnik je
+                eksplicitno prosil za nekaj, kar "dejansko izstopa". */}
+            <p
+              className={`${playfairDisplay.className} text-5xl font-black tracking-tight text-gold mb-2`}
+              style={{
+                textShadow: `
+                  1px 1px 0 color-mix(in srgb, var(--color-gold) 100%, black 25%),
+                  2px 2px 0 color-mix(in srgb, var(--color-gold) 100%, black 35%),
+                  3px 3px 0 color-mix(in srgb, var(--color-gold) 100%, black 45%),
+                  4px 4px 0 color-mix(in srgb, var(--color-gold) 100%, black 55%),
+                  6px 6px 10px rgba(0, 0, 0, 0.35)
+                `,
+              }}
+            >
               {salonName}
             </p>
             <h1 className="text-sm font-medium text-cream-dim">Nadzorna plošča</h1>

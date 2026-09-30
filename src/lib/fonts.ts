@@ -1,4 +1,11 @@
-import { Fraunces, Inter, Manrope, Cormorant_Garamond, Nunito_Sans } from "next/font/google";
+import {
+  Fraunces,
+  Inter,
+  Manrope,
+  Cormorant_Garamond,
+  Nunito_Sans,
+  Playfair_Display,
+} from "next/font/google";
 
 // Deljeno med layout.tsx (postavi --font-* CSS spremenljivke na <html>, glej
 // tam) in owner/page.tsx (uporabi fraunces.className NEPOSREDNO na imenu
@@ -39,4 +46,15 @@ export const nunitoSans = Nunito_Sans({
   variable: "--font-nunito-sans",
   subsets: ["latin"],
   weight: ["400", "500", "600"],
+});
+
+// SAMO za ime salona na owner/page.tsx (glej pogovor s Claude - lastnik ni
+// bil zadovoljen s Fraunces, "premium" izgled). Visoko-kontrasten,
+// dramatičen serif, pogosto uporabljen za luksuzne/premium blagovne znamke -
+// izstopa bolj kot mehkejši Fraunces. Brez `variable` (ni potreben CSS
+// spremenljivkski preklop kot pri ostalih - samo playfairDisplay.className
+// neposredno na enem mestu).
+export const playfairDisplay = Playfair_Display({
+  subsets: ["latin"],
+  weight: ["700", "800", "900"],
 });
