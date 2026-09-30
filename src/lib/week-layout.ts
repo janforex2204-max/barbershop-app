@@ -148,6 +148,35 @@ export function layoutDayAppointments(appointments: WeekAppointment[]): LaidOutA
   return result;
 }
 
+// Omeji IZRISANO višino bloka, da ne preseže začetka NASLEDNJEGA termina V
+// ISTEM LANE-u (glej pogovor s Claude - "se prekrivata in je neberljivo").
+// MIN_BLOCK_HEIGHT (spodaj) zagotavlja dovolj prostora za daljša imena
+// storitev pri KRATKIH terminih, a lahko pri DVEH kratkih, tesno postavljenih
+// terminih (npr. 20 min narazen) preseže dejansko vrzel med njima - brez te
+// omejitve bi se prvi blok vizualno raztegnil ČEZ začetek drugega. Nikoli
+// pod appt.durationMinutes (varovalka - v praksi se ne zgodi, ker bi to
+// pomenilo pravi časovni prekrivek, kar layoutDayAppointments že loči v
+// RAZLIČNE lane-e).
+export function computeBlockHeightPx(
+  appt: LaidOutAppointment,
+  allInColumn: LaidOutAppointment[]
+): number {
+  let nextStartInLane: number | null = null;
+  for (const other of allInColumn) {
+    if (other.lane !== appt.lane) continue;
+    if (other.startMinutes <= appt.startMinutes) continue;
+    if (nextStartInLane === null || other.startMinutes < nextStartInLane) {
+      nextStartInLane = other.startMinutes;
+    }
+  }
+
+  const naturalHeight = Math.max(appt.durationMinutes * PX_PER_MINUTE, MIN_BLOCK_HEIGHT);
+  if (nextStartInLane === null) return naturalHeight;
+
+  const gapHeight = (nextStartInLane - appt.startMinutes) * PX_PER_MINUTE;
+  return Math.max(Math.min(naturalHeight, gapHeight), appt.durationMinutes * PX_PER_MINUTE);
+}
+
 // Razpon ur, ki jih mreža prikaže (glej owner/week-calendar.tsx) - unija
 // odprtih ur VSEH (aktivnih) zaposlenih (ali salon_owners.hours za salone
 // brez zaposlenih) čez cel prikazan teden, zaokrožena na polno uro. Termini

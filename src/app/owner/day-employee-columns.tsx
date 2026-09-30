@@ -3,10 +3,10 @@ import { ChevronLeft, ChevronRight, User } from "lucide-react";
 import { addDays, weekStartOf, dayLabel } from "@/lib/constants";
 import {
   layoutDayAppointments,
+  computeBlockHeightPx,
   computeWeekHourRange,
   resolveEmployeeColor,
   PX_PER_MINUTE,
-  MIN_BLOCK_HEIGHT,
   TIME_GUTTER_PX,
   formatHourLabel,
   type WeekAppointment,
@@ -161,7 +161,7 @@ export default function DayEmployeeColumns({
                       appt={appt}
                       href={`/owner?date=${selectedDate}&view=week&week=${weekStart}`}
                       top={(appt.startMinutes - startMinutes) * PX_PER_MINUTE}
-                      height={Math.max(appt.durationMinutes * PX_PER_MINUTE, MIN_BLOCK_HEIGHT)}
+                      height={computeBlockHeightPx(appt, laidOut)}
                       leftPct={appt.lane * (100 / appt.laneCount)}
                       widthPct={100 / appt.laneCount}
                       color={col.color}

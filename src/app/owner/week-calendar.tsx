@@ -3,10 +3,10 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { weekDates, weekLabel, shiftWeek } from "@/lib/constants";
 import {
   layoutDayAppointments,
+  computeBlockHeightPx,
   computeWeekHourRange,
   resolveEmployeeColor,
   PX_PER_MINUTE,
-  MIN_BLOCK_HEIGHT,
   TIME_GUTTER_PX,
   formatHourLabel,
   type WeekAppointment,
@@ -182,7 +182,7 @@ export default function WeekCalendar({
                         appt={appt}
                         href={`/owner?date=${date}&view=week&week=${weekStart}`}
                         top={(appt.startMinutes - startMinutes) * PX_PER_MINUTE}
-                        height={Math.max(appt.durationMinutes * PX_PER_MINUTE, MIN_BLOCK_HEIGHT)}
+                        height={computeBlockHeightPx(appt, laidOut)}
                         leftPct={appt.lane * (100 / appt.laneCount)}
                         widthPct={100 / appt.laneCount}
                         color={resolveEmployeeColor(appt.employeeId, employees)}
