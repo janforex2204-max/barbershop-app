@@ -365,25 +365,15 @@ export default async function OwnerDashboard({
             {/* playfairDisplay.className NAMESTO font-display (Tailwind
                 razred, ki bi tu prebral --font-fraunces - ta je znotraj
                 [data-design="v2"] prepisan na Manrope, glej globals.css) -
-                lastniku ni bil všeč prejšnji poskus s Fraunces (prevečkrat
-                "mehek"), Playfair Display je bolj dramatičen, visoko-
-                kontrasten serif, pogosto uporabljen za luksuzne/premium
-                blagovne znamke (glej pogovor s Claude). Sklad text-shadow
-                spodaj (isti odtenek kot zlata barva, vsak nivo temnejši in
-                bolj zamaknjen prek color-mix()) ustvari "izrezljan"/
-                izbočen 3D učinek namesto ploščatega besedila - lastnik je
-                eksplicitno prosil za nekaj, kar "dejansko izstopa". */}
+                dramatičen, visoko-kontrasten serif, pogosto uporabljen za
+                luksuzne/premium blagovne znamke. Izrezljan/izbočen 3D
+                sklad senc (prejšnji poskus) je bil za lastnikov okus
+                pretiran - zdaj samo velike črke + ena sama mehka senca za
+                rahel dvig (drop-shadow), brez globine/plasti (glej pogovor
+                s Claude). */}
             <p
-              className={`${playfairDisplay.className} text-5xl font-black tracking-tight text-gold mb-2`}
-              style={{
-                textShadow: `
-                  1px 1px 0 color-mix(in srgb, var(--color-gold) 100%, black 25%),
-                  2px 2px 0 color-mix(in srgb, var(--color-gold) 100%, black 35%),
-                  3px 3px 0 color-mix(in srgb, var(--color-gold) 100%, black 45%),
-                  4px 4px 0 color-mix(in srgb, var(--color-gold) 100%, black 55%),
-                  6px 6px 10px rgba(0, 0, 0, 0.35)
-                `,
-              }}
+              className={`${playfairDisplay.className} text-5xl font-black tracking-wide uppercase text-gold mb-2`}
+              style={{ filter: "drop-shadow(0 3px 6px rgba(0, 0, 0, 0.3))" }}
             >
               {salonName}
             </p>
