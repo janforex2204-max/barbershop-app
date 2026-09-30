@@ -1,6 +1,6 @@
 export function ForWhom() {
   return (
-    <section id="za-koga-je" className="bg-fillio-dark px-20 py-[140px]">
+    <section id="za-koga-je" className="bg-fillio-dark px-5 py-16 md:px-20 md:py-[140px]">
       <div className="mb-[26px] flex items-center gap-[10px]">
         <span className="block h-[6px] w-[22px] bg-white" />
         <span className="block h-[6px] w-[22px] bg-white" />
@@ -11,20 +11,23 @@ export function ForWhom() {
         </span>
       </div>
 
-      <h2 className="mb-[22px] max-w-[780px] font-display text-[46px] font-semibold leading-[1.15] tracking-[-0.5px]">
+      <h2 className="mb-[22px] max-w-[780px] font-display text-[28px] md:text-[46px] font-semibold leading-[1.2] md:leading-[1.15] tracking-[-0.5px]">
         Fillio raste skupaj z vašo dejavnostjo.
       </h2>
 
-      <p className="mb-[76px] max-w-[660px] text-lg leading-[1.65] text-white/60">
+      <p className="mb-10 md:mb-[76px] max-w-[660px] text-base md:text-lg leading-[1.65] text-white/60">
         Fillio danes rešuje rezervacije za frizerske in kozmetične salone, a to
         je šele začetek. Sistem hitro širimo na vsako dejavnost, ki živi od
         terminov — kmalu boste lahko v priljubljeni gostilni izbrali celo
         mizo, za katero želite sedeti, ne le termin večerje.
       </p>
 
-      <div className="grid grid-cols-3 gap-7">
+      {/* grid-cols-1 pod md - prej trdo grid-cols-3 na VSEH širinah je bilo
+          tri kartice stisnilo v ~1/3 mobilnega zaslona vsako, besedilo se je
+          lomilo sredi besed (glej pogovor s Claude). */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-7">
         {/* Frizerski salon */}
-        <div className="flex flex-col rounded-md border border-white/[0.08] bg-[#17181B] p-9">
+        <div className="flex flex-col rounded-md border border-white/[0.08] bg-[#17181B] p-6 md:p-9">
           <div className="mb-6 h-[6px] w-[34px] bg-fillio-tealDark" />
           <h3 className="mb-3.5 text-[23px] font-bold">Frizerski salon</h3>
           <p className="mb-6 text-[15px] leading-[1.6] text-white/55">
@@ -49,7 +52,7 @@ export function ForWhom() {
         </div>
 
         {/* Kozmetični salon */}
-        <div className="flex flex-col rounded-md border border-white/[0.08] bg-[#17181B] p-9">
+        <div className="flex flex-col rounded-md border border-white/[0.08] bg-[#17181B] p-6 md:p-9">
           <div className="mb-6 h-[6px] w-[34px] bg-fillio-tealLight" />
           <h3 className="mb-3.5 text-[23px] font-bold">Kozmetični salon</h3>
           <p className="mb-6 text-[15px] leading-[1.6] text-white/55">
@@ -72,7 +75,7 @@ export function ForWhom() {
         </div>
 
         {/* Coming soon */}
-        <div className="flex flex-col rounded-md border border-dashed border-white/[0.22] p-9">
+        <div className="flex flex-col rounded-md border border-dashed border-white/[0.22] p-6 md:p-9">
           <div className="mb-5 inline-flex w-fit rounded-[3px] border border-white/25 px-2.5 py-[5px] text-[11px] font-bold uppercase tracking-wider text-white/75">
             Kmalu
           </div>

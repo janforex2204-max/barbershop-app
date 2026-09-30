@@ -234,20 +234,35 @@ export default async function OwnerDashboard({
   // kratek čas predpomnjen PO (salonId, mesec/dan) - obisk ISTEGA meseca/dne
   // v tem oknu je torej brez nove poizvedbe na Supabase. Ob dejanski
   // spremembi (odpoved/dodan termin, ./actions.ts) se cache takoj invalidira.
-  const [monthOverview, dayData, tomorrowData] = await Promise.all([
+  //
+  // getCachedWeekData in "employees" sta ZDAJ TUDI v tej isti Promise.all
+  // skupini - prej sta tekla ZAPOREDOMA ZA njo (in "employees" celo dvakrat,
+  // ločeno, za isto tabelo), kar je bil izmerjen, dejanski vzrok počasnejšega
+  // preklopa na tedenski pogled (glej pogovor s Claude - neposredna meritev
+  // proti produkcijski bazi: ~500-700ms samo na nivoju baze). Nobena od teh
+  // poizvedb ni odvisna od katere koli druge v tej skupini (vse potrebujejo
+  // samo salonId, ki je že znan) - združitev v EN Promise.all je torej varna.
+  // getCachedWeekData pri mesečnem pogledu ostane Promise.resolve(null) (brez
+  // omrežnega klica) - isti "samo, če je dejansko izbran" princip kot prej.
+  const weekDatesRange = weekDates(weekStart);
+  const [monthOverview, dayData, tomorrowData, weekData, employeesResult] = await Promise.all([
     getCachedMonthOverview(salonId, monthStart, monthEnd),
     getCachedDayData(salonId, selectedDate),
     getCachedTomorrowAppointments(salonId, nextBizDay),
-  ]);
-
-  // Samo, če je tedenski pogled dejansko izbran - brez tega bi VSAK obisk
-  // /owner (tudi tisti, ki tedenskega pogleda sploh ne uporabljajo) sprožil
-  // dodatno, tu nepotrebno poizvedbo.
-  const weekDatesRange = weekDates(weekStart);
-  const weekData =
     view === "week"
-      ? await getCachedWeekData(salonId, weekDatesRange[0], weekDatesRange[6])
-      : null;
+      ? getCachedWeekData(salonId, weekDatesRange[0], weekDatesRange[6])
+      : Promise.resolve(null),
+    // Združena poizvedba (prej dve ločeni - ena "id, name" za VSE zaposlene
+    // za ime-po-id iskanje spodaj, ena "id, name, hours, color, photo_url"
+    // samo za aktivne, za week-calendar.tsx) - eno branje cele tabele,
+    // oboje izpeljano spodaj v JS (hasEmployees/employeeNameById iz vseh,
+    // activeEmployeesForWeek s filtrom active===true).
+    supabase
+      .from("employees")
+      .select("id, name, hours, color, photo_url, active, sort_order")
+      .eq("salon_id", salonId)
+      .order("sort_order", { ascending: true }),
+  ]);
   const weekAppointments: WeekAppointment[] = (weekData?.appointments ?? []).map((a) => ({
     id: a.id,
     date: a.appointment_date,
@@ -308,38 +323,24 @@ export default async function OwnerDashboard({
     );
   }
 
-  // VSI zaposleni (tudi deaktivirani, glej groupByEmployee zgoraj), samo za
-  // ime/skupinjenje spodaj - ne za odločanje "ali naj se pokaže izbirnik"
-  // (to je ločena, aktivnost-scopana logika v manual-booking-form.tsx in
+  // VSI zaposleni (tudi deaktivirani, glej groupByEmployee spodaj), za
+  // ime/skupinjenje - ne za odločanje "ali naj se pokaže izbirnik" (to je
+  // ločena, aktivnost-scopana logika v manual-booking-form.tsx in
   // booking-page.tsx). Skupinjenje se sploh ne prikaže, če salon NIKOLI ni
   // dodal nobenega zaposlenega (identično vedenje kot pred to funkcionalnostjo).
-  const { data: employees } = await supabase
-    .from("employees")
-    .select("id, name")
-    .eq("salon_id", salonId);
-  const hasEmployees = (employees?.length ?? 0) > 0;
-  const employeeNameById = new Map((employees ?? []).map((e) => [e.id, e.name]));
+  const employees = employeesResult.data ?? [];
+  const hasEmployees = employees.length > 0;
+  const employeeNameById = new Map(employees.map((e) => [e.id, e.name]));
   const appointmentGroups = hasEmployees ? groupByEmployee(appointments, employeeNameById) : null;
   const tomorrowGroups = hasEmployees
     ? groupByEmployee(tomorrowAppointments, employeeNameById)
     : null;
 
-  // SAMO aktivni, z uro/vrstnim redom - za week-calendar.tsx (razpon ur +
-  // barvna legenda). Ločeno od "employees" zgoraj (ki namerno vključuje
-  // neaktivne, za ime-po-id iskanje na obstoječih terminih) - neaktiven
-  // zaposlen ne sme podaljšati prikazanega urnega razpona niti dobiti
-  // svoje barve v legendi.
-  const activeEmployeesForWeek =
-    view === "week"
-      ? (
-          await supabase
-            .from("employees")
-            .select("id, name, hours, color, photo_url")
-            .eq("salon_id", salonId)
-            .eq("active", true)
-            .order("sort_order", { ascending: true })
-        ).data ?? []
-      : [];
+  // SAMO aktivni - za week-calendar.tsx (razpon ur + barvna legenda).
+  // Neaktiven zaposlen ne sme podaljšati prikazanega urnega razpona niti
+  // dobiti svoje barve v legendi. Vrstni red (sort_order) je že iz zgornje
+  // poizvedbe - filter ohrani relativni vrstni red.
+  const activeEmployeesForWeek = view === "week" ? employees.filter((e) => e.active) : [];
 
   return (
     // data-design="v2" - preskusna "premium prenova" (glej pogovor s Claude,
@@ -395,6 +396,7 @@ export default async function OwnerDashboard({
         <div className="inline-flex gap-1 bg-ink-soft p-1 rounded-md mb-3">
           <Link
             href={`/owner?date=${selectedDate}&month=${monthStr}`}
+            scroll={false}
             className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
               view === "month" ? "bg-burgundy text-on-accent" : "text-cream-dim hover:text-cream"
             }`}
@@ -403,6 +405,7 @@ export default async function OwnerDashboard({
           </Link>
           <Link
             href={`/owner?date=${selectedDate}&view=week&week=${weekStart}`}
+            scroll={false}
             className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
               view === "week" ? "bg-burgundy text-on-accent" : "text-cream-dim hover:text-cream"
             }`}

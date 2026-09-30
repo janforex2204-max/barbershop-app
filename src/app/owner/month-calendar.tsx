@@ -28,6 +28,7 @@ export default function MonthCalendar({
       <div className="flex items-center justify-between mb-3">
         <Link
           href={`/owner?date=${selectedDate}&month=${shiftMonth(monthStr, -1)}`}
+          scroll={false}
           className="p-1.5 rounded hover:bg-ink-soft text-cream-dim hover:text-cream"
         >
           <ChevronLeft size={16} />
@@ -37,6 +38,7 @@ export default function MonthCalendar({
         </span>
         <Link
           href={`/owner?date=${selectedDate}&month=${shiftMonth(monthStr, 1)}`}
+          scroll={false}
           className="p-1.5 rounded hover:bg-ink-soft text-cream-dim hover:text-cream"
         >
           <ChevronRight size={16} />
@@ -115,6 +117,7 @@ function DayCell({
   return (
     <Link
       href={`/owner?date=${iso}&month=${monthStr}`}
+      scroll={false}
       className={`month-calendar-cell aspect-square flex flex-col items-center justify-center gap-0.5 rounded-md border text-xs transition-colors ${
         isSelected
           ? "border-gold bg-selected text-cream"

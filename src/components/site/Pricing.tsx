@@ -32,7 +32,7 @@ export function Pricing() {
   const proPrice = billing === "monthly" ? "50€" : "40€";
 
   return (
-    <section id="cenik" className="bg-fillio-dark px-20 py-[140px]">
+    <section id="cenik" className="bg-fillio-dark px-5 py-16 md:px-20 md:py-[140px]">
       <div className="mb-[26px] flex items-center gap-[10px]">
         <span className="block h-[6px] w-[22px] bg-white" />
         <span className="block h-[6px] w-[22px] bg-white" />
@@ -43,17 +43,17 @@ export function Pricing() {
         </span>
       </div>
 
-      <h2 className="mb-[22px] max-w-[780px] font-display text-[46px] font-semibold leading-[1.15] tracking-[-0.5px]">
+      <h2 className="mb-[22px] max-w-[780px] font-display text-[28px] md:text-[46px] font-semibold leading-[1.2] md:leading-[1.15] tracking-[-0.5px]">
         Preprost cenik, ki raste z vami.
       </h2>
 
-      <p className="mb-10 max-w-[640px] text-lg leading-[1.65] text-white/60">
+      <p className="mb-10 max-w-[640px] text-base md:text-lg leading-[1.65] text-white/60">
         Izberite paket, ki ustreza vašemu poslu. Nadgradite kadarkoli — brez
         vezave.
       </p>
 
       {/* billing toggle — actually functional */}
-      <div className="mb-[50px] inline-flex items-center rounded border border-white/10 bg-[#17181B] p-1">
+      <div className="mb-10 md:mb-[50px] inline-flex items-center rounded border border-white/10 bg-[#17181B] p-1">
         <button
           type="button"
           onClick={() => setBilling("monthly")}
@@ -77,9 +77,9 @@ export function Pricing() {
         </button>
       </div>
 
-      <div className="grid grid-cols-3 items-stretch gap-7">
+      <div className="grid grid-cols-1 md:grid-cols-3 items-stretch gap-5 md:gap-7">
         {/* OSNOVNI */}
-        <div className="flex flex-col rounded-md border border-white/[0.08] bg-[#17181B] p-10">
+        <div className="flex flex-col rounded-md border border-white/[0.08] bg-[#17181B] p-6 md:p-10">
           <div className="mb-[18px] text-sm font-bold uppercase tracking-wide text-white/55">
             Osnovni
           </div>
@@ -111,8 +111,8 @@ export function Pricing() {
         </div>
 
         {/* PRO */}
-        <div className="relative flex flex-col rounded-md border-2 border-fillio-tealLight bg-[#17181B] p-10">
-          <div className="absolute -top-3.5 left-9 rounded-[3px] bg-fillio-tealLight px-3 py-[5px] text-[11px] font-bold uppercase tracking-wide text-fillio-dark">
+        <div className="relative flex flex-col rounded-md border-2 border-fillio-tealLight bg-[#17181B] p-6 md:p-10">
+          <div className="absolute -top-3.5 left-6 md:left-9 rounded-[3px] bg-fillio-tealLight px-3 py-[5px] text-[11px] font-bold uppercase tracking-wide text-fillio-dark">
             Priporočeno
           </div>
           <div className="mb-[18px] text-sm font-bold uppercase tracking-wide text-white/55">
@@ -146,7 +146,7 @@ export function Pricing() {
         </div>
 
         {/* PREMIUM — coming soon */}
-        <div className="flex flex-col rounded-md border border-dashed border-white/[0.22] p-10">
+        <div className="flex flex-col rounded-md border border-dashed border-white/[0.22] p-6 md:p-10">
           <div className="mb-[18px] inline-flex w-fit rounded-[3px] border border-white/25 px-2.5 py-[5px] text-[11px] font-bold uppercase tracking-wide text-white/75">
             V pripravi
           </div>

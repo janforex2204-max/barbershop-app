@@ -3,8 +3,8 @@ import Image from "next/image";
 
 export function Footer() {
   return (
-    <footer className="flex flex-col justify-between bg-fillio-dark px-20 pb-[50px] pt-20">
-      <div className="flex items-start justify-between">
+    <footer className="flex flex-col justify-between bg-fillio-dark px-5 pb-10 pt-14 md:px-20 md:pb-[50px] md:pt-20">
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-10 md:gap-0">
         <div className="max-w-[340px]">
           <Image
             src="/logo.png"
@@ -19,7 +19,11 @@ export function Footer() {
           </p>
         </div>
 
-        <div className="flex gap-[90px]">
+        {/* Prej EN flex vrstica s fiksnim gap-[90px] med 4 stolpci - na
+            mobilnem je to daleč preseglo širino zaslona (glej pogovor s
+            Claude, isti razred napake kot glava). Pod md 2x2 mreža, od md
+            navzgor nazaj izvirna vrsta. */}
+        <div className="grid grid-cols-2 gap-x-8 gap-y-10 md:flex md:gap-[90px]">
           <div>
             <div className="mb-5 text-[13px] font-bold uppercase tracking-wide text-white/40">
               Produkt
@@ -71,7 +75,7 @@ export function Footer() {
 
       <div>
         <div className="mb-7 h-px bg-white/[0.08]" />
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
           <div className="text-[13px] text-white/40">
             © {new Date().getFullYear()} Fillio. Vse pravice pridržane.
           </div>

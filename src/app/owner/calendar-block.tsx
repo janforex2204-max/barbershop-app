@@ -40,6 +40,7 @@ export default function CalendarBlock({
     >
       <Link
         href={href}
+        scroll={false}
         title={`${appt.time} - ${appt.customerName} (${appt.service})`}
         className="absolute inset-0 rounded px-1 py-0.5 overflow-hidden text-[10px] leading-tight text-white hover:brightness-110 transition-[filter]"
         style={{ background: color }}

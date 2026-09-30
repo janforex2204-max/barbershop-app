@@ -73,6 +73,7 @@ export default function WeekCalendar({
         <div className="flex items-center justify-between mb-3">
           <Link
             href={`/owner?date=${selectedDate}&view=week&week=${shiftWeek(weekStart, -1)}`}
+            scroll={false}
             className="p-1.5 rounded hover:bg-ink-soft text-cream-dim hover:text-cream"
           >
             <ChevronLeft size={16} />
@@ -80,6 +81,7 @@ export default function WeekCalendar({
           <span className="font-display text-base text-cream capitalize">{weekLabel(weekStart)}</span>
           <Link
             href={`/owner?date=${selectedDate}&view=week&week=${shiftWeek(weekStart, 1)}`}
+            scroll={false}
             className="p-1.5 rounded hover:bg-ink-soft text-cream-dim hover:text-cream"
           >
             <ChevronRight size={16} />
@@ -97,6 +99,7 @@ export default function WeekCalendar({
               <Link
                 key={date}
                 href={`/owner?date=${date}&view=week&week=${weekStart}`}
+                scroll={false}
                 className={`flex flex-col items-center py-1 rounded-md border text-xs ${
                   isSelected
                     ? "border-gold bg-selected text-cream"
@@ -115,7 +118,14 @@ export default function WeekCalendar({
         {/* Drsna urna mreža - relative/absolute pozicioniranje (ne CSS grid
             vrstice), da lahko termin sega na poljubno minuto/trajanje, ne le na
             fiksne urne vrstice. */}
-        <div className="overflow-y-auto border-t border-border-soft" style={{ maxHeight: 600 }}>
+        {/* overscroll-y-contain - brez tega scroll ob doseženi zgornji/spodnji
+            meji te notranje mreže "uide" na CELO stran (privzeto browser
+            scroll-chaining vedenje, glej pogovor s Claude - opazno predvsem
+            pri trackpadu). */}
+        <div
+          className="overflow-y-auto overscroll-y-contain border-t border-border-soft"
+          style={{ maxHeight: 600 }}
+        >
           <div
             className="grid gap-px relative"
             style={{ gridTemplateColumns: `${TIME_GUTTER_PX}px repeat(7, 1fr)`, height: gridHeight }}

@@ -35,7 +35,7 @@ const steps = [
 
 export function HowItWorks() {
   return (
-    <section id="kako-deluje" className="bg-fillio-light px-20 py-[140px] text-fillio-dark">
+    <section id="kako-deluje" className="bg-fillio-light px-5 py-16 md:px-20 md:py-[140px] text-fillio-dark">
       <div className="mb-[26px] flex items-center gap-[10px]">
         <span className="block h-[6px] w-[22px] bg-fillio-dark" />
         <span className="block h-[6px] w-[22px] bg-fillio-dark" />
@@ -46,28 +46,28 @@ export function HowItWorks() {
         </span>
       </div>
 
-      <h2 className="mb-[22px] max-w-[780px] font-display text-[46px] font-semibold leading-[1.15] tracking-[-0.5px]">
+      <h2 className="mb-[22px] max-w-[780px] font-display text-[28px] md:text-[46px] font-semibold leading-[1.2] md:leading-[1.15] tracking-[-0.5px]">
         Vse, kar vaš posel potrebuje za urejen urnik — na enem mestu.
       </h2>
 
-      <p className="mb-[90px] max-w-[640px] text-lg leading-[1.65] text-fillio-dark/60">
+      <p className="mb-12 md:mb-[90px] max-w-[640px] text-base md:text-lg leading-[1.65] text-fillio-dark/60">
         Fillio ni le obrazec za rezervacije. Je celoten sistem za upravljanje
         vašega urnika, ekipe in strank — nastavljen natanko po meri vaše
         dejavnosti.
       </p>
 
-      <div className="flex flex-col gap-14">
+      <div className="flex flex-col gap-10 md:gap-14">
         {steps.map((step) => (
-          <div key={step.n} className="grid grid-cols-[56px_1fr] gap-x-10">
+          <div key={step.n} className="grid grid-cols-[40px_1fr] md:grid-cols-[56px_1fr] gap-x-5 md:gap-x-10">
             <div className="flex items-baseline gap-2">
-              <div className={`font-sans text-[40px] font-extrabold leading-none ${step.numColor}`}>
+              <div className={`font-sans text-[28px] md:text-[40px] font-extrabold leading-none ${step.numColor}`}>
                 {step.n}
               </div>
               <div className={`h-[9px] w-[9px] ${step.dotColor}`} />
             </div>
             <div>
-              <h3 className="mb-[14px] mt-1 text-2xl font-bold">{step.title}</h3>
-              <p className="mb-[18px] max-w-[660px] text-[17px] leading-[1.65] text-fillio-dark/62">
+              <h3 className="mb-[14px] mt-1 text-xl md:text-2xl font-bold">{step.title}</h3>
+              <p className="mb-[18px] max-w-[660px] text-[15px] md:text-[17px] leading-[1.65] text-fillio-dark/62">
                 {step.body}
               </p>
               <div className="flex flex-wrap gap-[10px]">

@@ -27,7 +27,7 @@ const faqs = [
 
 export function FAQ() {
   return (
-    <section id="faq" className="bg-fillio-light px-20 py-[140px] text-fillio-dark">
+    <section id="faq" className="bg-fillio-light px-5 py-16 md:px-20 md:py-[140px] text-fillio-dark">
       <div className="mb-[26px] flex items-center gap-[10px]">
         <span className="block h-[6px] w-[22px] bg-fillio-dark" />
         <span className="block h-[6px] w-[22px] bg-fillio-dark" />
@@ -38,11 +38,11 @@ export function FAQ() {
         </span>
       </div>
 
-      <h2 className="mb-[70px] max-w-[780px] font-display text-[46px] font-semibold leading-[1.15] tracking-[-0.5px]">
+      <h2 className="mb-10 md:mb-[70px] max-w-[780px] font-display text-[28px] md:text-[46px] font-semibold leading-[1.2] md:leading-[1.15] tracking-[-0.5px]">
         Vprašanja, ki jih dobimo največkrat.
       </h2>
 
-      <div className="grid grid-cols-2 gap-x-16 gap-y-11">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-8 md:gap-y-11">
         {faqs.map((item) => (
           <div key={item.q} className="border-b border-fillio-dark/10 pb-[30px]">
             <h3 className="mb-2.5 text-[19px] font-bold">{item.q}</h3>

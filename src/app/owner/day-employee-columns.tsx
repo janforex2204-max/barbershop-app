@@ -67,6 +67,7 @@ export default function DayEmployeeColumns({
       <div className="flex items-center justify-between mb-3">
         <Link
           href={`/owner?date=${prevDate}&view=week&week=${weekStartOf(prevDate)}`}
+          scroll={false}
           className="p-1.5 rounded hover:bg-ink-soft text-cream-dim hover:text-cream"
         >
           <ChevronLeft size={16} />
@@ -74,6 +75,7 @@ export default function DayEmployeeColumns({
         <span className="font-display text-base text-cream capitalize">{dayLabel(selectedDate)}</span>
         <Link
           href={`/owner?date=${nextDate}&view=week&week=${weekStartOf(nextDate)}`}
+          scroll={false}
           className="p-1.5 rounded hover:bg-ink-soft text-cream-dim hover:text-cream"
         >
           <ChevronRight size={16} />
@@ -103,7 +105,11 @@ export default function DayEmployeeColumns({
         ))}
       </div>
 
-      <div className="overflow-y-auto border-t border-border-soft" style={{ maxHeight: 600 }}>
+      {/* overscroll-y-contain - glej isto opombo v week-calendar.tsx. */}
+      <div
+        className="overflow-y-auto overscroll-y-contain border-t border-border-soft"
+        style={{ maxHeight: 600 }}
+      >
         <div
           className="grid gap-px relative"
           style={{ gridTemplateColumns: `${TIME_GUTTER_PX}px repeat(${columns.length}, 1fr)`, height: gridHeight }}
