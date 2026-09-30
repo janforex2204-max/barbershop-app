@@ -22,6 +22,7 @@ import AppointmentsHeader from "./appointments-header";
 import { CalendarBookingProvider } from "./calendar-booking-context";
 import NotificationsPanel from "./notifications-panel";
 import NotificationSettings from "./notification-settings";
+import OwnerAutoRefresh from "./owner-auto-refresh";
 import MonthCalendar from "./month-calendar";
 import WeekCalendar from "./week-calendar";
 import WaitlistOffer from "./waitlist-offer";
@@ -344,10 +345,15 @@ export default async function OwnerDashboard({
       data-design="v2"
       className="min-h-screen bg-ink text-cream font-sans px-6 py-10"
     >
+      <OwnerAutoRefresh />
+      {/* Logotip NAMENOMA izven max-w-2xl stolpca spodaj (ne znotraj) - tako
+          je poravnan na LEVI ROB CELE STRANI (px-6 zgornjega ovojnika), ne na
+          rob centriranega stolpca, ki je na širokih zaslonih sam vizualno
+          "na sredini" (glej pogovor s Claude - "trenutna pozicija, centriran"). */}
+      <div className="mb-6">
+        <PoweredBy size="lg" />
+      </div>
       <div className="max-w-2xl mx-auto">
-        <div className="mb-4">
-          <PoweredBy size="lg" />
-        </div>
         {/* relative SAMO na tem info bloku (ne na celi strani) - sidro za
             absolutno pozicioniran stranski stolpec spodaj (xl+), da ta NI
             del normalnega toka in torej ne vpliva na višino/scroll ostanka

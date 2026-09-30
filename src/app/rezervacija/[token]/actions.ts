@@ -1,9 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CANCELLATION_NOTICE_HOURS, isPastCancellationDeadline } from "@/lib/constants";
 import { notifyAffectedCustomersOfCancellation } from "@/lib/cancellation";
+import { OWNER_CALENDAR_TAG } from "../../owner/cached-queries";
 import {
   resolveDayWindow,
   resolveDayBreak,
@@ -50,6 +51,11 @@ export async function cancelBookingByToken(token: string): Promise<{ error?: str
   // čakajoče stranke o sprostitvi, ne glede na to, KDO je odpovedal.
   await notifyAffectedCustomersOfCancellation(admin, appt);
 
+  // KRITIČNO (bilo je bug, glej pogovor s Claude - celovita revizija
+  // zmogljivosti): ta JAVNA (strankina) pot ni invalidirala /owner
+  // predpomnilnika - lastnikov koledar je zato prikazoval odpovedani
+  // termin kot še vedno rezerviran do naravnega izteka cache okna.
+  updateTag(OWNER_CALENDAR_TAG);
   revalidatePath(`/rezervacija/${token}`);
   return {};
 }
@@ -149,6 +155,8 @@ export async function rescheduleBookingByToken(
     return { error: error.message };
   }
 
+  // Isti razlog kot cancelBookingByToken zgoraj.
+  updateTag(OWNER_CALENDAR_TAG);
   revalidatePath(`/rezervacija/${token}`);
   return {};
 }

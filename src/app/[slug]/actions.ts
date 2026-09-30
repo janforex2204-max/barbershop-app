@@ -1,6 +1,7 @@
 "use server";
 
 import { randomBytes } from "crypto";
+import { updateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
@@ -24,6 +25,7 @@ import {
   ANY_EMPLOYEE,
   type EmployeeBusyRow,
 } from "@/lib/employee-availability";
+import { OWNER_CALENDAR_TAG } from "../owner/cached-queries";
 import type { SalonDayHours } from "@/types/database.types";
 
 // KRITIČNO: salon_id se za VSAK klic izpelje TUKAJ, na strežniku, iz `slug`
@@ -453,6 +455,16 @@ export async function bookAppointment(
     }
   }
 
+  // KRITIČNO (bilo je bug, glej pogovor s Claude - celovita revizija
+  // zmogljivosti): JAVNA pot (ta funkcija) je bila edina, ki NI invalidirala
+  // /owner predpomnilnika (getCachedWeekData/getCachedDayData/
+  // getCachedMonthOverview, glej owner/cached-queries.ts) - lastnikov
+  // koledar je zato PRIKAZOVAL ZASTARELO stanje do naravnega izteka okna
+  // (20-30s), ne glede na to, da je bila nova rezervacija ŽE zapisana v
+  // bazo. Brez tega klica bi tudi periodično osveževanje (owner-page.tsx)
+  // pogosto postreglo star predpomnjen odgovor.
+  updateTag(OWNER_CALENDAR_TAG);
+
   await notifyOwnerOfBooking(salonId, { ...input, employeeName });
   if (email) {
     await notifyCustomerOfBooking(email, {
@@ -620,6 +632,11 @@ export async function joinWaitlist(
   if (error) {
     return { error: error.message };
   }
+
+  // OWNER_CALENDAR_TAG pokriva tudi waitlist (glej getCachedMonthOverview/
+  // getCachedDayData v owner/cached-queries.ts) - isti razlog kot
+  // bookAppointment zgoraj.
+  updateTag(OWNER_CALENDAR_TAG);
 
   return {};
 }
