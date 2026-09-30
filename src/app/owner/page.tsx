@@ -19,6 +19,7 @@ import {
 import { nextAvailableDayAfterToday } from "@/lib/availability";
 import type { WeekAppointment } from "@/lib/week-layout";
 import AppointmentsHeader from "./appointments-header";
+import { CalendarBookingProvider } from "./calendar-booking-context";
 import NotificationsPanel from "./notifications-panel";
 import NotificationSettings from "./notification-settings";
 import MonthCalendar from "./month-calendar";
@@ -405,25 +406,33 @@ export default async function OwnerDashboard({
           </Link>
         </div>
 
-        {view === "week" ? (
-          <WeekCalendar
-            weekStart={weekStart}
-            selectedDate={selectedDate}
-            today={today}
-            appointments={weekAppointments}
-            employees={activeEmployeesForWeek}
-            salonHours={ownerRow.hours}
-          />
-        ) : (
-          <MonthCalendar
-            monthStr={monthStr}
-            selectedDate={selectedDate}
-            today={today}
-            countsByDate={countsByDate}
-            waitingDates={waitingDates}
-            salonHours={ownerRow.hours}
-          />
-        )}
+        {/* CalendarBookingProvider - omogoča klik na prosto uro v tedenskem/
+            dnevnem pogledu (glej clickable-day-column.tsx), da odpre
+            ManualBookingForm kot modal, predizpolnjen z datumom/uro/
+            zaposlenim (glej pogovor s Claude). MonthCalendar te
+            funkcionalnosti ne uporablja (brez urne mreže), a je neškodljivo
+            zajet v isti ovojnik. */}
+        <CalendarBookingProvider salonId={salonId} salonHours={ownerRow.hours}>
+          {view === "week" ? (
+            <WeekCalendar
+              weekStart={weekStart}
+              selectedDate={selectedDate}
+              today={today}
+              appointments={weekAppointments}
+              employees={activeEmployeesForWeek}
+              salonHours={ownerRow.hours}
+            />
+          ) : (
+            <MonthCalendar
+              monthStr={monthStr}
+              selectedDate={selectedDate}
+              today={today}
+              countsByDate={countsByDate}
+              waitingDates={waitingDates}
+              salonHours={ownerRow.hours}
+            />
+          )}
+        </CalendarBookingProvider>
 
         {waitlistError ? (
           <p className="text-sm text-rose mb-10">

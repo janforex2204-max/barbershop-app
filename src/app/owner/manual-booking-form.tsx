@@ -8,6 +8,9 @@ import {
   resolveDayWindow,
   resolveDayBreak,
   computeFreeSlots,
+  computeGapMinutes,
+  toMinutes,
+  toHHMM,
   DEFAULT_SERVICE_DURATION_MINUTES,
 } from "@/lib/availability";
 import { busyForEmployee, type EmployeeBusyRow } from "@/lib/employee-availability";
@@ -21,11 +24,19 @@ const initialState: ManualBookingState = {};
 
 export default function ManualBookingForm({
   initialDate,
+  initialTime,
+  initialEmployeeId,
   salonId,
   salonHours,
   onClose,
 }: {
   initialDate: string;
+  // Predizpolnjena ura/zaposleni - klik na PROSTO uro v tedenskem/dnevnem
+  // koledarju (glej clickable-day-column.tsx, calendar-booking-context.tsx).
+  // Neobvezna - obstoječi vstop "+ Dodaj termin ročno" (appointments-
+  // header.tsx) ju ne pošlje, vedenje zanj ostane nespremenjeno.
+  initialTime?: string;
+  initialEmployeeId?: string | null;
   salonId: string;
   salonHours: SalonDayHours[] | null;
   onClose: () => void;
@@ -35,9 +46,9 @@ export default function ManualBookingForm({
   const [services, setServices] = useState<Service[]>([]);
   const [service, setService] = useState("");
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [employeeId, setEmployeeId] = useState("");
+  const [employeeId, setEmployeeId] = useState(initialEmployeeId ?? "");
   const [date, setDate] = useState(initialDate);
-  const [time, setTime] = useState("");
+  const [time, setTime] = useState(initialTime ?? "");
   // Zasedeni intervali (čas + trajanje + kateremu zaposlenemu pripadajo) -
   // isti tip in isti izračun kot na javni strani (glej
   // src/lib/availability.ts, src/lib/employee-availability.ts), zato
@@ -143,7 +154,11 @@ export default function ManualBookingForm({
       if (cancelled) return;
       if (!error && data) {
         setEmployees(data);
-        if (data.length === 1) setEmployeeId(data[0].id);
+        // Samodejna izbira SAMO, če ni že predizpolnjen (klik na koledarju
+        // je morda namerno kliknil "Ni dodeljeno" stolpec ali izven
+        // zaposlenega konteksta - initialEmployeeId je v tem primeru null,
+        // ne prazen niz, in se torej NE prepiše tu).
+        if (data.length === 1 && initialEmployeeId === undefined) setEmployeeId(data[0].id);
       }
     }
     loadEmployees();
@@ -214,6 +229,37 @@ export default function ManualBookingForm({
   const busyWithBreak = dayBreak ? [...busyForSelection, dayBreak] : busyForSelection;
   const freeTimes = computeFreeSlots(dayWindow, busyWithBreak, selectedServiceDuration);
   const validDay = dayWindow !== null;
+  const timeIsBookable = time !== "" && freeTimes.includes(time);
+
+  // Vrzel OD izbranega časa naprej (glej pogovor s Claude - klik na prosto
+  // uro v koledarju) - koliko minut je na voljo, preden nastopi naslednji
+  // zaseden termin/premor/konec delovnika. null, dokler čas še ni izbran
+  // (obstoječi "+ Dodaj termin ročno" vstop brez prefill-a) - v tem primeru
+  // spodnji izbirnik storitev ostane popolnoma nespremenjen (brez oznak).
+  const gapMinutes = time ? computeGapMinutes(dayWindow, busyWithBreak, time) : null;
+
+  // Za VSAKO storitev (ne samo izbrano) - ali se prilega vrzeli PRI
+  // IZBRANEM ČASU. Storitve, ki NE ustrezajo, ostanejo VIDNE (onemogočene,
+  // ne skrite) z razlago, kdaj bi bila ta storitev na voljo - glej pogovor s
+  // Claude, cilj je takojšen pregled brez ročnega računanja med klicem.
+  function serviceFitInfo(s: Service): { fits: boolean; label: string } {
+    const duration = s.duration_minutes ?? DEFAULT_SERVICE_DURATION_MINUTES;
+    const base = s.name + (s.duration_minutes ? ` (${s.duration_minutes} min)` : "");
+    if (gapMinutes === null || duration <= gapMinutes) {
+      return { fits: true, label: base };
+    }
+
+    const gapEndLabel = toHHMM(toMinutes(time) + gapMinutes);
+    const requiredEndLabel = toHHMM(toMinutes(time) + duration);
+    const nextForService = computeFreeSlots(dayWindow, busyWithBreak, duration).find((t) => t > time);
+    const nextInfo = nextForService
+      ? ` Naslednji prost termin zanjo: ${nextForService}.`
+      : " Danes zanjo ni več prostega termina.";
+    return {
+      fits: false,
+      label: `${base} — ne ustreza (na voljo do ${gapEndLabel}, traja do ${requiredEndLabel}).${nextInfo}`,
+    };
+  }
 
   return (
     <div className="border border-border rounded-lg bg-panel p-5 mb-4">
@@ -278,12 +324,19 @@ export default function ManualBookingForm({
           required
           className={inputClass}
         >
-          {services.map((s) => (
-            <option key={s.id} value={s.name}>
-              {s.name}
-              {s.duration_minutes ? ` (${s.duration_minutes} min)` : ""}
-            </option>
-          ))}
+          {services.map((s) => {
+            const info = serviceFitInfo(s);
+            return (
+              <option
+                key={s.id}
+                value={s.name}
+                disabled={!info.fits}
+                style={!info.fits ? { color: "var(--color-rose)" } : undefined}
+              >
+                {info.label}
+              </option>
+            );
+          })}
         </select>
 
         {/* Prikaže se SAMO pri 2+ aktivnih zaposlenih - pri 0 ostane
@@ -360,7 +413,7 @@ export default function ManualBookingForm({
           disabled={
             pending ||
             !validDay ||
-            !time ||
+            !timeIsBookable ||
             freeTimes.length === 0 ||
             (employees.length > 1 && !employeeId)
           }

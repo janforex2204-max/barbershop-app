@@ -14,6 +14,7 @@ import {
 } from "@/lib/week-layout";
 import type { SalonDayHours } from "@/types/database.types";
 import CalendarBlock from "./calendar-block";
+import ClickableDayColumn from "./clickable-day-column";
 import DayEmployeeColumns from "./day-employee-columns";
 
 const WEEKDAY_LABELS = ["Pon", "Tor", "Sre", "Čet", "Pet", "Sob", "Ned"];
@@ -55,6 +56,13 @@ export default function WeekCalendar({
   // 0/1 zaposlenem ni česa razdeliti po zaposlenem - en implicit stolpec na
   // OBEH širinah, torej ostane spodnja (dnevi-kot-stolpci) postavitev.
   const showEmployeeColumns = employees.length >= 2;
+
+  // Za predizpolnitev zaposlenega ob kliku na prosto uro (glej pogovor s
+  // Claude, clickable-day-column.tsx) - v TEM (dnevi-kot-stolpci) prikazu ni
+  // stolpca PO zaposlenem, zato je smiselno predizpolniti SAMO, če obstaja
+  // natanko EN aktiven zaposleni (nedvoumno) - sicer null (obrazec odpre s
+  // praznim izbirnikom, lastnik izbere sam).
+  const soleEmployeeId = employees.length === 1 ? employees[0].id : null;
 
   return (
     <div className="week-calendar-container border border-border rounded-lg p-4 mb-8 bg-calendar-panel">
@@ -126,48 +134,64 @@ export default function WeekCalendar({
           className="overflow-y-auto overscroll-y-contain border-t border-border-soft"
           style={{ maxHeight: 600 }}
         >
-          <div
-            className="grid gap-px relative"
-            style={{ gridTemplateColumns: `${TIME_GUTTER_PX}px repeat(7, 1fr)`, height: gridHeight }}
-          >
-            <div className="relative">
-              {hourMarks.map((m) => (
-                <span
-                  key={m}
-                  className="absolute right-1.5 -translate-y-1/2 text-[10px] text-cream-faint"
-                  style={{ top: (m - startMinutes) * PX_PER_MINUTE }}
-                >
-                  {formatHourLabel(m)}
-                </span>
-              ))}
-            </div>
+          {/* py-2 - BREZ tega je prva/zadnja urna oznaka spodaj (-translate-y-1/2,
+              centrirana na svojo uro-črto) na sami zgornji/spodnji meji
+              gridHeight polovico svoje višine odrezala ob robu scroll-area
+              (glej pogovor s Claude - "prva ura se prekriva/skriva"). Ovojnik
+              (ne sam grid, ki ima height: gridHeight - box-sizing: border-box
+              bi padding ODŠTEL od te višine) doda varen prostor na OBEH
+              koncih, ne da bi vplival na time-to-pixel izračune spodaj (vsi
+              "top" ostanejo relativni na notranji .relative grid). */}
+          <div className="py-2">
+            <div
+              className="grid gap-px relative"
+              style={{ gridTemplateColumns: `${TIME_GUTTER_PX}px repeat(7, 1fr)`, height: gridHeight }}
+            >
+              <div className="relative">
+                {hourMarks.map((m) => (
+                  <span
+                    key={m}
+                    className="absolute right-1.5 -translate-y-1/2 text-[10px] text-cream-faint"
+                    style={{ top: (m - startMinutes) * PX_PER_MINUTE }}
+                  >
+                    {formatHourLabel(m)}
+                  </span>
+                ))}
+              </div>
 
-            {dates.map((date) => {
-              const laidOut = layoutDayAppointments(appointmentsByDate.get(date) ?? []);
-              return (
-                <div key={date} className="relative border-l border-border-soft">
-                  {hourMarks.map((m) => (
-                    <div
-                      key={m}
-                      className="absolute w-full border-t border-border-soft/50"
-                      style={{ top: (m - startMinutes) * PX_PER_MINUTE }}
-                    />
-                  ))}
-                  {laidOut.map((appt) => (
-                    <CalendarBlock
-                      key={appt.id}
-                      appt={appt}
-                      href={`/owner?date=${date}&view=week&week=${weekStart}`}
-                      top={(appt.startMinutes - startMinutes) * PX_PER_MINUTE}
-                      height={Math.max(appt.durationMinutes * PX_PER_MINUTE, MIN_BLOCK_HEIGHT)}
-                      leftPct={appt.lane * (100 / appt.laneCount)}
-                      widthPct={100 / appt.laneCount}
-                      color={resolveEmployeeColor(appt.employeeId, employees)}
-                    />
-                  ))}
-                </div>
-              );
-            })}
+              {dates.map((date) => {
+                const laidOut = layoutDayAppointments(appointmentsByDate.get(date) ?? []);
+                return (
+                  <ClickableDayColumn
+                    key={date}
+                    date={date}
+                    employeeId={soleEmployeeId}
+                    startMinutes={startMinutes}
+                    endMinutes={endMinutes}
+                  >
+                    {hourMarks.map((m) => (
+                      <div
+                        key={m}
+                        className="absolute w-full border-t border-border-soft/50"
+                        style={{ top: (m - startMinutes) * PX_PER_MINUTE }}
+                      />
+                    ))}
+                    {laidOut.map((appt) => (
+                      <CalendarBlock
+                        key={appt.id}
+                        appt={appt}
+                        href={`/owner?date=${date}&view=week&week=${weekStart}`}
+                        top={(appt.startMinutes - startMinutes) * PX_PER_MINUTE}
+                        height={Math.max(appt.durationMinutes * PX_PER_MINUTE, MIN_BLOCK_HEIGHT)}
+                        leftPct={appt.lane * (100 / appt.laneCount)}
+                        widthPct={100 / appt.laneCount}
+                        color={resolveEmployeeColor(appt.employeeId, employees)}
+                      />
+                    ))}
+                  </ClickableDayColumn>
+                );
+              })}
+            </div>
           </div>
         </div>
 

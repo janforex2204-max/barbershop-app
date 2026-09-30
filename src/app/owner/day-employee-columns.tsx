@@ -13,6 +13,7 @@ import {
   type WeekCalendarEmployee,
 } from "@/lib/week-layout";
 import CalendarBlock from "./calendar-block";
+import ClickableDayColumn from "./clickable-day-column";
 
 // Dnevni pogled, stolpci = zaposleni (vzorec kot Fresha, glej pogovor s
 // Claude, item 3) - prikazano SAMO na lg:+ zaslonih pri 2+ aktivnih
@@ -110,56 +111,66 @@ export default function DayEmployeeColumns({
         className="overflow-y-auto overscroll-y-contain border-t border-border-soft"
         style={{ maxHeight: 600 }}
       >
-        <div
-          className="grid gap-px relative"
-          style={{ gridTemplateColumns: `${TIME_GUTTER_PX}px repeat(${columns.length}, 1fr)`, height: gridHeight }}
-        >
-          <div className="relative">
-            {hourMarks.map((m) => (
-              <span
-                key={m}
-                className="absolute right-1.5 -translate-y-1/2 text-[10px] text-cream-faint"
-                style={{ top: (m - startMinutes) * PX_PER_MINUTE }}
-              >
-                {formatHourLabel(m)}
-              </span>
-            ))}
-          </div>
+        {/* py-2 - glej isto opombo v week-calendar.tsx ("prva ura se
+            prekriva/skriva" - centrirana urna oznaka na robu gridHeight). */}
+        <div className="py-2">
+          <div
+            className="grid gap-px relative"
+            style={{ gridTemplateColumns: `${TIME_GUTTER_PX}px repeat(${columns.length}, 1fr)`, height: gridHeight }}
+          >
+            <div className="relative">
+              {hourMarks.map((m) => (
+                <span
+                  key={m}
+                  className="absolute right-1.5 -translate-y-1/2 text-[10px] text-cream-faint"
+                  style={{ top: (m - startMinutes) * PX_PER_MINUTE }}
+                >
+                  {formatHourLabel(m)}
+                </span>
+              ))}
+            </div>
 
-          {columns.map((col) => {
-            const colAppointments = dayAppointments.filter((a) =>
-              col.id === null ? !a.employeeId || !activeIds.has(a.employeeId) : a.employeeId === col.id
-            );
-            // layoutDayAppointments (lane-razdelitev za prekrivanje) je tu
-            // večinoma no-op - EN zaposleni ne more imeti dveh sočasnih
-            // terminov (unique index, glej supabase/schema.sql) - a se
-            // vseeno uporabi dosledno (isti, že preverjen algoritem), ker
-            // "Ni dodeljeno" stolpec TO prekrivanje dejansko lahko ima.
-            const laidOut = layoutDayAppointments(colAppointments);
-            return (
-              <div key={col.id ?? "unassigned"} className="relative border-l border-border-soft">
-                {hourMarks.map((m) => (
-                  <div
-                    key={m}
-                    className="absolute w-full border-t border-border-soft/50"
-                    style={{ top: (m - startMinutes) * PX_PER_MINUTE }}
-                  />
-                ))}
-                {laidOut.map((appt) => (
-                  <CalendarBlock
-                    key={appt.id}
-                    appt={appt}
-                    href={`/owner?date=${selectedDate}&view=week&week=${weekStart}`}
-                    top={(appt.startMinutes - startMinutes) * PX_PER_MINUTE}
-                    height={Math.max(appt.durationMinutes * PX_PER_MINUTE, MIN_BLOCK_HEIGHT)}
-                    leftPct={appt.lane * (100 / appt.laneCount)}
-                    widthPct={100 / appt.laneCount}
-                    color={col.color}
-                  />
-                ))}
-              </div>
-            );
-          })}
+            {columns.map((col) => {
+              const colAppointments = dayAppointments.filter((a) =>
+                col.id === null ? !a.employeeId || !activeIds.has(a.employeeId) : a.employeeId === col.id
+              );
+              // layoutDayAppointments (lane-razdelitev za prekrivanje) je tu
+              // večinoma no-op - EN zaposleni ne more imeti dveh sočasnih
+              // terminov (unique index, glej supabase/schema.sql) - a se
+              // vseeno uporabi dosledno (isti, že preverjen algoritem), ker
+              // "Ni dodeljeno" stolpec TO prekrivanje dejansko lahko ima.
+              const laidOut = layoutDayAppointments(colAppointments);
+              return (
+                <ClickableDayColumn
+                  key={col.id ?? "unassigned"}
+                  date={selectedDate}
+                  employeeId={col.id}
+                  startMinutes={startMinutes}
+                  endMinutes={endMinutes}
+                >
+                  {hourMarks.map((m) => (
+                    <div
+                      key={m}
+                      className="absolute w-full border-t border-border-soft/50"
+                      style={{ top: (m - startMinutes) * PX_PER_MINUTE }}
+                    />
+                  ))}
+                  {laidOut.map((appt) => (
+                    <CalendarBlock
+                      key={appt.id}
+                      appt={appt}
+                      href={`/owner?date=${selectedDate}&view=week&week=${weekStart}`}
+                      top={(appt.startMinutes - startMinutes) * PX_PER_MINUTE}
+                      height={Math.max(appt.durationMinutes * PX_PER_MINUTE, MIN_BLOCK_HEIGHT)}
+                      leftPct={appt.lane * (100 / appt.laneCount)}
+                      widthPct={100 / appt.laneCount}
+                      color={col.color}
+                    />
+                  ))}
+                </ClickableDayColumn>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

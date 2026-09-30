@@ -53,12 +53,15 @@ const WEEKDAY_NAMES = [
   "Sobota",
 ];
 
-function toMinutes(hhmm: string): number {
+// Izvoženo (prej zasebno) - owner/manual-booking-form.tsx ju potrebuje za
+// izračun "vrzeli" pri kliku na koledar (glej computeGapMinutes spodaj in
+// pogovor s Claude).
+export function toMinutes(hhmm: string): number {
   const [h, m] = hhmm.split(":").map(Number);
   return h * 60 + m;
 }
 
-function toHHMM(totalMinutes: number): string {
+export function toHHMM(totalMinutes: number): string {
   const h = Math.floor(totalMinutes / 60);
   const m = totalMinutes % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
@@ -175,6 +178,32 @@ export function computeFreeSlots(
   }
 
   return slots;
+}
+
+// Razpoložljiva "vrzel" OD danega časa naprej, v minutah - do naslednjega
+// zasedenega intervala/premora ALI konca delovnika, karkoli pride prej.
+// Uporabljeno na /owner (klik na prosto uro v tedenskem/dnevnem koledarju,
+// glej pogovor s Claude - manual-booking-form.tsx) za takojšen prikaz,
+// katere storitve se dejansko prilegajo na TO točko, brez ročnega računanja
+// med telefonskim klicem. null, če dan sploh ni odprt; 0, če je `fromTime`
+// že na/izven roba delovnika (npr. konec delovnika).
+export function computeGapMinutes(
+  window: DayWindow | null,
+  busy: BusyInterval[],
+  fromTime: string
+): number | null {
+  if (!window) return null;
+
+  const from = toMinutes(fromTime);
+  const dayEnd = toMinutes(window.end);
+  if (from >= dayEnd) return 0;
+
+  let boundary = dayEnd;
+  for (const b of busy) {
+    const busyStart = toMinutes(b.time);
+    if (busyStart >= from && busyStart < boundary) boundary = busyStart;
+  }
+  return boundary - from;
 }
 
 // Enaka logika kot computeFreeSlots, a za EN konkreten že izbran čas - glej
