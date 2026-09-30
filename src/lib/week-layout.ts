@@ -29,7 +29,11 @@ export type WeekCalendarEmployee = {
 // uvozi DayEmployeeColumns, DayEmployeeColumns bi sicer uvozil nazaj iz
 // week-calendar).
 export const PX_PER_MINUTE = 1.05;
-export const MIN_BLOCK_HEIGHT = 34;
+// 34 -> 52: blok zdaj prikazuje ČASOVNI RAZPON + ime + storitev (storitev se
+// lahko prelomi v 2 vrstici namesto odreza, glej calendar-block.tsx) - 34px
+// je zadoščalo za 3 vrstice, a je storitev v 2. vrstici ob kratkih terminih
+// obrezalo (glej pogovor s Claude, "besedilo storitve se odrezuje").
+export const MIN_BLOCK_HEIGHT = 52;
 export const TIME_GUTTER_PX = 44;
 
 export function formatHourLabel(minutes: number): string {

@@ -14,10 +14,15 @@ import { updateAppointmentNote } from "./actions";
 // Linkovo navigacijo. onClick tu zato NE potrebuje preventDefault/
 // stopPropagation za "pobeg" iz Linka - gumb je ločen element.
 //
-// Nizka OSNOVNA vidnost (opacity), ko opombe ni - vedno prisoten (edini
-// način, da lastnik SPLOH doda prvo opombo), a ne moti blokov brez opombe;
-// poln/opazen, ko opomba JE nastavljena (glej pogovor s Claude - "vidno
-// kot majhna ikona... ob kliku razširi in pokaže polno besedilo").
+// Opazno RAZLIČEN videz glede na stanje (glej pogovor s Claude - prejšnja
+// različica se je zanašala samo na opacity 40 % proti 100 %, kar je bilo
+// na različnih barvah koledarskih blokov (vsak zaposleni ima svojo) v praksi
+// premalo opazno, da bi lastnik na prvi pogled ločil termine z opombo).
+// Z opombo: poln zlat krog (--color-gold - isti barvni žeton kot povsod
+// drugod za "pomembno/izpostavljeno", npr. ura termina) - dosledno opazen
+// NE GLEDE na barvo bloka pod njim. Brez opombe: samo tanek svetel obris
+// brez polnila, nizka opacity - viden dovolj, da je odkrijen (ni popolnoma
+// skrit), a jasno diskretnejši od polnega zlatega kroga.
 export default function AppointmentNoteButton({
   appointmentId,
   initialNote,
@@ -58,11 +63,13 @@ export default function AppointmentNoteButton({
         type="button"
         onClick={openModal}
         title={hasNote ? "Opomba" : "Dodaj opombo"}
-        className={`absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center cursor-pointer transition-opacity ${
-          hasNote ? "bg-ink/70 opacity-100" : "opacity-40 hover:opacity-80"
+        className={`absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full flex items-center justify-center cursor-pointer transition-all ${
+          hasNote
+            ? "bg-gold opacity-100 shadow-sm"
+            : "bg-black/10 border border-white/40 opacity-55 hover:opacity-90 hover:bg-black/25"
         }`}
       >
-        <StickyNote size={8} className="text-white" />
+        <StickyNote size={8} className={hasNote ? "text-ink" : "text-white"} />
       </button>
 
       {open && (

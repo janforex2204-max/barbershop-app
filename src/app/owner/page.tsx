@@ -385,7 +385,15 @@ export default async function OwnerDashboard({
         <LogoUpload initialLogoUrl={ownerRow.logo_url} />
 
         <NotificationSettings current={notificationPreference} />
+      </div>
 
+      {/* Koledarski razdelek NAMENOMA izven max-w-2xl (širši max-w-5xl) - pri
+          672px je bilo pri tedenskem/dnevnem pogledu premalo prostora za
+          daljša imena storitev ("Britje z britvico" ipd.), besedilo se je
+          odrezovalo (glej pogovor s Claude). Preostanek strani (spodaj) ostane
+          pri max-w-2xl - besedilne sekcije (čakalna lista/seznami terminov)
+          berejo bolje pri ožji širini, koledar pa potrebuje več prostora. */}
+      <div className="max-w-5xl mx-auto">
         {/* Preklop mesečni/tedenski pogled - čist URL (?view=), brez client
             JS-a, isti vzorec kot vsa ostala koledarska navigacija na tej
             strani (glej pogovor s Claude - tedenski pogled je DODATNA
@@ -439,7 +447,9 @@ export default async function OwnerDashboard({
             />
           )}
         </CalendarBookingProvider>
+      </div>
 
+      <div className="max-w-2xl mx-auto">
         {waitlistError ? (
           <p className="text-sm text-rose mb-10">
             Napaka pri branju obvestil o prostem terminu: {waitlistError}

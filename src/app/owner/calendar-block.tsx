@@ -52,7 +52,11 @@ export default function CalendarBlock({
           {formatTimeRange(appt.startMinutes, appt.endMinutes)}
         </div>
         <div className="font-semibold truncate">{appt.customerName}</div>
-        <div className="truncate opacity-80">{appt.service}</div>
+        {/* line-clamp-2, NE truncate (eno-vrstični odrez) - daljša imena
+            storitev ("Britje z britvico" ipd.) so se prej odrezovala, zdaj
+            se prelomijo v do 2 vrstici (glej pogovor s Claude - MIN_BLOCK_
+            HEIGHT v week-layout.ts povečan, da ima za to prostor). */}
+        <div className="line-clamp-2 opacity-80">{appt.service}</div>
       </Link>
       <AppointmentNoteButton appointmentId={appt.id} initialNote={appt.ownerNote} />
     </div>
