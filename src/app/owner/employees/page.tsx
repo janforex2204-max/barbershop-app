@@ -48,12 +48,14 @@ export default async function EmployeesPage({
 
   return (
     <div data-theme={salonTheme} className="min-h-screen bg-ink text-cream font-sans px-6 py-10">
+      {/* Logotip NAMENOMA izven max-w-2xl stolpca spodaj - poravnan na LEVI
+          ROB CELE STRANI, ne na rob centriranega stolpca (glej pogovor s
+          Claude, isti popravek na owner/page.tsx). */}
+      <div className="flex items-center gap-3 mb-6">
+        <PoweredBy size="lg" />
+        {!salonTheme && <ThemeToggle />}
+      </div>
       <div className="max-w-2xl mx-auto">
-        <div className="flex items-center gap-3 mb-4">
-          <PoweredBy size="lg" />
-          {!salonTheme && <ThemeToggle />}
-        </div>
-
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="font-display text-2xl text-gold mb-1">Zaposleni</h1>

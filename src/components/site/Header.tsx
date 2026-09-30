@@ -1,18 +1,11 @@
 import Link from "next/link";
-import Image from "next/image";
+import FillioLogo from "@/components/fillio-logo";
 
 export function Header() {
   return (
     <header className="relative z-10 flex h-16 md:h-24 items-center justify-between border-b border-white/10 px-5 md:px-20">
       <Link href="/" className="shrink-0">
-        <Image
-          src="/logo.png"
-          alt="Fillio"
-          width={200}
-          height={46}
-          priority
-          className="h-8 md:h-[46px] w-auto"
-        />
+        <FillioLogo className="h-8 md:h-[46px] w-auto" />
       </Link>
 
       {/* Skrito pod md - na ozkem zaslonu px-20 + gap-11 + 4 povezave ne

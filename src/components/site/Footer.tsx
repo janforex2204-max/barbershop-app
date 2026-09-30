@@ -1,18 +1,12 @@
 import Link from "next/link";
-import Image from "next/image";
+import FillioLogo from "@/components/fillio-logo";
 
 export function Footer() {
   return (
     <footer className="flex flex-col justify-between bg-fillio-dark px-5 pb-10 pt-14 md:px-20 md:pb-[50px] md:pt-20">
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-10 md:gap-0">
         <div className="max-w-[340px]">
-          <Image
-            src="/logo.png"
-            alt="Fillio"
-            width={180}
-            height={40}
-            className="mb-[22px] h-10 w-auto"
-          />
+          <FillioLogo className="mb-[22px] h-10 w-auto" />
           <p className="text-[15px] leading-[1.65] text-white/50">
             Rezervacijski sistem za frizerske in kozmetične salone — in kmalu
             še marsikaj drugega.

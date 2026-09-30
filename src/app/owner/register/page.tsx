@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { Eye, EyeOff } from "lucide-react";
 import { registerOwner } from "./actions";
 import DayHoursEditor, { defaultHours } from "@/components/day-hours-editor";
+import FillioLogo from "@/components/fillio-logo";
 import type { SalonDayHours } from "@/types/database.types";
 
 type Category = "frizerski" | "kozmeticni" | "other" | null;
@@ -137,7 +137,7 @@ export default function RegisterPage() {
 
       {/* top bar */}
       <div className="relative z-10 flex h-24 flex-shrink-0 items-center justify-between border-b border-white/[0.08] px-20">
-        <Image src="/logo.png" alt="Fillio" width={170} height={40} className="h-10 w-auto" />
+        <FillioLogo className="h-10 w-auto" />
         <div className="text-sm text-white/50">
           Že imate račun?{" "}
           <Link href="/owner/login" className="font-bold text-white">

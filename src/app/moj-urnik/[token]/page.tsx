@@ -84,14 +84,15 @@ export default async function MojUrnikPage({
 
   return (
     <div data-theme={salonTheme} className="min-h-screen bg-ink text-cream font-sans px-6 py-10">
+      {/* Logotip NAMENOMA izven max-w-2xl stolpca spodaj - glej isti popravek
+          na owner/page.tsx. */}
+      <div className="flex items-center justify-between mb-6">
+        <PoweredBy size="lg" />
+        {!salonTheme && (
+          <ThemeToggle size={20} className="border border-border bg-ink-field p-2" />
+        )}
+      </div>
       <div className="max-w-2xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <PoweredBy size="lg" />
-          {!salonTheme && (
-            <ThemeToggle size={20} className="border border-border bg-ink-field p-2" />
-          )}
-        </div>
-
         <div className="mb-8">
           <p className="font-display text-3xl text-gold mb-1">{employee.name}</p>
           <h1 className="text-sm font-medium text-cream-dim">Tvoj urnik pri {salon.salon_name}</h1>

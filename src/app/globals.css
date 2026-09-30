@@ -151,31 +151,27 @@ body {
 }
 
 /*
-  Fillio logotip (PoweredBy komponenta) - DVE sliki v markupu (public/logo.png,
-  bel napis, in public/logo-black.png, črn napis - ISTA črka/tealni črtici v
-  obeh, samo barva napisa se razlikuje), preklop MED njima izključno prek te
-  CSS pravila, NE prek JS/React state-a. Privzeto (temno ozadje) viden BEL,
-  skrit ČRN - kadarkoli je ozadje SVETLO (osebna svetla tema NA <html> ALI
-  vsiljena spa tema NA katerikoli bližji predniku), obratno. Isti dve
-  "svetlo ozadje" pravili kot :root[data-theme="light"]/[data-theme="spa"]
-  zgoraj/spodaj - logotip mora slediti ISTIM pogojem kot vsak drug barvni
-  žeton, sicer bi bil bel napis na svetlem spa ozadju enako neviden, ne glede
-  na to, da je <html> morda nastavljen na "dark" (glej pogovor s Claude -
-  spa vsiljena tema že povsod drugod prezre osebno svetlo/temno nastavitev).
+  Fillio logotip (src/components/fillio-logo.tsx) - INLINE SVG (public/
+  fillio-logo.svg, prava vektorska datoteka - prej PNG, glej pogovor s
+  Claude), bel v VSEH temah (lastnikova eksplicitna zahteva - osnovna bela
+  barva znamke se med temami NE spreminja). V SVETLI/spa temi dobi vsaka
+  <path> znotraj PRAVI SVG stroke (ne več drop-shadow() približek - ta je
+  bil nujen, dokler je bil logotip neprozoren raster PNG; zdaj, ko je SVG
+  DEJANSKO del DOM-a, lahko CSS doseže posamezne poti neposredno, kar da
+  enakomeren rob TUDI na ukrivljenih/diagonalnih robovih, npr. "i"/"l"/"o",
+  kjer je bil prejšnji 4-smerni približek vidno robat). vector-effect:
+  non-scaling-stroke - širina obrisa ostane VEDNO enaka v pravih zaslonskih
+  pikslih (1.5px), ne glede na to, pri kateri velikosti (sm/lg, glej
+  powered-by.tsx) je logotip prikazan - SVG viewBox enote bi se sicer
+  skalirale z velikostjo izrisa. V TEMNI temi (privzeto, brez spodnjega
+  pravila) obris NI potreben - bel napis je na temnem ozadju že dovolj viden.
 */
-.logo-mark-white {
-  display: block;
-}
-.logo-mark-black {
-  display: none;
-}
-:root[data-theme="light"] .logo-mark-white,
-[data-theme="spa"] .logo-mark-white {
-  display: none;
-}
-:root[data-theme="light"] .logo-mark-black,
-[data-theme="spa"] .logo-mark-black {
-  display: block;
+:root[data-theme="light"] .fillio-logo-svg path,
+[data-theme="spa"] .fillio-logo-svg path {
+  stroke: #2a2622;
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+  paint-order: stroke fill;
 }
 
 /*
