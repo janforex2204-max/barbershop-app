@@ -2,41 +2,33 @@
 
 import { randomBytes } from "crypto";
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { defaultHours } from "@/lib/default-hours";
 import { EMPLOYEE_COLOR_PALETTE } from "@/lib/week-layout";
+import { OWNER_EMPLOYEES_TAG, getCachedOwnerRow } from "./cached-queries";
+import { resolveApprovedSalonId } from "./actions";
 import type { SalonDayHours } from "@/types/database.types";
-
-// Isti vzorec kot resolveApprovedSalonId v ./services-actions.ts - salon_id
-// NAMENOMA razrešimo tu, s strežniške seje klicatelja, nikoli iz podatkov,
-// ki bi jih poslal klient.
-async function resolveApprovedSalonId(
-  supabase: Awaited<ReturnType<typeof createClient>>
-): Promise<string | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: ownerRow } = await supabase
-    .from("salon_owners")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("status", "approved")
-    .maybeSingle();
-
-  return ownerRow?.id ?? null;
-}
 
 export async function addEmployee(formData: FormData) {
   const supabase = await createClient();
-  const salonId = await resolveApprovedSalonId(supabase);
 
-  if (!salonId) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
     redirect(`/owner/employees?error=${encodeURIComponent("Seja je potekla. Prijavi se znova.")}`);
   }
+
+  // Ena (predpomnjena) poizvedba za salonId IN trenutni urnik salona - prej
+  // dve ločeni, zaporedni poizvedbi na salon_owners (glej pogovor s Claude,
+  // celovita revizija zmogljivosti).
+  const ownerRow = await getCachedOwnerRow(user.id);
+  if (!ownerRow || ownerRow.status !== "approved") {
+    redirect(`/owner/employees?error=${encodeURIComponent("Seja je potekla. Prijavi se znova.")}`);
+  }
+  const salonId = ownerRow.id;
 
   const name = String(formData.get("name") ?? "").trim();
   if (!name) {
@@ -48,13 +40,8 @@ export async function addEmployee(formData: FormData) {
   // pred starim {legacy_text: ...} zapisom nekaterih salonov (glej
   // supabase/schema.sql) - brez nje bi nov zaposleni podedoval pokvarjeno
   // vrednost namesto veljavnega urnika.
-  const { data: ownerRow } = await supabase
-    .from("salon_owners")
-    .select("hours")
-    .eq("id", salonId)
-    .maybeSingle();
   const seedHours: SalonDayHours[] =
-    Array.isArray(ownerRow?.hours) && ownerRow.hours.length > 0 ? ownerRow.hours : defaultHours();
+    Array.isArray(ownerRow.hours) && ownerRow.hours.length > 0 ? ownerRow.hours : defaultHours();
 
   const { count } = await supabase
     .from("employees")
@@ -75,6 +62,7 @@ export async function addEmployee(formData: FormData) {
     redirect(`/owner/employees?error=${encodeURIComponent(error.message)}`);
   }
 
+  updateTag(OWNER_EMPLOYEES_TAG);
   revalidatePath("/owner/employees");
   revalidatePath("/owner");
 }
@@ -101,6 +89,7 @@ export async function updateEmployee(employeeId: string, formData: FormData) {
     redirect(`/owner/employees?error=${encodeURIComponent(error.message)}`);
   }
 
+  updateTag(OWNER_EMPLOYEES_TAG);
   revalidatePath("/owner/employees");
   revalidatePath("/owner");
 }
@@ -132,6 +121,7 @@ export async function updateEmployeeHours(
     return { error: error.message };
   }
 
+  updateTag(OWNER_EMPLOYEES_TAG);
   revalidatePath("/owner/employees");
   return {};
 }
@@ -206,6 +196,7 @@ export async function uploadEmployeePhoto(
     return { error: dbError.message };
   }
 
+  updateTag(OWNER_EMPLOYEES_TAG);
   revalidatePath("/owner/employees");
   return { url: publicUrl };
 }
@@ -232,6 +223,7 @@ export async function regenerateEmployeeScheduleToken(
     return { error: error.message };
   }
 
+  updateTag(OWNER_EMPLOYEES_TAG);
   revalidatePath("/owner/employees");
   return { token };
 }
@@ -256,6 +248,7 @@ export async function updateEmployeeColor(
     return { error: error.message };
   }
 
+  updateTag(OWNER_EMPLOYEES_TAG);
   revalidatePath("/owner/employees");
   revalidatePath("/owner");
   return {};

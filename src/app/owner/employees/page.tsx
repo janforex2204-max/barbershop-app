@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { resolveSalonTheme } from "@/lib/constants";
+import { getCachedOwnerRow, getCachedEmployeesList } from "../cached-queries";
 import { addEmployee, updateEmployee } from "../employees-actions";
 import EmployeeHoursEditor from "./employee-hours-editor";
 import EmployeePhotoUpload from "../employee-photo-upload";
@@ -30,12 +31,11 @@ export default async function EmployeesPage({
   }
 
   // Ista meja izolacije kot na /owner (glej owner/page.tsx) - vsaka
-  // poizvedba spodaj MORA filtrirati po salonId.
-  const { data: ownerRow } = await supabase
-    .from("salon_owners")
-    .select("id, status, category")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  // poizvedba spodaj MORA filtrirati po salonId. getCachedOwnerRow/
+  // getCachedEmployeesList (../cached-queries.ts) - prej sveži, nepredpomnjeni
+  // poizvedbi ob VSAKEM obisku te strani (izmerjeno kot del splošne
+  // počasnosti, glej pogovor s Claude, celovita revizija zmogljivosti).
+  const ownerRow = await getCachedOwnerRow(user.id);
 
   if (!ownerRow || ownerRow.status !== "approved") {
     redirect("/owner");
@@ -44,11 +44,7 @@ export default async function EmployeesPage({
   const salonId = ownerRow.id;
   const salonTheme = resolveSalonTheme(ownerRow.category);
 
-  const { data: employees, error: employeesError } = await supabase
-    .from("employees")
-    .select("*")
-    .eq("salon_id", salonId)
-    .order("sort_order", { ascending: true });
+  const { employees, error: employeesErrorMessage } = await getCachedEmployeesList(salonId);
 
   return (
     <div data-theme={salonTheme} className="min-h-screen bg-ink text-cream font-sans px-6 py-10">
@@ -81,9 +77,9 @@ export default async function EmployeesPage({
           </p>
         )}
 
-        {employeesError ? (
+        {employeesErrorMessage ? (
           <p className="text-sm text-rose">
-            Napaka pri branju zaposlenih: {employeesError.message}
+            Napaka pri branju zaposlenih: {employeesErrorMessage}
           </p>
         ) : (
           <div className="space-y-4 mb-8">

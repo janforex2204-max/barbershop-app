@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { resolveSalonTheme } from "@/lib/constants";
+import { getCachedOwnerRow } from "../cached-queries";
 import HoursEditorPage from "./hours-editor-page";
 import PoweredBy from "@/components/powered-by";
 import ThemeToggle from "@/components/theme-toggle";
@@ -21,11 +22,10 @@ export default async function OwnerHoursPage() {
     redirect("/");
   }
 
-  const { data: ownerRow } = await supabase
-    .from("salon_owners")
-    .select("id, status, category, hours")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  // getCachedOwnerRow (../cached-queries.ts) - prej sveža, nepredpomnjena
+  // poizvedba ob VSAKEM obisku te strani (glej pogovor s Claude, celovita
+  // revizija zmogljivosti).
+  const ownerRow = await getCachedOwnerRow(user.id);
 
   if (!ownerRow || ownerRow.status !== "approved") {
     redirect("/owner");

@@ -8,7 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { notifyAffectedCustomersOfCancellation } from "@/lib/cancellation";
 import { sendWaitlistNotificationEmail } from "@/lib/email";
 import { PLATFORM_URL } from "@/lib/constants";
-import { OWNER_CALENDAR_TAG } from "./cached-queries";
+import { OWNER_CALENDAR_TAG, OWNER_PROFILE_TAG, getCachedOwnerRow } from "./cached-queries";
 import { translateAuthError } from "@/lib/auth-errors";
 import {
   resolveDayWindow,
@@ -18,6 +18,25 @@ import {
 } from "@/lib/availability";
 import { busyForEmployee, type EmployeeBusyRow } from "@/lib/employee-availability";
 import type { NotificationPreference, SalonDayHours } from "@/types/database.types";
+
+// Deljeno z ./employees-actions.ts in ./services-actions.ts - PREJ skoraj
+// identična koda, podvojena v vsaki od treh datotek (glej pogovor s Claude,
+// celovita revizija zmogljivosti). salonId NAMENOMA razrešimo TU, s
+// strežniške seje klicatelja, nikoli iz podatkov, ki bi jih poslal klient.
+// auth.getUser() OSTAJA nepredpomnjen (Supabase priporoča svež klic v vsaki
+// akciji, ne samo v middleware) - predpomnjena je samo spodnja salon_owners
+// vrstica (glej getCachedOwnerRow).
+export async function resolveApprovedSalonId(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<string | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const ownerRow = await getCachedOwnerRow(user.id);
+  return ownerRow?.status === "approved" ? ownerRow.id : null;
+}
 
 export async function login(formData: FormData) {
   const supabase = await createClient();
@@ -213,14 +232,9 @@ export async function addManualAppointment(
     return { error: "Seja je potekla. Prijavi se znova." };
   }
 
-  const { data: ownerRow } = await supabase
-    .from("salon_owners")
-    .select("id, salon_name, hours")
-    .eq("user_id", user.id)
-    .eq("status", "approved")
-    .maybeSingle();
+  const ownerRow = await getCachedOwnerRow(user.id);
 
-  if (!ownerRow) {
+  if (!ownerRow || ownerRow.status !== "approved") {
     return { error: "Račun ni povezan z odobrenim salonom." };
   }
 
@@ -397,13 +411,8 @@ export async function updateNotificationPreference(formData: FormData) {
     redirect("/owner/login");
   }
 
-  const { data: ownerRow } = await supabase
-    .from("salon_owners")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("status", "approved")
-    .maybeSingle();
-  if (!ownerRow) {
+  const ownerRow = await getCachedOwnerRow(user.id);
+  if (!ownerRow || ownerRow.status !== "approved") {
     redirect("/owner");
   }
 
@@ -422,6 +431,7 @@ export async function updateNotificationPreference(formData: FormData) {
     .update({ notification_preference: preference })
     .eq("id", ownerRow.id);
 
+  updateTag(OWNER_PROFILE_TAG);
   revalidatePath("/owner");
 }
 
@@ -440,13 +450,8 @@ export async function updateSalonHours(hours: SalonDayHours[]): Promise<{ error?
     return { error: "Seja je potekla. Prijavi se znova." };
   }
 
-  const { data: ownerRow } = await supabase
-    .from("salon_owners")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("status", "approved")
-    .maybeSingle();
-  if (!ownerRow) {
+  const ownerRow = await getCachedOwnerRow(user.id);
+  if (!ownerRow || ownerRow.status !== "approved") {
     return { error: "Račun ni povezan z odobrenim salonom." };
   }
 
@@ -471,6 +476,7 @@ export async function updateSalonHours(hours: SalonDayHours[]): Promise<{ error?
     return { error: error.message };
   }
 
+  updateTag(OWNER_PROFILE_TAG);
   revalidatePath("/owner/hours");
   revalidatePath("/owner");
   return {};
@@ -502,13 +508,8 @@ export async function uploadSalonLogo(formData: FormData): Promise<{ url?: strin
     return { error: "Seja je potekla. Prijavi se znova." };
   }
 
-  const { data: ownerRow } = await supabase
-    .from("salon_owners")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("status", "approved")
-    .maybeSingle();
-  if (!ownerRow) {
+  const ownerRow = await getCachedOwnerRow(user.id);
+  if (!ownerRow || ownerRow.status !== "approved") {
     return { error: "Račun ni povezan z odobrenim salonom." };
   }
 
@@ -549,6 +550,7 @@ export async function uploadSalonLogo(formData: FormData): Promise<{ url?: strin
     return { error: dbError.message };
   }
 
+  updateTag(OWNER_PROFILE_TAG);
   revalidatePath("/owner");
   return { url: publicUrl };
 }

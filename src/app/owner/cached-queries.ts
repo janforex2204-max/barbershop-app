@@ -27,6 +27,73 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // pokliče, tako ali tako bere/piše samo v svoj lasten salon prek RLS).
 export const OWNER_CALENDAR_TAG = "owner-calendar";
 
+// Lastnikova salon_owners VRSTICA, ključena po user_id - PRED tem jo je
+// vsaka od štirih /owner/* strani (owner/page.tsx, employees/page.tsx,
+// services/page.tsx, hours/page.tsx) brala SVEŽE, neodvisno, ob VSAKEM
+// obisku (izmerjeno: ~1-1.3s na hladen obisk podstrani, brez izboljšave ob
+// ponovnem obisku - glej pogovor s Claude, celovita revizija zmogljivosti).
+// To je LOČENO od auth.getUser() klica, ki v vsaki strani/akciji OSTAJA
+// nespremenjen in NENAMENOMA ni predpomnjen - Supabase eksplicitno
+// priporoča klic getUser() v VSAKI server komponenti/akciji (ne samo v
+// middleware), kot namerno globinsko obrambo, zato ta klic tu ni zajet.
+// Sama VRSTICA (ime/slug/ure/plan/...) pa se spreminja redko - kratkotrajno
+// predpomnjenje po user_id odpravi ponovno poizvedbo ob preklopu med
+// podstranmi znotraj tega okna. Vsak porabnik izbere podmnožico stolpcev, ki
+// jih potrebuje - eno (nadmnožico) poizvedbo tu si delijo vsi štirje.
+export const OWNER_PROFILE_TAG = "owner-profile";
+
+export const getCachedOwnerRow = unstable_cache(
+  async (userId: string) => {
+    const admin = createAdminClient();
+    const { data } = await admin
+      .from("salon_owners")
+      .select(
+        "id, salon_name, slug, status, plan, hours, category, logo_url, notification_preference"
+      )
+      .eq("user_id", userId)
+      .maybeSingle();
+    return data;
+  },
+  ["owner-row"],
+  { revalidate: 30, tags: [OWNER_PROFILE_TAG] }
+);
+
+// Isti razlog/vzorec kot getCachedOwnerRow zgoraj, tu za employees - deli si
+// jo owner/page.tsx (koledarski razpon/barve) IN owner/employees/page.tsx
+// (upravljanje) namesto vsak svoje, ločene poizvedbe na isto tabelo.
+export const OWNER_EMPLOYEES_TAG = "owner-employees";
+
+export const getCachedEmployeesList = unstable_cache(
+  async (salonId: string) => {
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from("employees")
+      .select("id, name, hours, color, photo_url, active, sort_order, schedule_token")
+      .eq("salon_id", salonId)
+      .order("sort_order", { ascending: true });
+    return { employees: data ?? [], error: error?.message ?? null };
+  },
+  ["owner-employees-list"],
+  { revalidate: 30, tags: [OWNER_EMPLOYEES_TAG] }
+);
+
+// Isti razlog/vzorec kot zgoraj, za owner/services/page.tsx.
+export const OWNER_SERVICES_TAG = "owner-services";
+
+export const getCachedServicesList = unstable_cache(
+  async (salonId: string) => {
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from("services")
+      .select("*")
+      .eq("salon_id", salonId)
+      .order("sort_order", { ascending: true });
+    return { services: data ?? [], error: error?.message ?? null };
+  },
+  ["owner-services-list"],
+  { revalidate: 30, tags: [OWNER_SERVICES_TAG] }
+);
+
 export const getCachedMonthOverview = unstable_cache(
   async (salonId: string, monthStart: string, monthEnd: string) => {
     const admin = createAdminClient();

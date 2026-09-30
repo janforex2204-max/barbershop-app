@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatPrice, formatDuration, resolveSalonTheme } from "@/lib/constants";
+import { getCachedOwnerRow, getCachedServicesList } from "../cached-queries";
 import { addService, deleteService, updateService } from "../services-actions";
 import PoweredBy from "@/components/powered-by";
 import ThemeToggle from "@/components/theme-toggle";
@@ -26,12 +27,11 @@ export default async function ServicesPage({
   }
 
   // Ista meja izolacije kot na /owner (glej owner/page.tsx) - vsaka
-  // poizvedba spodaj MORA filtrirati po salonId.
-  const { data: ownerRow } = await supabase
-    .from("salon_owners")
-    .select("id, status, category")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  // poizvedba spodaj MORA filtrirati po salonId. getCachedOwnerRow/
+  // getCachedServicesList (../cached-queries.ts) - prej sveži, nepredpomnjeni
+  // poizvedbi ob VSAKEM obisku te strani (izmerjeno kot del splošne
+  // počasnosti, glej pogovor s Claude, celovita revizija zmogljivosti).
+  const ownerRow = await getCachedOwnerRow(user.id);
 
   if (!ownerRow || ownerRow.status !== "approved") {
     redirect("/owner");
@@ -40,11 +40,7 @@ export default async function ServicesPage({
   const salonId = ownerRow.id;
   const salonTheme = resolveSalonTheme(ownerRow.category);
 
-  const { data: services, error: servicesError } = await supabase
-    .from("services")
-    .select("*")
-    .eq("salon_id", salonId)
-    .order("sort_order", { ascending: true });
+  const { services, error: servicesErrorMessage } = await getCachedServicesList(salonId);
 
   return (
     <div data-theme={salonTheme} className="min-h-screen bg-ink text-cream font-sans px-6 py-10">
@@ -75,9 +71,9 @@ export default async function ServicesPage({
           </p>
         )}
 
-        {servicesError ? (
+        {servicesErrorMessage ? (
           <p className="text-sm text-rose">
-            Napaka pri branju storitev: {servicesError.message}
+            Napaka pri branju storitev: {servicesErrorMessage}
           </p>
         ) : (
           <div className="border border-border rounded-lg bg-panel divide-y divide-border-soft mb-8">

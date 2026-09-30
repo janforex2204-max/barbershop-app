@@ -1,29 +1,10 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-
-// Isti vzorec kot addManualAppointment v ./actions.ts - salon_id NAMENOMA
-// razrešimo tu, s strežniške seje klicatelja, nikoli iz podatkov, ki bi jih
-// poslal klient.
-async function resolveApprovedSalonId(
-  supabase: Awaited<ReturnType<typeof createClient>>
-): Promise<string | null> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: ownerRow } = await supabase
-    .from("salon_owners")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("status", "approved")
-    .maybeSingle();
-
-  return ownerRow?.id ?? null;
-}
+import { OWNER_SERVICES_TAG } from "./cached-queries";
+import { resolveApprovedSalonId } from "./actions";
 
 // Prazno polje -> null ("cena ni nastavljena"). Sprejme tudi vejico kot
 // decimalno ločilo (slovenska tipkovnica jo lahko vnese v number input kljub
@@ -109,6 +90,7 @@ export async function updateService(serviceId: string, formData: FormData) {
     redirect(`/owner/services?error=${encodeURIComponent(error.message)}`);
   }
 
+  updateTag(OWNER_SERVICES_TAG);
   revalidatePath("/owner/services");
   revalidatePath("/owner");
 }
@@ -168,6 +150,7 @@ export async function addService(formData: FormData) {
     redirect(`/owner/services?error=${encodeURIComponent(error.message)}`);
   }
 
+  updateTag(OWNER_SERVICES_TAG);
   revalidatePath("/owner/services");
   revalidatePath("/owner");
 }
@@ -178,6 +161,7 @@ export async function addService(formData: FormData) {
 export async function deleteService(serviceId: string) {
   const supabase = await createClient();
   await supabase.from("services").delete().eq("id", serviceId);
+  updateTag(OWNER_SERVICES_TAG);
   revalidatePath("/owner/services");
   revalidatePath("/owner");
 }

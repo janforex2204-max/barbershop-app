@@ -30,7 +30,9 @@ import PoweredBy from "@/components/powered-by";
 import ThemeToggle from "@/components/theme-toggle";
 import {
   getCachedDayData,
+  getCachedEmployeesList,
   getCachedMonthOverview,
+  getCachedOwnerRow,
   getCachedTomorrowAppointments,
   getCachedWeekData,
 } from "./cached-queries";
@@ -144,11 +146,10 @@ export default async function OwnerDashboard({
   // Vsaka poizvedba spodaj MORA filtrirati po salonId - to je edino, kar
   // (na nivoju aplikacije) prepreči mešanje podatkov med saloni; RLS
   // (my_salon_id() v shemi) je neodvisen, strežniški backstop za isto mejo.
-  const { data: ownerRow } = await supabase
-    .from("salon_owners")
-    .select("id, salon_name, slug, status, plan, hours, category, logo_url")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  // getCachedOwnerRow (./cached-queries.ts) - prej sveža, nepredpomnjena
+  // poizvedba ob VSAKEM obisku (izmerjeno kot del splošne počasnosti, glej
+  // pogovor s Claude, celovita revizija zmogljivosti).
+  const ownerRow = await getCachedOwnerRow(user.id);
 
   const salonTheme = resolveSalonTheme(ownerRow?.category);
 
@@ -190,17 +191,12 @@ export default async function OwnerDashboard({
   // povezava, kjer lahko čakajoča stranka takoj vidi proste termine in rezervira.
   const bookingUrl = `${PLATFORM_URL}/${ownerRow.slug}`;
 
-  // Ločena, izolirana poizvedba - dokler migracija (supabase/schema.sql) za
-  // notification_preference morda še ni pognana v produkciji, ta stolpec
-  // morda ne obstaja. Če pade, privzeto "off" namesto da podre CELO
-  // nadzorno ploščo (isti nauk kot pri services.price prej - glej
-  // [slug]/booking-page.tsx).
-  const { data: notificationRow } = await supabase
-    .from("salon_owners")
-    .select("notification_preference")
-    .eq("id", salonId)
-    .maybeSingle();
-  const notificationPreference = notificationRow?.notification_preference ?? "off";
+  // Prej ločena, izolirana poizvedba (obramba pred migracijo, ki morda še ni
+  // pognana v produkciji - glej git zgodovino) - neposredno preverjeno
+  // (pogovor s Claude, celovita revizija zmogljivosti), da notification_preference
+  // v produkciji ŽE obstaja, zato je zdaj del getCachedOwnerRow zgoraj, brez
+  // dodatnega omrežnega klica.
+  const notificationPreference = ownerRow.notification_preference ?? "off";
 
   const today = todayISO();
   const params = await searchParams;
@@ -252,16 +248,11 @@ export default async function OwnerDashboard({
     view === "week"
       ? getCachedWeekData(salonId, weekDatesRange[0], weekDatesRange[6])
       : Promise.resolve(null),
-    // Združena poizvedba (prej dve ločeni - ena "id, name" za VSE zaposlene
-    // za ime-po-id iskanje spodaj, ena "id, name, hours, color, photo_url"
-    // samo za aktivne, za week-calendar.tsx) - eno branje cele tabele,
-    // oboje izpeljano spodaj v JS (hasEmployees/employeeNameById iz vseh,
-    // activeEmployeesForWeek s filtrom active===true).
-    supabase
-      .from("employees")
-      .select("id, name, hours, color, photo_url, active, sort_order")
-      .eq("salon_id", salonId)
-      .order("sort_order", { ascending: true }),
+    // getCachedEmployeesList (./cached-queries.ts) - deljena z
+    // owner/employees/page.tsx (isti podatki, en cache namesto vsaka stran
+    // svojo sveže poizvedbo). hasEmployees/employeeNameById spodaj iz VSEH
+    // (tudi neaktivnih), activeEmployeesForWeek s filtrom active===true.
+    getCachedEmployeesList(salonId),
   ]);
   const weekAppointments: WeekAppointment[] = (weekData?.appointments ?? []).map((a) => ({
     id: a.id,
@@ -328,7 +319,7 @@ export default async function OwnerDashboard({
   // ločena, aktivnost-scopana logika v manual-booking-form.tsx in
   // booking-page.tsx). Skupinjenje se sploh ne prikaže, če salon NIKOLI ni
   // dodal nobenega zaposlenega (identično vedenje kot pred to funkcionalnostjo).
-  const employees = employeesResult.data ?? [];
+  const employees = employeesResult.employees;
   const hasEmployees = employees.length > 0;
   const employeeNameById = new Map(employees.map((e) => [e.id, e.name]));
   const appointmentGroups = hasEmployees ? groupByEmployee(appointments, employeeNameById) : null;
