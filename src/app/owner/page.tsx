@@ -18,6 +18,7 @@ import {
 } from "@/lib/constants";
 import { nextAvailableDayAfterToday } from "@/lib/availability";
 import type { WeekAppointment } from "@/lib/week-layout";
+import { fraunces } from "@/lib/fonts";
 import AppointmentsHeader from "./appointments-header";
 import { CalendarBookingProvider } from "./calendar-booking-context";
 import NotificationsPanel from "./notifications-panel";
@@ -361,7 +362,16 @@ export default async function OwnerDashboard({
             (preklop + 4 gumbi) - glej pogovor s Claude, "raztegne stran". */}
         <div className="mb-8 relative">
           <div>
-            <p className="font-display text-3xl text-gold mb-1">{salonName}</p>
+            {/* fraunces.className NAMESTO font-display (Tailwind razred, ki
+                bi tu prebral --font-fraunces - ta je znotraj [data-design=
+                "v2"] prepisan na Manrope, glej globals.css) - lastnik je
+                želel bolj "premium" ime salona (glej pogovor s Claude),
+                pravi elegantni serif Fraunces (namesto splošne UI pisave)
+                izstopa SAMO tu, kjer je to namenoma, ostala postavitev
+                ostane pri Manrope. */}
+            <p className={`${fraunces.className} text-5xl font-semibold tracking-tight text-gold mb-2`}>
+              {salonName}
+            </p>
             <h1 className="text-sm font-medium text-cream-dim">Nadzorna plošča</h1>
             <p className="text-sm text-cream-faint">{user.email}</p>
           </div>
@@ -483,7 +493,7 @@ export default async function OwnerDashboard({
                     key={w.id}
                     className="flex items-center justify-between gap-3 py-2.5 text-sm"
                   >
-                    <div>
+                    <div className="min-w-0">
                       <span className="text-cream">{w.customer_name}</span>
                       <span className="text-cream-faint ml-2">
                         {w.customer_phone}
@@ -501,11 +511,13 @@ export default async function OwnerDashboard({
                         </div>
                       )}
                     </div>
-                    <WaitlistNotifyButton
-                      entry={w}
-                      bookingUrl={bookingUrl}
-                      employeeName={w.employee_id ? (employeeNameById.get(w.employee_id) ?? null) : null}
-                    />
+                    <div className="shrink-0">
+                      <WaitlistNotifyButton
+                        entry={w}
+                        bookingUrl={bookingUrl}
+                        employeeName={w.employee_id ? (employeeNameById.get(w.employee_id) ?? null) : null}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -539,8 +551,12 @@ export default async function OwnerDashboard({
                 a.status === "cancelled" ? waitlistOffersByAppointment.get(a.id) : undefined;
               return (
                 <div key={a.id}>
-                  <div className="flex items-center justify-between px-4 py-3 text-sm">
-                    <div>
+                  {/* min-w-0 na besedilu + shrink-0 na gumbu - brez tega bi
+                      dolgo ime/priimek + storitev (glej pogovor s Claude)
+                      lahko potisnilo/prekrilo gumb "Odpovej", namesto da se
+                      besedilo prelomi v naslednjo vrstico. */}
+                  <div className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                    <div className="min-w-0">
                       <span className="text-gold font-medium mr-3">
                         {a.appointment_time}
                       </span>
@@ -559,10 +575,10 @@ export default async function OwnerDashboard({
                       <span className="text-cream-faint"> — {a.service}</span>
                     </div>
                     {a.status === "booked" && (
-                      <form action={cancelAppointment.bind(null, a.id)}>
+                      <form action={cancelAppointment.bind(null, a.id)} className="shrink-0">
                         <button
                           type="submit"
-                          className="text-xs px-3 py-1.5 rounded border border-rose text-rose hover:bg-rose/10 cursor-pointer"
+                          className="text-xs px-3 py-1.5 rounded border border-rose text-rose hover:bg-rose/10 cursor-pointer whitespace-nowrap"
                         >
                           Odpovej
                         </button>
@@ -623,7 +639,7 @@ export default async function OwnerDashboard({
                   key={a.id}
                   className="flex items-center justify-between gap-3 px-4 py-3 text-sm"
                 >
-                  <div>
+                  <div className="min-w-0">
                     <span className="text-gold font-medium mr-3">
                       {a.appointment_time}
                     </span>
@@ -634,7 +650,7 @@ export default async function OwnerDashboard({
                     href={whatsAppLink(a.customer_phone, reminderMessage)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="whitespace-nowrap flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-sage text-sage hover:bg-sage/10"
+                    className="shrink-0 whitespace-nowrap flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-sage text-sage hover:bg-sage/10"
                   >
                     <MessageCircle size={13} /> Pošlji opomnik
                   </a>

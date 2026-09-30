@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Inter, Manrope, Cormorant_Garamond, Nunito_Sans } from "next/font/google";
+import { fraunces, inter, manrope, cormorantGaramond, nunitoSans } from "@/lib/fonts";
 import { ThemeProvider } from "@/components/theme-provider";
 import ServiceWorkerRegister from "@/components/service-worker-register";
 import "./globals.css";
@@ -20,41 +20,6 @@ const themeInitScript = `
   } catch (e) {}
 })();
 `;
-
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
-  subsets: ["latin"],
-  weight: ["400", "600", "700"],
-});
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-});
-
-// Samo za marketinške strani (glej --font-marketing v globals.css) - app
-// strani (prijava, nadzorna plošča ...) ostanejo pri Inter zgoraj.
-const manrope = Manrope({
-  variable: "--font-manrope",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-});
-
-// SAMO za spa temo (glej [data-theme="spa"] v globals.css, ki --font-fraunces/
-// --font-inter LOKALNO prepiše na te dve - barber/privzeta temna tema
-// ostane pri Fraunces/Inter zgoraj nedotaknjena, glej pogovor s Claude).
-const cormorantGaramond = Cormorant_Garamond({
-  variable: "--font-cormorant",
-  subsets: ["latin"],
-  weight: ["400", "600", "700"],
-});
-
-const nunitoSans = Nunito_Sans({
-  variable: "--font-nunito-sans",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-});
 
 export const metadata: Metadata = {
   title: "Fillio — rezervacije",

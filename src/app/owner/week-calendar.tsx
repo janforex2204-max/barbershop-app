@@ -55,6 +55,15 @@ export default function WeekCalendar({
   // kot že owner/page.tsx glave gumbi in day-hours-editor.tsx mreža). Pri
   // 0/1 zaposlenem ni česa razdeliti po zaposlenem - en implicit stolpec na
   // OBEH širinah, torej ostane spodnja (dnevi-kot-stolpci) postavitev.
+  //
+  // POMEMBNO: to NI VEČ omejeno na lg:+ (glej pogovor s Claude - na mobilnem
+  // je bilo pri 2+ zaposlenih 7 dnevnih stolpcev, vsak dodatno razdeljen na
+  // lane-e PO zaposlenem, popolnoma nečitljivo - barve so se mešale v
+  // milimetrskih pasovih brez prostora za ime/storitev). Stolpci PO
+  // ZAPOSLENEM (en dan naenkrat) so pri 2+ zaposlenih VEDNO berljivejši, ne
+  // glede na širino zaslona - vsak zaposleni dobi svoj, dovolj širok stolpec
+  // (namesto deljenja ozkega dnevnega stolpca), noben nadaljnji lane-split
+  // ni potreben (en zaposleni ne more imeti dveh terminov hkrati).
   const showEmployeeColumns = employees.length >= 2;
 
   // Za predizpolnitev zaposlenega ob kliku na prosto uro (glej pogovor s
@@ -67,17 +76,15 @@ export default function WeekCalendar({
   return (
     <div className="week-calendar-container border border-border rounded-lg p-4 mb-8 bg-calendar-panel">
       {showEmployeeColumns && (
-        <div className="hidden lg:block">
-          <DayEmployeeColumns
-            weekStart={weekStart}
-            selectedDate={selectedDate}
-            appointments={appointments}
-            employees={employees}
-          />
-        </div>
+        <DayEmployeeColumns
+          weekStart={weekStart}
+          selectedDate={selectedDate}
+          appointments={appointments}
+          employees={employees}
+        />
       )}
 
-      <div className={showEmployeeColumns ? "lg:hidden" : ""}>
+      <div className={showEmployeeColumns ? "hidden" : ""}>
         <div className="flex items-center justify-between mb-3">
           <Link
             href={`/owner?date=${selectedDate}&view=week&week=${shiftWeek(weekStart, -1)}`}
