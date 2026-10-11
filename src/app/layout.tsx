@@ -9,10 +9,21 @@ import "./globals.css";
 // prednost; ob prvem obisku (brez shranjene izbire) uporabi sistemsko
 // prefers-color-scheme. ThemeProvider (client komponenta) kasneje samo
 // PREBERE to že nastavljeno stanje - glej src/components/theme-provider.tsx.
+//
+// Ključ je odvisen od poti (lastniška /owner, /moj-urnik proti strankini
+// /[slug], /rezervacija/[token]) - ISTA logika kot themeStorageKeyForPath v
+// theme-provider.tsx, tu NUJNO podvojena kot navaden JS niz, ker ta skript
+// teče PRED React-om/uvozi (glej pogovor s Claude - prej je bil preklop
+// teme na /owner spremenil tudi temo na /[slug], ker sta si delili EN sam
+// ključ "fillio-theme").
 const themeInitScript = `
 (function () {
   try {
-    var stored = localStorage.getItem("fillio-theme");
+    var path = window.location.pathname;
+    var key = (path.indexOf("/owner") === 0 || path.indexOf("/moj-urnik") === 0)
+      ? "fillio-theme-owner"
+      : "fillio-theme-customer";
+    var stored = localStorage.getItem(key);
     var theme = stored === "light" || stored === "dark"
       ? stored
       : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");

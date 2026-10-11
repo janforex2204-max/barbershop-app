@@ -1,10 +1,23 @@
 "use client";
 
 import { createContext, useContext, useSyncExternalStore, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 
 export type Theme = "light" | "dark";
 
-const THEME_STORAGE_KEY = "fillio-theme";
+// Dva LOČENA localStorage ključa - lastniška stran (/owner/*, /moj-urnik/
+// [token]) in strankina stran (/[slug], /rezervacija/[token]) sta
+// NEODVISNI (glej pogovor s Claude - prej je bil preklop teme na /owner
+// spremenil tudi temo na /[slug] v istem brskalniku, ker sta si delili EN
+// sam ključ "fillio-theme"). Ista funkcija se uporabi TUKAJ (toggleTheme
+// spodaj) IN v layout.tsx-jevem sinhronem init skriptu (dobesedno
+// podvojena logika kot niz JS-a, ker ta teče PRED React/uvozi) - obe
+// mesti morata ostati usklajeni.
+export function themeStorageKeyForPath(pathname: string): string {
+  return pathname.startsWith("/owner") || pathname.startsWith("/moj-urnik")
+    ? "fillio-theme-owner"
+    : "fillio-theme-customer";
+}
 
 const ThemeContext = createContext<{
   theme: Theme;
@@ -39,10 +52,10 @@ function subscribe(onChange: () => void): () => void {
   return () => window.removeEventListener(THEME_CHANGE_EVENT, onChange);
 }
 
-function applyTheme(theme: Theme) {
+function applyTheme(theme: Theme, storageKey: string) {
   document.documentElement.setAttribute("data-theme", theme);
   try {
-    localStorage.setItem(THEME_STORAGE_KEY, theme);
+    localStorage.setItem(storageKey, theme);
   } catch {
     // localStorage lahko ni na voljo (zasebno brskanje itd.) - preklop teme
     // naj še vedno deluje za trenutno sejo, samo brez pomnjenja.
@@ -56,9 +69,10 @@ function applyTheme(theme: Theme) {
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const pathname = usePathname();
 
   function toggleTheme() {
-    applyTheme(theme === "dark" ? "light" : "dark");
+    applyTheme(theme === "dark" ? "light" : "dark", themeStorageKeyForPath(pathname));
   }
 
   return (

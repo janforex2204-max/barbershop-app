@@ -824,23 +824,30 @@ export default function BookingPage({
       <header className="relative border-b border-border px-6 py-8">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {/* PROMINENTEN logotip (80px, prej 56px) - glej pogovor s Claude:
-                lastnikov naložen logotip je bil sicer že povezan/prikazan, a
-                premajhen/ob strani, ne kot glavni vizualni element. Če
-                logotip OBSTAJA, nadomesti besedilni naslov v celoti (isti
-                vzorec kot Fillio-jev lasten header - logotip GOVORI ime, ni
-                treba podvajati zraven) - h1 ostane v DOM-u (sr-only), da
-                stran še vedno ima pravo naslovno strukturo za dostopnost/
-                SEO, samo vizualno skrit, ker ga slika že pove. Brez
-                logotipa: enako večja škarjasta ikona + besedilo, za
-                dosledno prominenco ne glede na to, ali je logotip naložen. */}
+            {/* PROMINENTEN logotip - glej pogovor s Claude: lastnikov naložen
+                logotip je bil sicer že povezan/prikazan, a premajhen/ob
+                strani, ne kot glavni vizualni element. Če logotip OBSTAJA,
+                nadomesti besedilni naslov v celoti (isti vzorec kot
+                Fillio-jev lasten header - logotip GOVORI ime, ni treba
+                podvajati zraven) - h1 ostane v DOM-u (sr-only), da stran
+                še vedno ima pravo naslovno strukturo za dostopnost/SEO,
+                samo vizualno skrit, ker ga slika že pove. Brez logotipa:
+                enako večja škarjasta ikona + besedilo, za dosledno
+                prominenco ne glede na to, ali je logotip naložen.
+                object-contain (NE object-cover + vsiljen kvadrat kot prej) -
+                prejšnja različica je ŠIROK/OZEK logotip (napis, ne kvadratna
+                ikona) obrezala skoraj v nič, glej pogovor s Claude,
+                "prenizek/preozek, da bi bil karkoli viden". h-24/md:h-32 =
+                96px/128px višina (minimum iz zahteve), w-auto po pravem
+                razmerju stranic, max-w-[70vw] prepreči, da bi izjemno širok
+                logotip prevzel cel zaslon. */}
             {salonLogoUrl ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element -- zunanja, dinamična Storage URL (ni lokalna slika), next/image bi zahteval remotePatterns za Supabase domeno */}
                 <img
                   src={salonLogoUrl}
                   alt={salonName}
-                  className="h-20 w-20 rounded-xl object-cover"
+                  className="h-24 md:h-32 w-auto max-w-[70vw] object-contain"
                 />
                 <h1 className="sr-only">{salonName}</h1>
               </>
